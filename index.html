@@ -7,799 +7,205 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #0f0f0f;
-    --surface: #1a1a1a;
-    --surface2: #222222;
-    --border: #2e2e2e;
-    --border2: #3a3a3a;
-    --text: #e8e8e8;
-    --text2: #999999;
-    --text3: #555555;
-    --accent: #c8f03c;
-    --accent2: #a8cc28;
-    --red: #ff4444;
-    --yellow: #ffaa00;
-    --green: #44cc88;
-    --blue: #4488ff;
-    --radius: 6px;
-    --mono: 'DM Mono', monospace;
-    --sans: 'DM Sans', sans-serif;
-  }
-
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: var(--sans);
-    font-size: 14px;
-    line-height: 1.5;
-    min-height: 100vh;
-  }
-
-  /* ── SCROLLBAR ── */
-  ::-webkit-scrollbar { width: 4px; height: 4px; }
-  ::-webkit-scrollbar-track { background: var(--bg); }
-  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
-
-  /* ── LOGIN ── */
-  #login-screen {
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-direction: column;
-    gap: 32px;
-  }
-
-  .login-logo {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .login-badge {
-    font-family: var(--mono);
-    font-size: 11px;
-    color: var(--accent);
-    letter-spacing: 3px;
-    text-transform: uppercase;
-  }
-
-  .login-title {
-    font-size: 28px;
-    font-weight: 300;
-    letter-spacing: -0.5px;
-    color: var(--text);
-  }
-
-  .login-title span { color: var(--accent); font-weight: 600; }
-
-  .login-sub {
-    font-size: 13px;
-    color: var(--text2);
-    font-family: var(--mono);
-  }
-
-  .btn-google {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    background: var(--accent);
-    color: #0f0f0f;
-    border: none;
-    padding: 12px 24px;
-    border-radius: var(--radius);
-    font-family: var(--sans);
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background 0.15s;
-  }
-
-  .btn-google:hover { background: var(--accent2); }
-
-  .login-note {
-    font-size: 11px;
-    color: var(--text3);
-    font-family: var(--mono);
-    text-align: center;
-  }
-
-  /* ── APP SHELL ── */
-  #app { display: none; flex-direction: column; min-height: 100vh; }
-
-  /* ── TOPBAR ── */
-  .topbar {
-    height: 48px;
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    padding: 0 20px;
-    gap: 16px;
-    position: sticky;
-    top: 0;
-    z-index: 100;
-  }
-
-  .topbar-brand {
-    font-family: var(--mono);
-    font-size: 12px;
-    color: var(--accent);
-    letter-spacing: 2px;
-    font-weight: 500;
-  }
-
-  .topbar-sep { width: 1px; height: 20px; background: var(--border); }
-
-  .topbar-nav { display: flex; gap: 4px; flex: 1; }
-
-  .nav-btn {
-    background: none;
-    border: none;
-    color: var(--text2);
-    font-family: var(--sans);
-    font-size: 13px;
-    padding: 6px 12px;
-    border-radius: var(--radius);
-    cursor: pointer;
-    transition: all 0.15s;
-  }
-
-  .nav-btn:hover { background: var(--surface2); color: var(--text); }
-  .nav-btn.active { background: var(--surface2); color: var(--accent); }
-
-  .topbar-user {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-left: auto;
-  }
-
-  .user-name { font-size: 12px; color: var(--text2); }
-  .user-role {
-    font-family: var(--mono);
-    font-size: 10px;
-    color: var(--text3);
-    background: var(--surface2);
-    padding: 2px 6px;
-    border-radius: 3px;
-    border: 1px solid var(--border);
-  }
-
-  .btn-logout {
-    background: none;
-    border: 1px solid var(--border);
-    color: var(--text3);
-    font-size: 11px;
-    padding: 4px 8px;
-    border-radius: var(--radius);
-    cursor: pointer;
-    transition: all 0.15s;
-  }
-  .btn-logout:hover { border-color: var(--red); color: var(--red); }
-
-  /* ── MAIN ── */
-  .main { flex: 1; padding: 24px; max-width: 1200px; margin: 0 auto; width: 100%; }
-
-  /* ── VIEWS ── */
-  .view { display: none; }
-  .view.active { display: block; }
-
-  /* ── PAGE HEADER ── */
-  .page-header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    margin-bottom: 24px;
-  }
-
-  .page-title {
-    font-size: 20px;
-    font-weight: 500;
-    letter-spacing: -0.3px;
-  }
-
-  .page-sub {
-    font-size: 12px;
-    color: var(--text2);
-    font-family: var(--mono);
-    margin-top: 2px;
-  }
-
-  /* ── BUTTONS ── */
-  .btn-primary {
-    background: var(--accent);
-    color: #0f0f0f;
-    border: none;
-    padding: 8px 16px;
-    border-radius: var(--radius);
-    font-family: var(--sans);
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background 0.15s;
-  }
-  .btn-primary:hover { background: var(--accent2); }
-
-  .btn-secondary {
-    background: none;
-    border: 1px solid var(--border);
-    color: var(--text2);
-    padding: 8px 16px;
-    border-radius: var(--radius);
-    font-family: var(--sans);
-    font-size: 13px;
-    cursor: pointer;
-    transition: all 0.15s;
-  }
-  .btn-secondary:hover { border-color: var(--border2); color: var(--text); }
-
-  .btn-ghost {
-    background: none;
-    border: none;
-    color: var(--text2);
-    font-size: 12px;
-    cursor: pointer;
-    padding: 4px 8px;
-    border-radius: var(--radius);
-    transition: all 0.15s;
-  }
-  .btn-ghost:hover { background: var(--surface2); color: var(--text); }
-
-  /* ── CARDS ── */
-  .card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 16px;
-  }
-
-  /* ── PROJECT LIST ── */
-  .project-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .project-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 16px 20px;
-    cursor: pointer;
-    transition: border-color 0.15s;
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 12px;
-    align-items: center;
-  }
-
-  .project-card:hover { border-color: var(--border2); }
-
-  .project-card.risk-red { border-left: 3px solid var(--red); }
-  .project-card.risk-yellow { border-left: 3px solid var(--yellow); }
-  .project-card.risk-green { border-left: 3px solid var(--green); }
-
-  .project-name {
-    font-size: 15px;
-    font-weight: 500;
-    margin-bottom: 4px;
-  }
-
-  .project-meta {
-    display: flex;
-    gap: 16px;
-    flex-wrap: wrap;
-  }
-
-  .meta-item {
-    font-size: 11px;
-    color: var(--text2);
-    font-family: var(--mono);
-    display: flex;
-    align-items: center;
-    gap: 4px;
-  }
-
-  .meta-item .label { color: var(--text3); }
-
-  .project-right {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 6px;
-  }
-
-  .semaforo {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    flex-shrink: 0;
-  }
-  .semaforo.red { background: var(--red); box-shadow: 0 0 6px var(--red); }
-  .semaforo.yellow { background: var(--yellow); box-shadow: 0 0 6px var(--yellow); }
-  .semaforo.green { background: var(--green); box-shadow: 0 0 6px var(--green); }
-  .semaforo.gray { background: var(--text3); }
-
-  .desvio-badge {
-    font-family: var(--mono);
-    font-size: 11px;
-    padding: 2px 6px;
-    border-radius: 3px;
-  }
-  .desvio-badge.red { background: rgba(255,68,68,0.15); color: var(--red); }
-  .desvio-badge.yellow { background: rgba(255,170,0,0.15); color: var(--yellow); }
-  .desvio-badge.green { background: rgba(68,204,136,0.15); color: var(--green); }
-  .desvio-badge.gray { background: var(--surface2); color: var(--text3); }
-
-  /* ── HITOS PRÓXIMOS ── */
-  .hitos-section { margin-top: 32px; }
-
-  .section-title {
-    font-size: 11px;
-    font-family: var(--mono);
-    color: var(--text3);
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    margin-bottom: 12px;
-  }
-
-  .hito-row {
-    display: grid;
-    grid-template-columns: 140px 1fr 120px 80px;
-    gap: 12px;
-    align-items: center;
-    padding: 10px 16px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    margin-bottom: 4px;
-    font-size: 13px;
-  }
-
-  .hito-fecha {
-    font-family: var(--mono);
-    font-size: 12px;
-    color: var(--text2);
-  }
-
-  .hito-proyecto { font-weight: 500; }
-  .hito-nombre { color: var(--text2); font-size: 12px; }
-
-  /* ── PROJECT DETAIL ── */
-  .back-btn {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    color: var(--text2);
-    font-size: 12px;
-    cursor: pointer;
-    margin-bottom: 20px;
-    background: none;
-    border: none;
-    font-family: var(--sans);
-    transition: color 0.15s;
-  }
-  .back-btn:hover { color: var(--text); }
-
-  .project-detail-header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    margin-bottom: 24px;
-  }
-
-  .project-detail-title { font-size: 22px; font-weight: 500; }
-  .project-detail-meta { font-size: 12px; color: var(--text2); font-family: var(--mono); margin-top: 4px; }
-
-  .detail-actions { display: flex; gap: 8px; }
-
-  /* ── GROUPS ── */
-  .groups-container { display: flex; flex-direction: column; gap: 4px; }
-
-  .group-row {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    overflow: hidden;
-  }
-
-  .group-header {
-    display: grid;
-    grid-template-columns: 24px 200px 1fr auto auto;
-    gap: 12px;
-    align-items: center;
-    padding: 12px 16px;
-    cursor: pointer;
-    transition: background 0.15s;
-    user-select: none;
-  }
-
-  .group-header:hover { background: var(--surface2); }
-
-  .group-chevron {
-    font-size: 10px;
-    color: var(--text3);
-    transition: transform 0.15s;
-  }
-  .group-row.open .group-chevron { transform: rotate(90deg); }
-
-  .group-id {
-    font-family: var(--mono);
-    font-size: 10px;
-    color: var(--text3);
-    background: var(--surface2);
-    padding: 2px 6px;
-    border-radius: 3px;
-    width: fit-content;
-  }
-
-  .group-name { font-size: 13px; font-weight: 500; }
-
-  .group-progress {
-    font-family: var(--mono);
-    font-size: 11px;
-    color: var(--text3);
-  }
-
-  .group-semaforo { display: flex; align-items: center; gap: 6px; }
-
-  /* ── DISCIPLINAS ── */
-  .group-body { display: none; border-top: 1px solid var(--border); }
-  .group-row.open .group-body { display: block; }
-
-  .disciplina-row {
-    display: grid;
-    grid-template-columns: 1fr auto auto auto;
-    gap: 12px;
-    align-items: center;
-    padding: 10px 16px 10px 52px;
-    border-bottom: 1px solid var(--border);
-    cursor: pointer;
-    transition: background 0.15s;
-  }
-  .disciplina-row:last-child { border-bottom: none; }
-  .disciplina-row:hover { background: var(--surface2); }
-
-  .disciplina-name { font-size: 13px; }
-
-  .disciplina-estado {
-    font-family: var(--mono);
-    font-size: 10px;
-    padding: 2px 6px;
-    border-radius: 3px;
-  }
-  .disciplina-estado.pendiente { background: var(--surface2); color: var(--text3); }
-  .disciplina-estado.en-proceso { background: rgba(68,136,255,0.15); color: var(--blue); }
-  .disciplina-estado.completado { background: rgba(68,204,136,0.15); color: var(--green); }
-  .disciplina-estado.en-riesgo { background: rgba(255,68,68,0.15); color: var(--red); }
-
-  /* ── LOG EVENTOS ── */
-  .log-panel {
-    display: none;
-    background: var(--bg);
-    border-top: 1px solid var(--border);
-    padding: 16px 16px 16px 52px;
-  }
-  .log-panel.open { display: block; }
-
-  .log-entry {
-    display: grid;
-    grid-template-columns: 100px 140px 1fr auto;
-    gap: 12px;
-    align-items: start;
-    padding: 8px 0;
-    border-bottom: 1px solid var(--border);
-    font-size: 12px;
-  }
-  .log-entry:last-child { border-bottom: none; }
-
-  .log-fecha { font-family: var(--mono); color: var(--text3); }
-  .log-evento { color: var(--text2); }
-  .log-nota { color: var(--text3); font-style: italic; }
-
-  .log-dir {
-    font-family: var(--mono);
-    font-size: 10px;
-    color: var(--text3);
-    background: var(--surface2);
-    padding: 1px 5px;
-    border-radius: 2px;
-    white-space: nowrap;
-  }
-
-  .log-add-btn {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    color: var(--accent);
-    font-size: 12px;
-    cursor: pointer;
-    background: none;
-    border: none;
-    font-family: var(--sans);
-    margin-top: 10px;
-    padding: 0;
-    transition: opacity 0.15s;
-  }
-  .log-add-btn:hover { opacity: 0.7; }
-
-  .log-empty {
-    color: var(--text3);
-    font-size: 12px;
-    font-family: var(--mono);
-    padding: 8px 0;
-  }
-
-  /* ── MODAL ── */
-  .modal-overlay {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.7);
-    z-index: 200;
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
-  }
-  .modal-overlay.open { display: flex; }
-
-  .modal {
-    background: var(--surface);
-    border: 1px solid var(--border2);
-    border-radius: 8px;
-    width: 100%;
-    max-width: 560px;
-    max-height: 90vh;
-    overflow-y: auto;
-  }
-
-  .modal-header {
-    padding: 20px 24px 16px;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-
-  .modal-title { font-size: 16px; font-weight: 500; }
-
-  .modal-close {
-    background: none;
-    border: none;
-    color: var(--text3);
-    font-size: 18px;
-    cursor: pointer;
-    line-height: 1;
-    transition: color 0.15s;
-  }
-  .modal-close:hover { color: var(--text); }
-
-  .modal-body { padding: 20px 24px; }
-  .modal-footer {
-    padding: 16px 24px;
-    border-top: 1px solid var(--border);
-    display: flex;
-    gap: 8px;
-    justify-content: flex-end;
-  }
-
-  /* ── FORM ── */
-  .form-group { margin-bottom: 16px; }
-  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-
-  .form-label {
-    display: block;
-    font-size: 11px;
-    font-family: var(--mono);
-    color: var(--text2);
-    margin-bottom: 6px;
-    letter-spacing: 0.5px;
-  }
-
-  .form-input, .form-select, .form-textarea {
-    width: 100%;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    color: var(--text);
-    padding: 8px 12px;
-    border-radius: var(--radius);
-    font-family: var(--sans);
-    font-size: 13px;
-    transition: border-color 0.15s;
-    outline: none;
-  }
-
-  .form-input:focus, .form-select:focus, .form-textarea:focus {
-    border-color: var(--accent);
-  }
-
-  .form-textarea { resize: vertical; min-height: 80px; }
-
-  .form-select option { background: var(--surface); }
-
-  .form-toggle {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    cursor: pointer;
-  }
-
-  .toggle-switch {
-    width: 36px;
-    height: 20px;
-    background: var(--border2);
-    border-radius: 10px;
-    position: relative;
-    transition: background 0.2s;
-  }
-
-  .toggle-switch.on { background: var(--accent); }
-
-  .toggle-switch::after {
-    content: '';
-    position: absolute;
-    width: 14px;
-    height: 14px;
-    background: white;
-    border-radius: 50%;
-    top: 3px;
-    left: 3px;
-    transition: left 0.2s;
-  }
-
-  .toggle-switch.on::after { left: 19px; }
-
-  .toggle-label { font-size: 13px; color: var(--text2); }
-
-  /* ── DISCIPLINAS CHECKLIST ── */
-  .disc-group { margin-bottom: 12px; }
-
-  .disc-group-title {
-    font-size: 10px;
-    font-family: var(--mono);
-    color: var(--text3);
-    letter-spacing: 1px;
-    text-transform: uppercase;
-    margin-bottom: 6px;
-  }
-
-  .disc-items { display: flex; flex-wrap: wrap; gap: 6px; }
-
-  .disc-chip {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 4px 8px;
-    font-size: 12px;
-    cursor: pointer;
-    transition: all 0.15s;
-    user-select: none;
-  }
-
-  .disc-chip.selected {
-    background: rgba(200,240,60,0.1);
-    border-color: var(--accent);
-    color: var(--accent);
-  }
-
-  .disc-chip-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--border2);
-  }
-  .disc-chip.selected .disc-chip-dot { background: var(--accent); }
-
-  /* ── ENTRY FORM ── */
-  .entry-tipo-selector {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
-    margin-bottom: 16px;
-  }
-
-  .tipo-btn {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 10px;
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.15s;
-  }
-
-  .tipo-btn.selected {
-    border-color: var(--accent);
-    background: rgba(200,240,60,0.08);
-  }
-
-  .tipo-btn-icon { font-size: 16px; margin-bottom: 4px; }
-  .tipo-btn-label { font-size: 11px; font-family: var(--mono); color: var(--text2); }
-  .tipo-btn.selected .tipo-btn-label { color: var(--accent); }
-
-  /* ── LOADING ── */
-  .loading {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 48px;
-    color: var(--text3);
-    font-family: var(--mono);
-    font-size: 12px;
-    gap: 10px;
-  }
-
-  .spinner {
-    width: 16px;
-    height: 16px;
-    border: 2px solid var(--border);
-    border-top-color: var(--accent);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-  }
-
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  /* ── EMPTY STATE ── */
-  .empty-state {
-    text-align: center;
-    padding: 48px;
-    color: var(--text3);
-    font-family: var(--mono);
-    font-size: 12px;
-  }
-
-  .empty-state-icon { font-size: 32px; margin-bottom: 12px; }
-
-  /* ── TOAST ── */
-  #toast {
-    position: fixed;
-    bottom: 24px;
-    right: 24px;
-    background: var(--surface);
-    border: 1px solid var(--border2);
-    border-radius: var(--radius);
-    padding: 12px 16px;
-    font-size: 13px;
-    z-index: 999;
-    transform: translateY(80px);
-    opacity: 0;
-    transition: all 0.3s;
-    max-width: 320px;
-  }
-
-  #toast.show {
-    transform: translateY(0);
-    opacity: 1;
-  }
-
-  #toast.success { border-left: 3px solid var(--green); }
-  #toast.error { border-left: 3px solid var(--red); }
-
-  /* ── ACCESS DENIED ── */
-  .access-denied {
-    text-align: center;
-    padding: 64px 24px;
-    color: var(--text2);
-  }
-
-  .access-denied-icon { font-size: 40px; margin-bottom: 16px; }
-  .access-denied h2 { font-size: 18px; font-weight: 400; margin-bottom: 8px; }
-  .access-denied p { font-size: 13px; color: var(--text3); font-family: var(--mono); }
+    --bg: #0f0f0f; --surface: #1a1a1a; --surface2: #222222;
+    --border: #2e2e2e; --border2: #3a3a3a;
+    --text: #e8e8e8; --text2: #999999; --text3: #555555;
+    --accent: #c8f03c; --accent2: #a8cc28;
+    --red: #ff4444; --yellow: #ffaa00; --green: #44cc88; --blue: #4488ff;
+    --radius: 6px; --mono: 'DM Mono', monospace; --sans: 'DM Sans', sans-serif;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--text); font-family:var(--sans); font-size:14px; line-height:1.5; min-height:100vh; }
+  ::-webkit-scrollbar { width:4px; height:4px; }
+  ::-webkit-scrollbar-track { background:var(--bg); }
+  ::-webkit-scrollbar-thumb { background:var(--border2); border-radius:2px; }
+
+  /* LOGIN */
+  #login-screen { min-height:100vh; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:32px; }
+  .login-badge { font-family:var(--mono); font-size:11px; color:var(--accent); letter-spacing:3px; text-transform:uppercase; }
+  .login-title { font-size:28px; font-weight:300; letter-spacing:-0.5px; }
+  .login-title span { color:var(--accent); font-weight:600; }
+  .login-sub { font-size:13px; color:var(--text2); font-family:var(--mono); }
+  .btn-google { display:flex; align-items:center; gap:10px; background:var(--accent); color:#0f0f0f; border:none; padding:12px 24px; border-radius:var(--radius); font-family:var(--sans); font-size:14px; font-weight:600; cursor:pointer; transition:background 0.15s; }
+  .btn-google:hover { background:var(--accent2); }
+  .login-note { font-size:11px; color:var(--text3); font-family:var(--mono); text-align:center; }
+
+  /* APP */
+  #app { display:none; flex-direction:column; min-height:100vh; }
+  .topbar { height:48px; background:var(--surface); border-bottom:1px solid var(--border); display:flex; align-items:center; padding:0 20px; gap:16px; position:sticky; top:0; z-index:100; }
+  .topbar-brand { font-family:var(--mono); font-size:12px; color:var(--accent); letter-spacing:2px; font-weight:500; }
+  .topbar-sep { width:1px; height:20px; background:var(--border); }
+  .topbar-nav { display:flex; gap:4px; flex:1; }
+  .nav-btn { background:none; border:none; color:var(--text2); font-family:var(--sans); font-size:13px; padding:6px 12px; border-radius:var(--radius); cursor:pointer; transition:all 0.15s; }
+  .nav-btn:hover { background:var(--surface2); color:var(--text); }
+  .nav-btn.active { background:var(--surface2); color:var(--accent); }
+  .topbar-user { display:flex; align-items:center; gap:8px; margin-left:auto; }
+  .user-name { font-size:12px; color:var(--text2); }
+  .user-role { font-family:var(--mono); font-size:10px; color:var(--text3); background:var(--surface2); padding:2px 6px; border-radius:3px; border:1px solid var(--border); }
+  .btn-logout { background:none; border:1px solid var(--border); color:var(--text3); font-size:11px; padding:4px 8px; border-radius:var(--radius); cursor:pointer; transition:all 0.15s; }
+  .btn-logout:hover { border-color:var(--red); color:var(--red); }
+
+  .main { flex:1; padding:24px; max-width:1200px; margin:0 auto; width:100%; }
+  .view { display:none; }
+  .view.active { display:block; }
+  .page-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:24px; }
+  .page-title { font-size:20px; font-weight:500; letter-spacing:-0.3px; }
+  .page-sub { font-size:12px; color:var(--text2); font-family:var(--mono); margin-top:2px; }
+
+  /* BUTTONS */
+  .btn-primary { background:var(--accent); color:#0f0f0f; border:none; padding:8px 16px; border-radius:var(--radius); font-family:var(--sans); font-size:13px; font-weight:600; cursor:pointer; transition:background 0.15s; }
+  .btn-primary:hover { background:var(--accent2); }
+  .btn-primary:disabled { opacity:0.5; cursor:not-allowed; }
+  .btn-secondary { background:none; border:1px solid var(--border); color:var(--text2); padding:8px 16px; border-radius:var(--radius); font-family:var(--sans); font-size:13px; cursor:pointer; transition:all 0.15s; }
+  .btn-secondary:hover { border-color:var(--border2); color:var(--text); }
+  .btn-ghost { background:none; border:none; color:var(--text2); font-size:12px; cursor:pointer; padding:4px 8px; border-radius:var(--radius); transition:all 0.15s; font-family:var(--sans); }
+  .btn-ghost:hover { background:var(--surface2); color:var(--text); }
+
+  /* PROJECT CARDS */
+  .project-grid { display:flex; flex-direction:column; gap:8px; }
+  .project-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px 20px; cursor:pointer; transition:border-color 0.15s; display:grid; grid-template-columns:1fr auto; gap:12px; align-items:center; }
+  .project-card:hover { border-color:var(--border2); }
+  .project-card.risk-red { border-left:3px solid var(--red); }
+  .project-card.risk-yellow { border-left:3px solid var(--yellow); }
+  .project-card.risk-green { border-left:3px solid var(--green); }
+  .project-name { font-size:15px; font-weight:500; margin-bottom:4px; }
+  .project-meta { display:flex; gap:16px; flex-wrap:wrap; }
+  .meta-item { font-size:11px; color:var(--text2); font-family:var(--mono); display:flex; align-items:center; gap:4px; }
+  .meta-item .label { color:var(--text3); }
+  .project-right { display:flex; flex-direction:column; align-items:flex-end; gap:6px; }
+  .semaforo { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+  .semaforo.red { background:var(--red); box-shadow:0 0 6px var(--red); }
+  .semaforo.yellow { background:var(--yellow); box-shadow:0 0 6px var(--yellow); }
+  .semaforo.green { background:var(--green); box-shadow:0 0 6px var(--green); }
+  .semaforo.gray { background:var(--text3); }
+  .desvio-badge { font-family:var(--mono); font-size:11px; padding:2px 6px; border-radius:3px; }
+  .desvio-badge.red { background:rgba(255,68,68,0.15); color:var(--red); }
+  .desvio-badge.yellow { background:rgba(255,170,0,0.15); color:var(--yellow); }
+  .desvio-badge.green { background:rgba(68,204,136,0.15); color:var(--green); }
+  .desvio-badge.gray { background:var(--surface2); color:var(--text3); }
+
+  /* HITOS */
+  .hitos-section { margin-top:32px; }
+  .section-title { font-size:11px; font-family:var(--mono); color:var(--text3); letter-spacing:2px; text-transform:uppercase; margin-bottom:12px; }
+  .hito-row { display:grid; grid-template-columns:120px 1fr 200px 80px; gap:12px; align-items:center; padding:10px 16px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); margin-bottom:4px; font-size:13px; cursor:pointer; transition:border-color 0.15s; }
+  .hito-row:hover { border-color:var(--border2); }
+  .hito-fecha { font-family:var(--mono); font-size:12px; color:var(--text2); }
+
+  /* CRITERIOS BANNER */
+  .criterios-banner { background:rgba(200,240,60,0.06); border:1px solid rgba(200,240,60,0.2); border-radius:var(--radius); padding:12px 16px; margin-bottom:20px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  .criterios-banner-text { font-size:13px; color:var(--accent); }
+  .criterios-banner-sub { font-size:11px; color:var(--text2); font-family:var(--mono); margin-top:2px; }
+
+  /* DETAIL */
+  .back-btn { display:flex; align-items:center; gap:6px; color:var(--text2); font-size:12px; cursor:pointer; margin-bottom:20px; background:none; border:none; font-family:var(--sans); transition:color 0.15s; }
+  .back-btn:hover { color:var(--text); }
+  .project-detail-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:24px; }
+  .project-detail-title { font-size:22px; font-weight:500; }
+  .project-detail-meta { font-size:12px; color:var(--text2); font-family:var(--mono); margin-top:4px; }
+
+  /* GROUPS */
+  .groups-container { display:flex; flex-direction:column; gap:4px; }
+  .group-row { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; }
+  .group-header { display:grid; grid-template-columns:24px 60px 1fr auto auto; gap:12px; align-items:center; padding:12px 16px; cursor:pointer; transition:background 0.15s; user-select:none; }
+  .group-header:hover { background:var(--surface2); }
+  .group-chevron { font-size:10px; color:var(--text3); transition:transform 0.15s; }
+  .group-row.open .group-chevron { transform:rotate(90deg); }
+  .group-id { font-family:var(--mono); font-size:10px; color:var(--text3); background:var(--surface2); padding:2px 6px; border-radius:3px; }
+  .group-name { font-size:13px; font-weight:500; }
+  .group-progress { font-family:var(--mono); font-size:11px; color:var(--text3); }
+  .group-body { display:none; border-top:1px solid var(--border); }
+  .group-row.open .group-body { display:block; }
+
+  .disciplina-row { display:grid; grid-template-columns:1fr auto auto auto; gap:12px; align-items:center; padding:10px 16px 10px 52px; border-bottom:1px solid var(--border); cursor:pointer; transition:background 0.15s; }
+  .disciplina-row:last-child { border-bottom:none; }
+  .disciplina-row:hover { background:var(--surface2); }
+  .disciplina-estado { font-family:var(--mono); font-size:10px; padding:2px 6px; border-radius:3px; }
+  .disciplina-estado.pendiente { background:var(--surface2); color:var(--text3); }
+  .disciplina-estado.en-proceso { background:rgba(68,136,255,0.15); color:var(--blue); }
+  .disciplina-estado.completado { background:rgba(68,204,136,0.15); color:var(--green); }
+
+  /* LOG PANEL */
+  .log-panel { display:none; background:var(--bg); border-top:1px solid var(--border); padding:16px 16px 16px 52px; }
+  .log-panel.open { display:block; }
+  .log-entry { display:grid; grid-template-columns:100px 180px 1fr 100px; gap:12px; align-items:start; padding:8px 0; border-bottom:1px solid var(--border); font-size:12px; }
+  .log-entry:last-child { border-bottom:none; }
+  .log-fecha { font-family:var(--mono); color:var(--text3); }
+  .log-evento { color:var(--text); font-weight:500; }
+  .log-nota { color:var(--text3); font-style:italic; }
+  .log-tipo { font-family:var(--mono); font-size:10px; color:var(--text3); background:var(--surface2); padding:1px 5px; border-radius:2px; text-align:right; }
+  .log-empty { color:var(--text3); font-size:12px; font-family:var(--mono); padding:8px 0; }
+
+  /* CRITERIOS */
+  .criterio-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px; margin-bottom:8px; }
+  .criterio-card.pendiente_vobo { border-left:3px solid var(--yellow); }
+  .criterio-card.vigente { border-left:3px solid var(--green); }
+  .criterio-concepto { font-family:var(--mono); font-size:10px; color:var(--text3); margin-bottom:6px; text-transform:uppercase; letter-spacing:1px; }
+  .criterio-desc { font-size:13px; margin-bottom:8px; line-height:1.6; }
+  .criterio-meta { font-size:11px; color:var(--text3); font-family:var(--mono); }
+  .criterio-actions { display:flex; gap:8px; margin-top:10px; }
+
+  /* MODAL */
+  .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:200; align-items:center; justify-content:center; padding:20px; }
+  .modal-overlay.open { display:flex; }
+  .modal { background:var(--surface); border:1px solid var(--border2); border-radius:8px; width:100%; max-width:560px; max-height:90vh; overflow-y:auto; }
+  .modal-header { padding:20px 24px 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+  .modal-title { font-size:16px; font-weight:500; }
+  .modal-close { background:none; border:none; color:var(--text3); font-size:18px; cursor:pointer; line-height:1; transition:color 0.15s; }
+  .modal-close:hover { color:var(--text); }
+  .modal-body { padding:20px 24px; }
+  .modal-footer { padding:16px 24px; border-top:1px solid var(--border); display:flex; gap:8px; justify-content:flex-end; }
+
+  /* FORM */
+  .form-group { margin-bottom:16px; }
+  .form-row { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .form-label { display:block; font-size:11px; font-family:var(--mono); color:var(--text2); margin-bottom:6px; letter-spacing:0.5px; }
+  .form-input, .form-select, .form-textarea { width:100%; background:var(--bg); border:1px solid var(--border); color:var(--text); padding:8px 12px; border-radius:var(--radius); font-family:var(--sans); font-size:13px; transition:border-color 0.15s; outline:none; }
+  .form-input:focus, .form-select:focus, .form-textarea:focus { border-color:var(--accent); }
+  .form-textarea { resize:vertical; min-height:80px; }
+  .form-select option { background:var(--surface); }
+  .form-toggle { display:flex; align-items:center; gap:10px; cursor:pointer; }
+  .toggle-switch { width:36px; height:20px; background:var(--border2); border-radius:10px; position:relative; transition:background 0.2s; }
+  .toggle-switch.on { background:var(--accent); }
+  .toggle-switch::after { content:''; position:absolute; width:14px; height:14px; background:white; border-radius:50%; top:3px; left:3px; transition:left 0.2s; }
+  .toggle-switch.on::after { left:19px; }
+  .toggle-label { font-size:13px; color:var(--text2); }
+
+  /* CHIPS */
+  .disc-group { margin-bottom:12px; }
+  .disc-group-title { font-size:10px; font-family:var(--mono); color:var(--text3); letter-spacing:1px; text-transform:uppercase; margin-bottom:6px; }
+  .disc-items { display:flex; flex-wrap:wrap; gap:6px; }
+  .disc-chip { display:flex; align-items:center; gap:6px; background:var(--surface2); border:1px solid var(--border); border-radius:4px; padding:4px 8px; font-size:12px; cursor:pointer; transition:all 0.15s; user-select:none; }
+  .disc-chip.selected { background:rgba(200,240,60,0.1); border-color:var(--accent); color:var(--accent); }
+  .disc-chip-dot { width:6px; height:6px; border-radius:50%; background:var(--border2); }
+  .disc-chip.selected .disc-chip-dot { background:var(--accent); }
+
+  /* ENTRY TYPE */
+  .entry-tipo-selector { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:16px; }
+  .tipo-btn { background:var(--bg); border:1px solid var(--border); border-radius:var(--radius); padding:10px; text-align:center; cursor:pointer; transition:all 0.15s; }
+  .tipo-btn.selected { border-color:var(--accent); background:rgba(200,240,60,0.08); }
+  .tipo-btn-icon { font-size:16px; margin-bottom:4px; }
+  .tipo-btn-label { font-size:11px; font-family:var(--mono); color:var(--text2); }
+  .tipo-btn.selected .tipo-btn-label { color:var(--accent); }
+
+  /* LOADING / EMPTY */
+  .loading { display:flex; align-items:center; justify-content:center; padding:48px; color:var(--text3); font-family:var(--mono); font-size:12px; gap:10px; }
+  .spinner { width:16px; height:16px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.8s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .empty-state { text-align:center; padding:48px; color:var(--text3); font-family:var(--mono); font-size:12px; }
+  .empty-state-icon { font-size:32px; margin-bottom:12px; }
+
+  /* TOAST */
+  #toast { position:fixed; bottom:24px; right:24px; background:var(--surface); border:1px solid var(--border2); border-radius:var(--radius); padding:12px 16px; font-size:13px; z-index:999; transform:translateY(80px); opacity:0; transition:all 0.3s; max-width:320px; }
+  #toast.show { transform:translateY(0); opacity:1; }
+  #toast.success { border-left:3px solid var(--green); }
+  #toast.error { border-left:3px solid var(--red); }
 </style>
 </head>
 <body>
 
-<!-- ── LOGIN ── -->
+<!-- LOGIN -->
 <div id="login-screen">
-  <div class="login-logo">
+  <div style="display:flex;flex-direction:column;align-items:center;gap:8px">
     <div class="login-badge">JLL · Innovasport</div>
     <div class="login-title">IS4 <span>Tracking</span></div>
     <div class="login-sub">Store Planning · Project Management</div>
@@ -816,14 +222,14 @@
   <div class="login-note">Acceso restringido · Solo usuarios autorizados</div>
 </div>
 
-<!-- ── APP ── -->
+<!-- APP -->
 <div id="app">
   <div class="topbar">
     <div class="topbar-brand">IS4</div>
     <div class="topbar-sep"></div>
     <div class="topbar-nav">
       <button class="nav-btn active" onclick="showView('dashboard')" id="nav-dashboard">Dashboard</button>
-      <button class="nav-btn" onclick="showView('proyectos')" id="nav-proyectos">Proyectos</button>
+      <button class="nav-btn" onclick="showView('criterios')" id="nav-criterios">Criterios</button>
     </div>
     <div class="topbar-user">
       <span class="user-name" id="user-name-display"></span>
@@ -833,8 +239,9 @@
   </div>
 
   <div class="main">
-    <!-- DASHBOARD VIEW -->
+    <!-- DASHBOARD -->
     <div class="view active" id="view-dashboard">
+      <div id="criterios-banner-container"></div>
       <div class="page-header">
         <div>
           <div class="page-title">Dashboard</div>
@@ -842,20 +249,14 @@
         </div>
         <button class="btn-primary" onclick="openNuevoProyecto()" id="btn-nuevo-proyecto">+ Nuevo Proyecto</button>
       </div>
-
-      <div id="proyectos-list">
-        <div class="loading"><div class="spinner"></div>Cargando proyectos…</div>
-      </div>
-
+      <div id="proyectos-list"><div class="loading"><div class="spinner"></div>Cargando proyectos…</div></div>
       <div class="hitos-section">
         <div class="section-title">Hitos próximos — 7 días</div>
-        <div id="hitos-proximos">
-          <div class="loading"><div class="spinner"></div>Calculando…</div>
-        </div>
+        <div id="hitos-proximos"><div class="loading"><div class="spinner"></div>Calculando…</div></div>
       </div>
     </div>
 
-    <!-- PROYECTO DETAIL VIEW -->
+    <!-- PROYECTO DETAIL -->
     <div class="view" id="view-proyecto-detail">
       <button class="back-btn" onclick="showView('dashboard')">← Volver al dashboard</button>
       <div class="project-detail-header">
@@ -863,444 +264,295 @@
           <div class="project-detail-title" id="detail-title"></div>
           <div class="project-detail-meta" id="detail-meta"></div>
         </div>
-        <div class="detail-actions">
-          <button class="btn-primary" onclick="openNuevoEntry()" id="btn-nuevo-entry">+ Registrar evento</button>
-        </div>
+        <button class="btn-primary" onclick="openNuevoEntry()">+ Registrar evento</button>
       </div>
       <div class="groups-container" id="groups-container"></div>
     </div>
 
-    <!-- PROYECTOS VIEW -->
-    <div class="view" id="view-proyectos">
+    <!-- CRITERIOS -->
+    <div class="view" id="view-criterios">
       <div class="page-header">
         <div>
-          <div class="page-title">Proyectos</div>
-          <div class="page-sub">Todos los proyectos activos</div>
+          <div class="page-title">Criterios del Programa</div>
+          <div class="page-sub">IS 4.0 · Innovasport · Definiciones de diseño vigentes</div>
         </div>
-        <button class="btn-primary" onclick="openNuevoProyecto()">+ Nuevo Proyecto</button>
+        <button class="btn-primary" onclick="openNuevoCriterio()">+ Nuevo Criterio</button>
       </div>
-      <div id="proyectos-list-2">
-        <div class="loading"><div class="spinner"></div>Cargando…</div>
-      </div>
+      <div id="criterios-list"><div class="loading"><div class="spinner"></div>Cargando…</div></div>
     </div>
   </div>
 </div>
 
-<!-- ── MODAL: NUEVO PROYECTO ── -->
+<!-- MODAL: NUEVO PROYECTO -->
 <div class="modal-overlay" id="modal-proyecto">
   <div class="modal">
-    <div class="modal-header">
-      <div class="modal-title">Nuevo Proyecto</div>
-      <button class="modal-close" onclick="closeModal('modal-proyecto')">×</button>
-    </div>
+    <div class="modal-header"><div class="modal-title">Nuevo Proyecto</div><button class="modal-close" onclick="closeModal('modal-proyecto')">×</button></div>
     <div class="modal-body">
       <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Nombre del proyecto</label>
-          <input class="form-input" id="p-nombre" placeholder="IS Nombre Sucursal">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Clave Innovasport</label>
-          <input class="form-input" id="p-clave" placeholder="IS-XXX">
-        </div>
+        <div class="form-group"><label class="form-label">Nombre del proyecto</label><input class="form-input" id="p-nombre" placeholder="IS Nombre Sucursal"></div>
+        <div class="form-group"><label class="form-label">Clave Innovasport</label><input class="form-input" id="p-clave" placeholder="IS-XXX"></div>
       </div>
       <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Tipo de proyecto</label>
-          <select class="form-select" id="p-tipo">
-            <option value="">Seleccionar…</option>
-            <option>Apertura nueva</option>
-            <option>Reubicación</option>
-            <option>Remodelación</option>
-          </select>
+        <div class="form-group"><label class="form-label">Tipo de proyecto</label>
+          <select class="form-select" id="p-tipo"><option value="">Seleccionar…</option><option>Apertura nueva</option><option>Reubicación</option><option>Remodelación</option></select>
         </div>
-        <div class="form-group">
-          <label class="form-label">Fecha de aprobación</label>
-          <input class="form-input" id="p-fecha" type="date">
-        </div>
+        <div class="form-group"><label class="form-label">Fecha de aprobación</label><input class="form-input" id="p-fecha" type="date"></div>
       </div>
-      <div class="form-group">
-        <label class="form-label">Arquitecto asignado</label>
-        <select class="form-select" id="p-arquitecto">
-          <option value="">Sin asignar</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <div class="form-toggle" onclick="toggleBubblePlan()">
-          <div class="toggle-switch" id="toggle-bubble"></div>
-          <div class="toggle-label">Bubble Plan aplica</div>
-        </div>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Disciplinas que aplican</label>
-        <div id="disciplinas-checklist"></div>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Notas</label>
-        <textarea class="form-textarea" id="p-notas" placeholder="Contexto del proyecto…"></textarea>
-      </div>
+      <div class="form-group"><label class="form-label">Arquitecto asignado</label><select class="form-select" id="p-arquitecto"><option value="">Sin asignar</option></select></div>
+      <div class="form-group"><div class="form-toggle" onclick="toggleBubblePlan()"><div class="toggle-switch" id="toggle-bubble"></div><div class="toggle-label">Bubble Plan aplica</div></div></div>
+      <div class="form-group"><label class="form-label">Disciplinas que aplican</label><div id="disciplinas-checklist"></div></div>
+      <div class="form-group"><label class="form-label">Notas</label><textarea class="form-textarea" id="p-notas" placeholder="Contexto del proyecto…"></textarea></div>
     </div>
     <div class="modal-footer">
       <button class="btn-secondary" onclick="closeModal('modal-proyecto')">Cancelar</button>
-      <button class="btn-primary" onclick="guardarProyecto()">Crear Proyecto</button>
+      <button class="btn-primary" id="btn-guardar-proyecto" onclick="guardarProyecto()">Crear Proyecto</button>
     </div>
   </div>
 </div>
 
-<!-- ── MODAL: NUEVO ENTRY ── -->
+<!-- MODAL: NUEVO ENTRY -->
 <div class="modal-overlay" id="modal-entry">
   <div class="modal">
-    <div class="modal-header">
-      <div class="modal-title">Registrar Evento</div>
-      <button class="modal-close" onclick="closeModal('modal-entry')">×</button>
-    </div>
+    <div class="modal-header"><div class="modal-title">Registrar Evento</div><button class="modal-close" onclick="closeModal('modal-entry')">×</button></div>
     <div class="modal-body">
       <div class="entry-tipo-selector">
-        <div class="tipo-btn selected" id="tipo-hito" onclick="selectTipo('hito_completado')">
-          <div class="tipo-btn-icon">✓</div>
-          <div class="tipo-btn-label">Hito completado</div>
-        </div>
-        <div class="tipo-btn" id="tipo-cambio" onclick="selectTipo('cambio_registrado')">
-          <div class="tipo-btn-icon">⚡</div>
-          <div class="tipo-btn-label">Cambio registrado</div>
-        </div>
-        <div class="tipo-btn" id="tipo-nota" onclick="selectTipo('nota')">
-          <div class="tipo-btn-icon">📝</div>
-          <div class="tipo-btn-label">Nota</div>
-        </div>
+        <div class="tipo-btn selected" id="tipo-hito" onclick="selectTipo('hito_completado')"><div class="tipo-btn-icon">✓</div><div class="tipo-btn-label">Hito completado</div></div>
+        <div class="tipo-btn" id="tipo-cambio" onclick="selectTipo('cambio_registrado')"><div class="tipo-btn-icon">⚡</div><div class="tipo-btn-label">Cambio registrado</div></div>
+        <div class="tipo-btn" id="tipo-nota" onclick="selectTipo('nota')"><div class="tipo-btn-icon">📝</div><div class="tipo-btn-label">Nota</div></div>
       </div>
-
       <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Grupo</label>
-          <select class="form-select" id="e-grupo" onchange="updateDisciplinas()">
-            <option value="">Seleccionar grupo…</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Disciplina</label>
-          <select class="form-select" id="e-disciplina" onchange="updateEventos()">
-            <option value="">Seleccionar disciplina…</option>
-          </select>
-        </div>
+        <div class="form-group"><label class="form-label">Grupo</label><select class="form-select" id="e-grupo" onchange="updateDisciplinas()"><option value="">Seleccionar grupo…</option></select></div>
+        <div class="form-group"><label class="form-label">Disciplina</label><select class="form-select" id="e-disciplina" onchange="updateEventos()"><option value="">Seleccionar disciplina…</option></select></div>
       </div>
-
-      <div class="form-group" id="e-evento-group">
-        <label class="form-label">Evento</label>
-        <select class="form-select" id="e-evento">
-          <option value="">Seleccionar evento…</option>
-        </select>
-      </div>
-
-      <div class="form-group">
-        <label class="form-label">Fecha real</label>
-        <input class="form-input" id="e-fecha" type="date">
-      </div>
-
-      <!-- CAMBIO FIELDS -->
+      <div class="form-group"><label class="form-label">Evento</label><select class="form-select" id="e-evento"><option value="">Seleccionar evento…</option></select></div>
+      <div class="form-group"><label class="form-label">Fecha real</label><input class="form-input" id="e-fecha" type="date"></div>
       <div id="cambio-fields" style="display:none">
         <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">Tipo de cambio</label>
-            <select class="form-select" id="e-impacto-tipo">
-              <option value="">Seleccionar…</option>
-              <option>Cambio Menor</option>
-              <option>Cambio Arquitectónico</option>
-              <option>Cambio de Ingenierías</option>
-              <option>Cambio Mayor</option>
-            </select>
+          <div class="form-group"><label class="form-label">Tipo de cambio</label>
+            <select class="form-select" id="e-impacto-tipo"><option value="">Seleccionar…</option><option>Cambio Menor</option><option>Cambio Arquitectónico</option><option>Cambio de Ingenierías</option><option>Cambio Mayor</option></select>
           </div>
-          <div class="form-group">
-            <label class="form-label">Origen del cambio</label>
-            <select class="form-select" id="e-origen">
-              <option value="">Seleccionar…</option>
-              <option>Comercial</option>
-              <option>Operaciones</option>
-              <option>Dirección</option>
-              <option>Marketing</option>
-              <option>Marca</option>
-              <option>Interno SP</option>
-            </select>
+          <div class="form-group"><label class="form-label">Origen del cambio</label>
+            <select class="form-select" id="e-origen"><option value="">Seleccionar…</option><option>Comercial</option><option>Operaciones</option><option>Dirección</option><option>Marketing</option><option>Marca</option><option>Interno SP</option></select>
           </div>
         </div>
       </div>
-
-      <div class="form-group">
-        <label class="form-label">Nota <span style="color:var(--text3)">(opcional)</span></label>
-        <textarea class="form-textarea" id="e-nota" placeholder="Contexto, observaciones, riesgos…" style="min-height:60px"></textarea>
-      </div>
+      <div class="form-group"><label class="form-label">Nota <span style="color:var(--text3)">(opcional)</span></label><textarea class="form-textarea" id="e-nota" placeholder="Contexto, observaciones, riesgos…" style="min-height:60px"></textarea></div>
     </div>
     <div class="modal-footer">
       <button class="btn-secondary" onclick="closeModal('modal-entry')">Cancelar</button>
-      <button class="btn-primary" onclick="guardarEntry()">Guardar Evento</button>
+      <button class="btn-primary" id="btn-guardar-entry" onclick="guardarEntry()">Guardar Evento</button>
     </div>
   </div>
 </div>
 
-<!-- ── TOAST ── -->
+<!-- MODAL: NUEVO CRITERIO -->
+<div class="modal-overlay" id="modal-criterio">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title">Nuevo Criterio de Programa</div><button class="modal-close" onclick="closeModal('modal-criterio')">×</button></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Concepto</label>
+          <select class="form-select" id="c-concepto"><option value="">Seleccionar…</option><option>Acabados</option><option>Estructura</option><option>MEP</option><option>Mobiliario</option><option>Iluminación</option><option>Señalética</option><option>Fachada</option><option>Costos</option><option>Proceso</option><option>General</option></select>
+        </div>
+        <div class="form-group"><label class="form-label">Proyecto detonador</label><select class="form-select" id="c-proyecto"><option value="">Ninguno / General</option></select></div>
+      </div>
+      <div class="form-group"><label class="form-label">Descripción del criterio</label><textarea class="form-textarea" id="c-descripcion" placeholder="Describe el criterio de diseño, decisión o ajuste…" style="min-height:100px"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('modal-criterio')">Cancelar</button>
+      <button class="btn-primary" id="btn-guardar-criterio" onclick="guardarCriterio()">Proponer Criterio</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
-// ═══════════════════════════════════════════════════════
-// CONFIG
-// ═══════════════════════════════════════════════════════
 const CONFIG = {
   CLIENT_ID: '917190875425-0ccso9k1pthi9imfsrjd39dc4jvg9run.apps.googleusercontent.com',
-  SHEET_ID: '16Eb5wpLNt2H3qIstLb5RJ41MQTJ9wPF6YR5PQq64RI4',
-  SCOPES: 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.readonly',
-  DISCOVERY_DOCS: ['https://sheets.googleapis.com/$discovery/rest?version=v4']
+  WEBAPP_URL: 'https://script.google.com/macros/s/AKfycbwN8LLJ3FXEb4M4qVINDQLmx60D4mXP57QMvsSTelwe71lXzu5Dvuae94TJgWignmFh/exec',
+  SCOPES: 'https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile openid'
 };
 
-// ═══════════════════════════════════════════════════════
-// STATE
-// ═══════════════════════════════════════════════════════
 let state = {
-  user: null,
-  rol: null,
-  proyectos: [],
-  disciplinasCatalogo: [],
-  eventosCatalogo: [],
-  logEventos: [],
-  timelineHitos: [],
-  currentProyecto: null,
-  entryTipo: 'hito_completado',
-  bubblePlan: false,
-  disciplinasSeleccionadas: new Set()
+  user: null, rol: null, accessToken: null,
+  proyectos: [], eventosCatalogo: [], logEventos: [], criterios: [], usuarios: [],
+  currentProyecto: null, entryTipo: 'hito_completado',
+  bubblePlan: false, disciplinasSeleccionadas: new Set()
 };
 
-// ═══════════════════════════════════════════════════════
-// GOOGLE API INIT
-// ═══════════════════════════════════════════════════════
+// ── AUTH ──
 function initGoogleAPI() {
-  gapi.load('client:auth2', async () => {
-    await gapi.client.init({
-      clientId: CONFIG.CLIENT_ID,
-      discoveryDocs: CONFIG.DISCOVERY_DOCS,
-      scope: CONFIG.SCOPES
-    });
-
-    const authInstance = gapi.auth2.getAuthInstance();
-    if (authInstance.isSignedIn.get()) {
-      await onSignIn(authInstance.currentUser.get());
-    }
+  gapi.load('auth2', async () => {
+    await gapi.auth2.init({ client_id: CONFIG.CLIENT_ID, scope: CONFIG.SCOPES });
+    const auth = gapi.auth2.getAuthInstance();
+    if (auth.isSignedIn.get()) await onSignIn(auth.currentUser.get());
   });
 }
 
 async function handleLogin() {
   try {
-    const authInstance = gapi.auth2.getAuthInstance();
-    const user = await authInstance.signIn();
+    const user = await gapi.auth2.getAuthInstance().signIn();
     await onSignIn(user);
-  } catch(e) {
-    showToast('Error al iniciar sesión', 'error');
-  }
+  } catch(e) { showToast('Error al iniciar sesión', 'error'); }
 }
 
 async function onSignIn(googleUser) {
   const profile = googleUser.getBasicProfile();
-  const email = profile.getEmail();
-  const name = profile.getName();
+  state.user = { email: profile.getEmail(), name: profile.getName() };
+  state.accessToken = googleUser.getAuthResponse().access_token;
 
-  // Verificar acceso en hoja usuarios
-  const rol = await verificarAcceso(email);
-  if (!rol) {
-    showToast('Acceso no autorizado. Contacta al PM.', 'error');
-    return;
-  }
+  try {
+    const usuarios = await api('getUsuarios');
+    const u = usuarios.find(x => x.email.toLowerCase() === state.user.email.toLowerCase());
+    if (!u) { showToast('Acceso no autorizado. Contacta al PM.', 'error'); handleLogout(); return; }
+    state.rol = u.rol;
+    state.usuarios = usuarios;
+  } catch(e) { showToast('Error verificando acceso: ' + e.message, 'error'); return; }
 
-  state.user = { email, name };
-  state.rol = rol;
-
-  document.getElementById('user-name-display').textContent = name.split(' ')[0];
-  document.getElementById('user-role-display').textContent = rol;
-
-  // PM-only buttons
-  if (rol !== 'PM') {
-    document.getElementById('btn-nuevo-proyecto').style.display = 'none';
-  }
-
+  document.getElementById('user-name-display').textContent = state.user.name.split(' ')[0];
+  document.getElementById('user-role-display').textContent = state.rol;
+  if (state.rol !== 'PM') document.getElementById('btn-nuevo-proyecto').style.display = 'none';
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
   document.getElementById('dashboard-date').textContent = new Date().toLocaleDateString('es-MX', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
-
   await loadAllData();
 }
 
-async function verificarAcceso(email) {
-  try {
-    const res = await gapi.client.sheets.spreadsheets.values.get({
-      spreadsheetId: CONFIG.SHEET_ID,
-      range: 'usuarios!A:C'
-    });
-    const rows = res.result.values || [];
-    for (let i = 1; i < rows.length; i++) {
-      if (rows[i][0] && rows[i][0].toLowerCase() === email.toLowerCase()) {
-        return rows[i][2] || 'Arquitecto';
-      }
-    }
-    return null;
-  } catch(e) {
-    // Si no existe la hoja usuarios, dar acceso PM al primero (setup inicial)
-    return 'PM';
-  }
-}
-
 function handleLogout() {
-  gapi.auth2.getAuthInstance().signOut();
+  try { gapi.auth2.getAuthInstance().signOut(); } catch(e) {}
   document.getElementById('login-screen').style.display = 'flex';
   document.getElementById('app').style.display = 'none';
-  state = { ...state, user: null, rol: null, proyectos: [], currentProyecto: null };
+  state.user = null; state.rol = null; state.accessToken = null;
 }
 
-// ═══════════════════════════════════════════════════════
-// DATA LOADING
-// ═══════════════════════════════════════════════════════
+// ── API ──
+async function api(action, body = {}) {
+  const payload = { action, token: state.accessToken, ...body };
+  const res = await fetch(CONFIG.WEBAPP_URL, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    headers: { 'Content-Type': 'text/plain' }
+  });
+  const data = await res.json();
+  if (data && data.error) throw new Error(data.error);
+  return data;
+}
+
+// ── DATA ──
 async function loadAllData() {
   try {
-    const [proyectosRes, catalogoRes, eventosRes, logRes, timelineRes] = await Promise.all([
-      readSheet('proyectos!A:J'),
-      readSheet('disciplinas_catalogo!A:M'),
-      readSheet('eventos_catalogo!A:J'),
-      readSheet('log_eventos!A:J'),
-      readSheet('timeline_hitos!A:G')
+    const [proyectos, eventos, log, criterios] = await Promise.all([
+      api('getProyectos'), api('getEventosCatalogo'),
+      api('getLogEventos'), api('getCriteriosPrograma')
     ]);
-
-    state.proyectos = parseRows(proyectosRes, ['proyecto_id','nombre','clave_innovasport','arquitecto_id','fecha_aprobacion','tipo_proyecto','estado','bubble_plan_aplica','fecha_entrega_v1','notas']);
-    state.disciplinasCatalogo = parseRows(catalogoRes, ['disciplina_id','grupo_id','grupo_nombre','grupo_tipo','disciplina_nombre','hito_id','hito_nombre','offset_desde_aprobacion','dia_productivo','depende_de_hito_id','tiene_cruce','offset_variable','notas']);
-    state.eventosCatalogo = parseRows(eventosRes, ['evento_id','grupo_id','grupo_nombre','disciplina_nombre','orden_disciplina','evento_nombre','orden_evento','direccion','es_cierre','notas']);
-    state.logEventos = parseRows(logRes, ['entry_id','proyecto_id','fecha_real','arquitecto_id','disciplina_id','hito_id','tipo_entry','version_hito','nota','version_timeline_activa']);
-    state.timelineHitos = parseRows(timelineRes, ['th_id','version_id','proyecto_id','disciplina_id','hito_id','fecha_esperada','es_ruta_critica']);
-
+    state.proyectos = proyectos || [];
+    state.eventosCatalogo = eventos || [];
+    state.logEventos = log || [];
+    state.criterios = criterios || [];
     renderDashboard();
-  } catch(e) {
-    console.error(e);
-    showToast('Error cargando datos', 'error');
-  }
+    renderCriteriosBanner();
+  } catch(e) { showToast('Error cargando datos: ' + e.message, 'error'); console.error(e); }
 }
 
-async function readSheet(range) {
-  const res = await gapi.client.sheets.spreadsheets.values.get({
-    spreadsheetId: CONFIG.SHEET_ID,
-    range
-  });
-  return res.result.values || [];
-}
-
-function parseRows(rows, fields) {
-  if (!rows || rows.length < 2) return [];
-  return rows.slice(1).filter(r => r[0]).map(r => {
-    const obj = {};
-    fields.forEach((f, i) => obj[f] = r[i] || '');
-    return obj;
-  });
-}
-
-// ═══════════════════════════════════════════════════════
-// DASHBOARD
-// ═══════════════════════════════════════════════════════
+// ── DASHBOARD ──
 function renderDashboard() {
-  renderProyectosList();
-  renderHitosProximos();
-  renderProyectosListSecondary();
-}
-
-function renderProyectosList() {
+  const activos = state.proyectos.filter(p => !p.estado || p.estado === 'Activo');
   const container = document.getElementById('proyectos-list');
-  const activos = state.proyectos.filter(p => p.estado === 'Activo' || p.estado === '');
 
   if (activos.length === 0) {
     container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📋</div>No hay proyectos activos.<br>Crea el primero con el botón de arriba.</div>`;
-    return;
+  } else {
+    container.innerHTML = `<div class="project-grid">${activos.map(p => {
+      const { nivel, label } = calcRiesgo(p);
+      return `<div class="project-card risk-${nivel}" onclick="openProyecto('${p.proyecto_id}')">
+        <div>
+          <div class="project-name">${p.nombre || '—'}</div>
+          <div class="project-meta">
+            <div class="meta-item"><span class="label">Tipo&nbsp;</span>${p.tipo_proyecto || '—'}</div>
+            <div class="meta-item"><span class="label">Aprobación&nbsp;</span>${formatDate(p.fecha_aprobacion)}</div>
+            <div class="meta-item"><span class="label">Entrega est.&nbsp;</span>${calcFechaEntrega(p.fecha_aprobacion)}</div>
+            ${p.arquitecto_id ? `<div class="meta-item"><span class="label">Arq.&nbsp;</span>${p.arquitecto_id}</div>` : ''}
+          </div>
+        </div>
+        <div class="project-right">
+          <div class="semaforo ${nivel}"></div>
+          <div class="desvio-badge ${nivel}">${label}</div>
+        </div>
+      </div>`;
+    }).join('')}</div>`;
   }
 
-  container.innerHTML = activos.map(p => {
-    const { nivel, dias } = calcRiesgo(p);
-    const claseRiesgo = nivel === 'red' ? 'risk-red' : nivel === 'yellow' ? 'risk-yellow' : 'risk-green';
-    const fechaEntrega = p.fecha_entrega_v1 ? formatDate(p.fecha_entrega_v1) : calcFechaEntrega(p.fecha_aprobacion);
-
-    return `
-    <div class="project-card ${claseRiesgo}" onclick="openProyecto('${p.proyecto_id}')">
-      <div>
-        <div class="project-name">${p.nombre || '—'}</div>
-        <div class="project-meta">
-          <div class="meta-item"><span class="label">Tipo</span> ${p.tipo_proyecto || '—'}</div>
-          <div class="meta-item"><span class="label">Aprobación</span> ${formatDate(p.fecha_aprobacion)}</div>
-          <div class="meta-item"><span class="label">Entrega estimada</span> ${fechaEntrega}</div>
-          ${p.arquitecto_id ? `<div class="meta-item"><span class="label">Arquitecto</span> ${p.arquitecto_id}</div>` : ''}
-        </div>
-      </div>
-      <div class="project-right">
-        <div class="semaforo ${nivel}"></div>
-        <div class="desvio-badge ${nivel}">${dias > 0 ? '+' + dias + 'd' : dias < 0 ? dias + 'd' : 'En tiempo'}</div>
-      </div>
-    </div>`;
-  }).join('');
-}
-
-function renderHitosProximos() {
-  const container = document.getElementById('hitos-proximos');
+  // Hitos próximos
   const hoy = new Date();
   const limite = new Date(); limite.setDate(limite.getDate() + 7);
   const proximos = [];
-
-  state.proyectos.filter(p => p.estado === 'Activo' || !p.estado).forEach(p => {
+  activos.forEach(p => {
     if (!p.fecha_aprobacion) return;
-    const hitos = calcTimeline(p);
-    hitos.forEach(h => {
-      const fecha = new Date(h.fecha_esperada);
+    // Hitos de G0 con offsets conocidos
+    const hitosRef = [
+      { id:'H06', nombre:'Día 1 de Diseño', offset:10 },
+      { id:'H09', nombre:'VoBo Layout Dirección', offset:14 },
+      { id:'H11', nombre:'Liberación de Layout', offset:20 },
+      { id:'H23', nombre:'Cierre Instalaciones', offset:33 },
+      { id:'H36', nombre:'Entrega Proyecto Ejecutivo', offset:43 }
+    ];
+    hitosRef.forEach(h => {
+      const fecha = addBusinessDays(new Date(p.fecha_aprobacion + 'T12:00:00'), h.offset);
       if (fecha >= hoy && fecha <= limite) {
-        proximos.push({ proyecto: p.nombre, hito: h.hito_nombre, fecha: h.fecha_esperada, grupo: h.grupo_id });
+        proximos.push({ proyecto: p.nombre, hito: h.nombre, fecha: fecha.toISOString().split('T')[0], proyectoId: p.proyecto_id });
       }
     });
   });
-
   proximos.sort((a,b) => new Date(a.fecha) - new Date(b.fecha));
 
-  if (proximos.length === 0) {
-    container.innerHTML = `<div style="color:var(--text3);font-family:var(--mono);font-size:12px;padding:12px 0">Sin hitos en los próximos 7 días</div>`;
-    return;
-  }
-
-  container.innerHTML = proximos.map(h => `
-    <div class="hito-row">
-      <div class="hito-fecha">${formatDate(h.fecha)}</div>
-      <div class="hito-proyecto">${h.proyecto}</div>
-      <div class="hito-nombre">${h.hito}</div>
-      <div class="meta-item" style="font-size:10px">${h.grupo}</div>
-    </div>
-  `).join('');
+  const hitosContainer = document.getElementById('hitos-proximos');
+  hitosContainer.innerHTML = proximos.length === 0
+    ? `<div style="color:var(--text3);font-family:var(--mono);font-size:12px;padding:12px 0">Sin hitos en los próximos 7 días</div>`
+    : proximos.map(h => `<div class="hito-row" onclick="openProyecto('${h.proyectoId}')">
+        <div class="hito-fecha">${formatDate(h.fecha)}</div>
+        <div style="font-weight:500">${h.proyecto}</div>
+        <div style="font-size:12px;color:var(--text2)">${h.hito}</div>
+        <div></div>
+      </div>`).join('');
 }
 
-function renderProyectosListSecondary() {
-  const container = document.getElementById('proyectos-list-2');
-  container.innerHTML = document.getElementById('proyectos-list').innerHTML;
+function renderCriteriosBanner() {
+  const container = document.getElementById('criterios-banner-container');
+  if (!state.user) return;
+  const pendientes = state.criterios.filter(c => {
+    if (c.estado !== 'vigente') return false;
+    try { return !JSON.parse(c.confirmaciones || '{}')[state.user.email]; } catch(e) { return true; }
+  });
+  container.innerHTML = pendientes.length === 0 ? '' : `
+    <div class="criterios-banner">
+      <div>
+        <div class="criterios-banner-text">📌 ${pendientes.length} criterio${pendientes.length > 1 ? 's' : ''} pendiente${pendientes.length > 1 ? 's' : ''} de confirmar</div>
+        <div class="criterios-banner-sub">Nuevas definiciones de diseño que aplican a todos los proyectos activos</div>
+      </div>
+      <button class="btn-primary" onclick="showView('criterios')" style="white-space:nowrap;font-size:12px">Ver criterios</button>
+    </div>`;
 }
 
-// ═══════════════════════════════════════════════════════
-// PROYECTO DETAIL
-// ═══════════════════════════════════════════════════════
+// ── PROYECTO DETAIL ──
 function openProyecto(proyectoId) {
   const p = state.proyectos.find(x => x.proyecto_id === proyectoId);
   if (!p) return;
   state.currentProyecto = p;
-
   document.getElementById('detail-title').textContent = p.nombre;
-  document.getElementById('detail-meta').textContent =
-    `${p.tipo_proyecto || '—'} · Aprobación: ${formatDate(p.fecha_aprobacion)} · Entrega estimada: ${calcFechaEntrega(p.fecha_aprobacion)}`;
-
+  document.getElementById('detail-meta').textContent = `${p.tipo_proyecto || '—'} · Aprobación: ${formatDate(p.fecha_aprobacion)} · Entrega estimada: ${calcFechaEntrega(p.fecha_aprobacion)}`;
   renderGroups(p);
   showView('proyecto-detail');
 }
 
 function renderGroups(proyecto) {
-  const container = document.getElementById('groups-container');
-  const grupos = getGruposProyecto(proyecto);
-
-  container.innerHTML = grupos.map(g => {
-    const disciplinas = getDisciplinasGrupo(proyecto, g.grupo_id);
-    const log = state.logEventos.filter(e => e.proyecto_id === proyecto.proyecto_id);
+  const log = state.logEventos.filter(e => e.proyecto_id === proyecto.proyecto_id);
+  const grupos = getGruposUnicos();
+  document.getElementById('groups-container').innerHTML = grupos.map(g => {
+    const disciplinas = getDisciplinasGrupo(g.grupo_id);
     const completadas = disciplinas.filter(d => isDisciplinaCompleta(d, log)).length;
-
+    const enProceso = disciplinas.filter(d => !isDisciplinaCompleta(d, log) && log.some(e => e.disciplina_id === `${g.grupo_id}::${d}`)).length;
+    const nivel = completadas === disciplinas.length && disciplinas.length > 0 ? 'green' : enProceso > 0 ? 'yellow' : 'gray';
     return `
     <div class="group-row" id="group-${g.grupo_id}">
       <div class="group-header" onclick="toggleGroup('${g.grupo_id}')">
@@ -1308,236 +560,150 @@ function renderGroups(proyecto) {
         <span class="group-id">${g.grupo_id}</span>
         <span class="group-name">${g.grupo_nombre}</span>
         <span class="group-progress">${completadas}/${disciplinas.length}</span>
-        <div class="group-semaforo">
-          <div class="semaforo ${completadas === disciplinas.length ? 'green' : completadas > 0 ? 'yellow' : 'gray'}"></div>
-        </div>
+        <div class="semaforo ${nivel}"></div>
       </div>
-      <div class="group-body">
-        ${disciplinas.map(d => renderDisciplina(proyecto, g, d, log)).join('')}
-      </div>
+      <div class="group-body">${disciplinas.map(d => renderDisciplina(proyecto, g, d, log)).join('')}</div>
     </div>`;
   }).join('');
 }
 
 function renderDisciplina(proyecto, grupo, disciplina, log) {
-  const discId = `${proyecto.proyecto_id}_${grupo.grupo_id}_${disciplina}`;
-  const eventos = log.filter(e => e.disciplina_id && e.disciplina_id.includes(disciplina));
+  const discKey = `${grupo.grupo_id}::${disciplina}`;
+  const safeId = `${proyecto.proyecto_id}_${grupo.grupo_id}_${disciplina}`.replace(/[^a-zA-Z0-9_]/g, '_');
+  const eventos = log.filter(e => e.disciplina_id === discKey);
   const completa = isDisciplinaCompleta(disciplina, log);
   const estado = completa ? 'completado' : eventos.length > 0 ? 'en-proceso' : 'pendiente';
-
   return `
   <div>
-    <div class="disciplina-row" onclick="toggleLogPanel('${discId}')">
-      <div class="disciplina-name">${disciplina}</div>
+    <div class="disciplina-row" onclick="toggleLogPanel('log_${safeId}')">
+      <div>${disciplina}</div>
       <div class="disciplina-estado ${estado}">${estado.replace('-',' ')}</div>
       <div style="font-size:11px;color:var(--text3);font-family:var(--mono)">${eventos.length} eventos</div>
-      <button class="btn-ghost" onclick="event.stopPropagation(); openEntryForDisciplina('${grupo.grupo_id}','${disciplina}')">+ Evento</button>
+      <button class="btn-ghost" onclick="event.stopPropagation();openEntryForDisciplina('${grupo.grupo_id}','${disciplina}')">+ Evento</button>
     </div>
-    <div class="log-panel" id="log-${discId}">
-      ${eventos.length === 0
-        ? '<div class="log-empty">Sin eventos registrados</div>'
-        : eventos.sort((a,b) => new Date(a.fecha_real) - new Date(b.fecha_real)).map(e => `
+    <div class="log-panel" id="log_${safeId}">
+      ${eventos.length === 0 ? '<div class="log-empty">Sin eventos registrados</div>'
+        : eventos.sort((a,b) => new Date(a.fecha_real)-new Date(b.fecha_real)).map(e => `
           <div class="log-entry">
             <div class="log-fecha">${formatDate(e.fecha_real)}</div>
-            <div class="log-evento">${e.hito_id || e.tipo_entry}</div>
+            <div class="log-evento">${e.hito_id || '—'}</div>
             <div class="log-nota">${e.nota || ''}</div>
-            <div class="log-dir">${e.arquitecto_id || ''}</div>
-          </div>`).join('')
-      }
+            <div class="log-tipo">${e.tipo_entry}</div>
+          </div>`).join('')}
     </div>
   </div>`;
 }
 
-function toggleGroup(grupoId) {
-  const el = document.getElementById(`group-${grupoId}`);
-  el.classList.toggle('open');
-}
-
-function toggleLogPanel(discId) {
-  const el = document.getElementById(`log-${discId}`);
-  el.classList.toggle('open');
-}
-
+function toggleGroup(id) { document.getElementById(`group-${id}`)?.classList.toggle('open'); }
+function toggleLogPanel(id) { document.getElementById(id)?.classList.toggle('open'); }
 function openEntryForDisciplina(grupoId, disciplina) {
   openNuevoEntry();
   setTimeout(() => {
-    const grupoSel = document.getElementById('e-grupo');
-    grupoSel.value = grupoId;
+    document.getElementById('e-grupo').value = grupoId;
     updateDisciplinas();
-    setTimeout(() => {
-      document.getElementById('e-disciplina').value = disciplina;
-      updateEventos();
-    }, 50);
-  }, 50);
+    setTimeout(() => { document.getElementById('e-disciplina').value = disciplina; updateEventos(); }, 60);
+  }, 60);
 }
 
-// ═══════════════════════════════════════════════════════
-// NUEVO PROYECTO
-// ═══════════════════════════════════════════════════════
+// ── NUEVO PROYECTO ──
 function openNuevoProyecto() {
-  // Set today as default
   document.getElementById('p-fecha').value = new Date().toISOString().split('T')[0];
-  document.getElementById('p-nombre').value = '';
-  document.getElementById('p-clave').value = '';
-  document.getElementById('p-notas').value = '';
+  ['p-nombre','p-clave','p-notas'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('p-tipo').value = '';
-  state.bubblePlan = false;
+  state.bubblePlan = false; state.disciplinasSeleccionadas = new Set();
   document.getElementById('toggle-bubble').classList.remove('on');
-
-  // Populate arquitectos
   const sel = document.getElementById('p-arquitecto');
   sel.innerHTML = '<option value="">Sin asignar</option>';
-  // Arquitectos hardcoded del equipo (se pueden cargar de hoja usuarios)
-  ['Natali Vargas','Héctor Martínez','Jesús Martínez'].forEach(a => {
-    sel.innerHTML += `<option>${a}</option>`;
-  });
-
-  // Build disciplinas checklist
+  state.usuarios.filter(u => u.rol === 'Arquitecto').forEach(u => sel.innerHTML += `<option value="${u.email}">${u.nombre}</option>`);
   buildDisciplinasChecklist();
   openModal('modal-proyecto');
 }
 
 function buildDisciplinasChecklist() {
-  const container = document.getElementById('disciplinas-checklist');
-  state.disciplinasSeleccionadas = new Set();
-
-  // Get unique groups and their disciplinas from catalogo
   const grupos = {};
   state.eventosCatalogo.forEach(e => {
-    if (!e.grupo_id || e.grupo_id === 'G0' || e.grupo_id === 'G1') return;
+    if (!e.grupo_id || e.grupo_id === 'G0') return;
     if (!grupos[e.grupo_id]) grupos[e.grupo_id] = { nombre: e.grupo_nombre, disciplinas: new Set() };
     if (e.disciplina_nombre) grupos[e.grupo_id].disciplinas.add(e.disciplina_nombre);
   });
-
-  container.innerHTML = Object.entries(grupos).map(([gid, g]) => `
+  document.getElementById('disciplinas-checklist').innerHTML = Object.entries(grupos).map(([gid, g]) => `
     <div class="disc-group">
       <div class="disc-group-title">${gid} — ${g.nombre}</div>
-      <div class="disc-items">
-        ${[...g.disciplinas].map(d => `
-          <div class="disc-chip" id="chip-${gid}-${d.replace(/\s+/g,'_')}" onclick="toggleDisciplina('${gid}','${d}')">
-            <div class="disc-chip-dot"></div>${d}
-          </div>`).join('')}
-      </div>
+      <div class="disc-items">${[...g.disciplinas].map(d => {
+        const cid = `chip_${gid}_${d.replace(/\W+/g,'_')}`;
+        return `<div class="disc-chip" id="${cid}" onclick="toggleDisciplina('${gid}','${d}','${cid}')"><div class="disc-chip-dot"></div>${d}</div>`;
+      }).join('')}</div>
     </div>`).join('');
 }
 
-function toggleDisciplina(grupoId, disciplina) {
-  const key = `${grupoId}::${disciplina}`;
-  const chipId = `chip-${grupoId}-${disciplina.replace(/\s+/g,'_')}`;
-  const chip = document.getElementById(chipId);
-  if (state.disciplinasSeleccionadas.has(key)) {
-    state.disciplinasSeleccionadas.delete(key);
-    chip.classList.remove('selected');
-  } else {
-    state.disciplinasSeleccionadas.add(key);
-    chip.classList.add('selected');
-  }
+function toggleDisciplina(gid, d, cid) {
+  const key = `${gid}::${d}`;
+  const chip = document.getElementById(cid);
+  if (state.disciplinasSeleccionadas.has(key)) { state.disciplinasSeleccionadas.delete(key); chip.classList.remove('selected'); }
+  else { state.disciplinasSeleccionadas.add(key); chip.classList.add('selected'); }
 }
-
-function toggleBubblePlan() {
-  state.bubblePlan = !state.bubblePlan;
-  document.getElementById('toggle-bubble').classList.toggle('on', state.bubblePlan);
-}
+function toggleBubblePlan() { state.bubblePlan = !state.bubblePlan; document.getElementById('toggle-bubble').classList.toggle('on', state.bubblePlan); }
 
 async function guardarProyecto() {
   const nombre = document.getElementById('p-nombre').value.trim();
   const fecha = document.getElementById('p-fecha').value;
-  if (!nombre || !fecha) { showToast('Nombre y fecha de aprobación son requeridos', 'error'); return; }
-
-  const proyectoId = 'P' + Date.now();
-  const fechaEntregaV1 = calcFechaEntregaISO(fecha);
-
-  const row = [
-    proyectoId,
-    nombre,
-    document.getElementById('p-clave').value,
-    document.getElementById('p-arquitecto').value,
-    fecha,
-    document.getElementById('p-tipo').value,
-    'Activo',
-    state.bubblePlan ? 'TRUE' : 'FALSE',
-    fechaEntregaV1,
-    document.getElementById('p-notas').value
-  ];
-
+  if (!nombre || !fecha) { showToast('Nombre y fecha son requeridos', 'error'); return; }
+  const btn = document.getElementById('btn-guardar-proyecto');
+  btn.disabled = true; btn.textContent = 'Guardando…';
   try {
-    await appendRow('proyectos', row);
-
-    // Crear timeline v1
-    const versionId = 'V' + Date.now();
-    await appendRow('timeline_versiones', [versionId, proyectoId, 1, new Date().toISOString().split('T')[0], 'inicial', 'Creación del proyecto', fechaEntregaV1]);
-
-    // Guardar disciplinas seleccionadas
-    for (const key of state.disciplinasSeleccionadas) {
-      const [grupoId, disciplina] = key.split('::');
-      await appendRow('disciplinas_proyecto', ['DP' + Date.now() + Math.random().toString(36).slice(2,5), proyectoId, `${grupoId}::${disciplina}`, 'TRUE', grupoId]);
-    }
-
+    await api('crearProyecto', {
+      nombre, clave_innovasport: document.getElementById('p-clave').value,
+      arquitecto_id: document.getElementById('p-arquitecto').value,
+      fecha_aprobacion: fecha, tipo_proyecto: document.getElementById('p-tipo').value,
+      bubble_plan_aplica: state.bubblePlan, notas: document.getElementById('p-notas').value,
+      disciplinas: [...state.disciplinasSeleccionadas].map(k => { const [g,d] = k.split('::'); return { disciplina_id: k, grupo_id: g }; })
+    });
     closeModal('modal-proyecto');
     showToast(`Proyecto "${nombre}" creado`, 'success');
     await loadAllData();
-  } catch(e) {
-    showToast('Error al guardar', 'error');
-    console.error(e);
-  }
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+  finally { btn.disabled = false; btn.textContent = 'Crear Proyecto'; }
 }
 
-// ═══════════════════════════════════════════════════════
-// NUEVO ENTRY
-// ═══════════════════════════════════════════════════════
+// ── NUEVO ENTRY ──
 function openNuevoEntry() {
   document.getElementById('e-fecha').value = new Date().toISOString().split('T')[0];
   document.getElementById('e-nota').value = '';
   document.getElementById('e-grupo').value = '';
   document.getElementById('e-disciplina').innerHTML = '<option value="">Seleccionar disciplina…</option>';
   document.getElementById('e-evento').innerHTML = '<option value="">Seleccionar evento…</option>';
-
   selectTipo('hito_completado');
-  populateGrupos();
-  openModal('modal-entry');
-}
-
-function populateGrupos() {
   const sel = document.getElementById('e-grupo');
   sel.innerHTML = '<option value="">Seleccionar grupo…</option>';
   const grupos = {};
-  state.eventosCatalogo.forEach(e => {
-    if (!grupos[e.grupo_id]) grupos[e.grupo_id] = e.grupo_nombre;
-  });
-  Object.entries(grupos).forEach(([id, nombre]) => {
-    sel.innerHTML += `<option value="${id}">${id} — ${nombre}</option>`;
-  });
+  state.eventosCatalogo.forEach(e => { if (!grupos[e.grupo_id]) grupos[e.grupo_id] = e.grupo_nombre; });
+  Object.entries(grupos).forEach(([id, n]) => sel.innerHTML += `<option value="${id}">${id} — ${n}</option>`);
+  openModal('modal-entry');
 }
 
 function updateDisciplinas() {
-  const grupoId = document.getElementById('e-grupo').value;
+  const gid = document.getElementById('e-grupo').value;
   const sel = document.getElementById('e-disciplina');
   sel.innerHTML = '<option value="">Seleccionar disciplina…</option>';
-  if (!grupoId) return;
-
-  const disciplinas = [...new Set(state.eventosCatalogo.filter(e => e.grupo_id === grupoId).map(e => e.disciplina_nombre))];
-  disciplinas.forEach(d => sel.innerHTML += `<option value="${d}">${d}</option>`);
+  if (!gid) return;
+  [...new Set(state.eventosCatalogo.filter(e => e.grupo_id === gid).map(e => e.disciplina_nombre))].forEach(d => sel.innerHTML += `<option value="${d}">${d}</option>`);
 }
 
 function updateEventos() {
-  const grupoId = document.getElementById('e-grupo').value;
-  const disciplina = document.getElementById('e-disciplina').value;
+  const gid = document.getElementById('e-grupo').value;
+  const disc = document.getElementById('e-disciplina').value;
   const sel = document.getElementById('e-evento');
   sel.innerHTML = '<option value="">Seleccionar evento…</option>';
-  if (!grupoId || !disciplina) return;
-
-  const eventos = state.eventosCatalogo.filter(e => e.grupo_id === grupoId && e.disciplina_nombre === disciplina);
-  eventos.forEach(e => {
-    const dir = e.direccion ? ` · ${e.direccion}` : '';
-    sel.innerHTML += `<option value="${e.evento_nombre}">${e.evento_nombre}${dir}</option>`;
-  });
+  if (!gid || !disc) return;
+  state.eventosCatalogo.filter(e => e.grupo_id === gid && e.disciplina_nombre === disc)
+    .forEach(e => sel.innerHTML += `<option value="${e.evento_nombre}">${e.evento_nombre}${e.direccion ? ' · ' + e.direccion : ''}</option>`);
 }
 
 function selectTipo(tipo) {
   state.entryTipo = tipo;
   ['hito_completado','cambio_registrado','nota'].forEach(t => {
-    const id = t === 'hito_completado' ? 'tipo-hito' : t === 'cambio_registrado' ? 'tipo-cambio' : 'tipo-nota';
-    document.getElementById(id).classList.toggle('selected', t === tipo);
+    const ids = { hito_completado:'tipo-hito', cambio_registrado:'tipo-cambio', nota:'tipo-nota' };
+    document.getElementById(ids[t]).classList.toggle('selected', t === tipo);
   });
   document.getElementById('cambio-fields').style.display = tipo === 'cambio_registrado' ? 'block' : 'none';
 }
@@ -1547,210 +713,155 @@ async function guardarEntry() {
   const grupo = document.getElementById('e-grupo').value;
   const disciplina = document.getElementById('e-disciplina').value;
   const evento = document.getElementById('e-evento').value;
-
   if (!fecha || !grupo) { showToast('Grupo y fecha son requeridos', 'error'); return; }
-
   if (!state.currentProyecto) { showToast('Selecciona un proyecto primero', 'error'); return; }
-
-  const entryId = 'E' + Date.now();
-  const proyectoId = state.currentProyecto.proyecto_id;
-  const disciplinaId = `${grupo}::${disciplina}`;
-
-  const row = [
-    entryId, proyectoId, fecha,
-    state.user.email,
-    disciplinaId,
-    evento,
-    state.entryTipo,
-    '1',
-    document.getElementById('e-nota').value,
-    '1'
-  ];
-
+  const btn = document.getElementById('btn-guardar-entry');
+  btn.disabled = true; btn.textContent = 'Guardando…';
   try {
-    await appendRow('log_eventos', row);
-
-    // Si es cambio, guardar detalle
+    const res = await api('appendLogEvento', {
+      proyecto_id: state.currentProyecto.proyecto_id, fecha_real: fecha,
+      disciplina_id: `${grupo}::${disciplina}`, hito_id: evento,
+      tipo_entry: state.entryTipo, nota: document.getElementById('e-nota').value, version_timeline_activa: '1'
+    });
     if (state.entryTipo === 'cambio_registrado') {
-      await appendRow('cambios_detalle', [
-        'CD' + Date.now(), entryId,
-        document.getElementById('e-origen').value,
-        disciplinaId,
-        document.getElementById('e-impacto-tipo').value,
-        '', ''
-      ]);
+      await api('appendCambioDetalle', {
+        entry_id: res.entry_id, origen_cambio: document.getElementById('e-origen').value,
+        disciplinas_afectadas: `${grupo}::${disciplina}`, impacto_tipo: document.getElementById('e-impacto-tipo').value
+      });
     }
-
     closeModal('modal-entry');
     showToast('Evento registrado', 'success');
     await loadAllData();
-    if (state.currentProyecto) openProyecto(proyectoId);
-  } catch(e) {
-    showToast('Error al guardar', 'error');
-    console.error(e);
-  }
+    if (state.currentProyecto) openProyecto(state.currentProyecto.proyecto_id);
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+  finally { btn.disabled = false; btn.textContent = 'Guardar Evento'; }
 }
 
-// ═══════════════════════════════════════════════════════
-// SHEET WRITE
-// ═══════════════════════════════════════════════════════
-async function appendRow(sheet, values) {
-  await gapi.client.sheets.spreadsheets.values.append({
-    spreadsheetId: CONFIG.SHEET_ID,
-    range: `${sheet}!A1`,
-    valueInputOption: 'USER_ENTERED',
-    resource: { values: [values] }
-  });
+// ── CRITERIOS ──
+function renderCriteriosList() {
+  const container = document.getElementById('criterios-list');
+  const lista = state.criterios.filter(c => c.estado !== 'obsoleto');
+  if (lista.length === 0) { container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📌</div>Sin criterios registrados.</div>`; return; }
+  container.innerHTML = lista.map(c => {
+    let confirmado = false;
+    try { confirmado = state.user && JSON.parse(c.confirmaciones || '{}')[state.user.email]; } catch(e) {}
+    const esPM = state.rol === 'PM';
+    return `
+    <div class="criterio-card ${c.estado}">
+      <div class="criterio-concepto">${c.concepto || 'General'}${c.proyecto_detonador ? ' · ' + c.proyecto_detonador : ''}</div>
+      <div class="criterio-desc">${c.descripcion}</div>
+      <div class="criterio-meta">Registrado por ${c.registrado_por} · ${formatDate(c.fecha_registro)}
+        ${c.estado === 'vigente' ? ` · Aprobado ${formatDate(c.fecha_aprobacion)}` : ''}
+        ${c.estado === 'vigente' && confirmado ? ' · <span style="color:var(--green)">✓ Leído</span>' : ''}
+        ${c.estado === 'pendiente_vobo' ? ' · <span style="color:var(--yellow)">Pendiente VoBo PM</span>' : ''}
+      </div>
+      <div class="criterio-actions">
+        ${c.estado === 'pendiente_vobo' && esPM ? `<button class="btn-primary" style="font-size:12px" onclick="aprobarCriterio('${c.criterio_id}')">Aprobar</button>` : ''}
+        ${c.estado === 'vigente' && !confirmado ? `<button class="btn-secondary" style="font-size:12px" onclick="confirmarLectura('${c.criterio_id}')">Confirmar lectura</button>` : ''}
+        ${c.estado === 'vigente' && esPM ? `<button class="btn-ghost" style="color:var(--text3);font-size:12px" onclick="obsoletarCriterio('${c.criterio_id}')">Obsoletizar</button>` : ''}
+      </div>
+    </div>`;
+  }).join('');
 }
 
-// ═══════════════════════════════════════════════════════
-// TIMELINE / HITOS
-// ═══════════════════════════════════════════════════════
-function calcTimeline(proyecto) {
-  if (!proyecto.fecha_aprobacion) return [];
-  const hitos = [];
-  const fechaAprobacion = new Date(proyecto.fecha_aprobacion + 'T12:00:00');
-
-  // Offsets desde disciplinas_catalogo
-  const seen = new Set();
-  state.disciplinasCatalogo.forEach(d => {
-    if (!d.hito_id || seen.has(d.hito_id)) return;
-    seen.add(d.hito_id);
-    const offset = parseInt(d.offset_desde_aprobacion);
-    if (isNaN(offset)) return;
-    const fechaEsperada = addBusinessDays(fechaAprobacion, offset);
-    hitos.push({
-      hito_id: d.hito_id,
-      hito_nombre: d.hito_nombre,
-      grupo_id: d.grupo_id,
-      fecha_esperada: fechaEsperada.toISOString().split('T')[0]
-    });
-  });
-
-  return hitos.sort((a,b) => new Date(a.fecha_esperada) - new Date(b.fecha_esperada));
+function openNuevoCriterio() {
+  document.getElementById('c-descripcion').value = '';
+  document.getElementById('c-concepto').value = '';
+  const sel = document.getElementById('c-proyecto');
+  sel.innerHTML = '<option value="">Ninguno / General</option>';
+  state.proyectos.forEach(p => sel.innerHTML += `<option value="${p.proyecto_id}">${p.nombre}</option>`);
+  openModal('modal-criterio');
 }
 
+async function guardarCriterio() {
+  const desc = document.getElementById('c-descripcion').value.trim();
+  if (!desc) { showToast('La descripción es requerida', 'error'); return; }
+  const btn = document.getElementById('btn-guardar-criterio');
+  btn.disabled = true; btn.textContent = 'Guardando…';
+  try {
+    await api('crearCriterio', { concepto: document.getElementById('c-concepto').value, descripcion: desc, proyecto_detonador: document.getElementById('c-proyecto').value });
+    closeModal('modal-criterio');
+    showToast('Criterio propuesto — pendiente VoBo PM', 'success');
+    await loadAllData(); renderCriteriosList();
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+  finally { btn.disabled = false; btn.textContent = 'Proponer Criterio'; }
+}
+
+async function aprobarCriterio(id) {
+  try { await api('aprobarCriterio', { criterio_id: id }); showToast('Criterio aprobado', 'success'); await loadAllData(); renderCriteriosList(); renderCriteriosBanner(); }
+  catch(e) { showToast('Error: ' + e.message, 'error'); }
+}
+async function confirmarLectura(id) {
+  try { await api('confirmarLecturaCriterio', { criterio_id: id }); showToast('Lectura confirmada', 'success'); await loadAllData(); renderCriteriosList(); renderCriteriosBanner(); }
+  catch(e) { showToast('Error: ' + e.message, 'error'); }
+}
+async function obsoletarCriterio(id) {
+  if (!confirm('¿Marcar este criterio como obsoleto?')) return;
+  try { await api('obsoletarCriterio', { criterio_id: id }); showToast('Criterio obsoletado', 'success'); await loadAllData(); renderCriteriosList(); }
+  catch(e) { showToast('Error: ' + e.message, 'error'); }
+}
+
+// ── TIMELINE / FECHAS ──
 function calcFechaEntrega(fechaAprobacion) {
   if (!fechaAprobacion) return '—';
-  const fecha = addBusinessDays(new Date(fechaAprobacion + 'T12:00:00'), 43);
-  return formatDate(fecha.toISOString().split('T')[0]);
+  try { return formatDate(addBusinessDays(new Date(fechaAprobacion + 'T12:00:00'), 43).toISOString().split('T')[0]); }
+  catch(e) { return '—'; }
 }
 
-function calcFechaEntregaISO(fechaAprobacion) {
-  if (!fechaAprobacion) return '';
-  const fecha = addBusinessDays(new Date(fechaAprobacion + 'T12:00:00'), 43);
-  return fecha.toISOString().split('T')[0];
+function calcRiesgo(proyecto) {
+  if (!proyecto.fecha_aprobacion) return { nivel: 'gray', label: 'Sin fecha' };
+  const hoy = new Date();
+  const fechaEntrega = addBusinessDays(new Date(proyecto.fecha_aprobacion + 'T12:00:00'), 43);
+  const dias = Math.round((fechaEntrega - hoy) / (1000*60*60*24));
+  if (dias < 0) return { nivel: 'red', label: Math.abs(dias) + 'd vencido' };
+  if (dias < 7) return { nivel: 'yellow', label: dias + 'd' };
+  return { nivel: 'green', label: dias + 'd' };
 }
 
 function addBusinessDays(startDate, days) {
   const date = new Date(startDate);
   let added = 0;
-  const direction = days >= 0 ? 1 : -1;
-  const absDays = Math.abs(days);
-  while (added < absDays) {
-    date.setDate(date.getDate() + direction);
-    const dow = date.getDay();
-    if (dow !== 0 && dow !== 6) added++;
-  }
+  while (added < days) { date.setDate(date.getDate() + 1); if (date.getDay() !== 0 && date.getDay() !== 6) added++; }
   return date;
 }
 
-function calcRiesgo(proyecto) {
-  if (!proyecto.fecha_aprobacion) return { nivel: 'gray', dias: 0 };
-  const hoy = new Date();
-  const fechaEntrega = new Date(calcFechaEntregaISO(proyecto.fecha_aprobacion) + 'T12:00:00');
-  const diasRestantes = Math.round((fechaEntrega - hoy) / (1000*60*60*24));
-
-  // Calcular desvío basado en hitos vencidos sin completar
-  const hitos = calcTimeline(proyecto);
-  const log = state.logEventos.filter(e => e.proyecto_id === proyecto.proyecto_id);
-  let hitosVencidos = 0;
-
-  hitos.forEach(h => {
-    const fechaHito = new Date(h.fecha_esperada);
-    if (fechaHito < hoy) {
-      const completado = log.some(e => e.hito_id === h.hito_id);
-      if (!completado) hitosVencidos++;
-    }
-  });
-
-  if (hitosVencidos > 3) return { nivel: 'red', dias: hitosVencidos };
-  if (hitosVencidos > 0) return { nivel: 'yellow', dias: hitosVencidos };
-  return { nivel: 'green', dias: 0 };
-}
-
-function getGruposProyecto(proyecto) {
-  const grupos = [];
-  const seen = new Set();
-  state.eventosCatalogo.forEach(e => {
-    if (!seen.has(e.grupo_id)) {
-      seen.add(e.grupo_id);
-      grupos.push({ grupo_id: e.grupo_id, grupo_nombre: e.grupo_nombre });
-    }
-  });
+// ── HELPERS ──
+function getGruposUnicos() {
+  const grupos = []; const seen = new Set();
+  state.eventosCatalogo.forEach(e => { if (!seen.has(e.grupo_id)) { seen.add(e.grupo_id); grupos.push({ grupo_id: e.grupo_id, grupo_nombre: e.grupo_nombre }); } });
   return grupos;
 }
-
-function getDisciplinasGrupo(proyecto, grupoId) {
-  const disciplinas = new Set();
-  state.eventosCatalogo.filter(e => e.grupo_id === grupoId).forEach(e => {
-    if (e.disciplina_nombre) disciplinas.add(e.disciplina_nombre);
-  });
-  return [...disciplinas];
-}
-
+function getDisciplinasGrupo(gid) { return [...new Set(state.eventosCatalogo.filter(e => e.grupo_id === gid).map(e => e.disciplina_nombre))]; }
 function isDisciplinaCompleta(disciplina, log) {
-  const catalogoEntry = state.eventosCatalogo.find(e =>
-    e.disciplina_nombre === disciplina && e.es_cierre === 'TRUE'
-  );
-  if (!catalogoEntry) return false;
-  return log.some(e => e.hito_id === catalogoEntry.evento_nombre);
+  const cierre = state.eventosCatalogo.find(e => e.disciplina_nombre === disciplina && e.es_cierre === 'TRUE');
+  if (!cierre) return false;
+  return log.some(e => e.hito_id === cierre.evento_nombre);
 }
 
-// ═══════════════════════════════════════════════════════
-// UI HELPERS
-// ═══════════════════════════════════════════════════════
+// ── UI ──
 function showView(viewName) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-
-  if (viewName === 'proyecto-detail') {
-    document.getElementById('view-proyecto-detail').classList.add('active');
-  } else {
-    document.getElementById(`view-${viewName}`).classList.add('active');
-    const navBtn = document.getElementById(`nav-${viewName}`);
-    if (navBtn) navBtn.classList.add('active');
-  }
+  document.getElementById(`view-${viewName}`)?.classList.add('active');
+  document.getElementById(`nav-${viewName}`)?.classList.add('active');
+  if (viewName === 'criterios') renderCriteriosList();
 }
-
 function openModal(id) { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
-
-function formatDate(dateStr) {
-  if (!dateStr) return '—';
-  const [y, m, d] = dateStr.split('-');
-  if (!y || !m || !d) return dateStr;
-  const months = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
-  return `${parseInt(d)} ${months[parseInt(m)-1]} ${y}`;
+function formatDate(d) {
+  if (!d) return '—';
+  const p = d.toString().split('-');
+  if (p.length < 3) return d;
+  const m = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  return `${parseInt(p[2])} ${m[parseInt(p[1])-1]} ${p[0]}`;
 }
-
 function showToast(msg, type = 'success') {
   const el = document.getElementById('toast');
-  el.textContent = msg;
-  el.className = `show ${type}`;
-  setTimeout(() => el.className = '', 3000);
+  el.textContent = msg; el.className = `show ${type}`;
+  setTimeout(() => el.className = '', 3500);
 }
-
-// Cerrar modals al click fuera
-document.querySelectorAll('.modal-overlay').forEach(overlay => {
-  overlay.addEventListener('click', e => {
-    if (e.target === overlay) overlay.classList.remove('open');
-  });
-});
+document.querySelectorAll('.modal-overlay').forEach(o => o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); }));
 </script>
-
-<!-- Google API -->
 <script src="https://apis.google.com/js/api.js" onload="initGoogleAPI()"></script>
-
 </body>
 </html>
