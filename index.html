@@ -381,27 +381,33 @@ let state = {
   bubblePlan: false, disciplinasSeleccionadas: new Set()
 };
 
-// ── AUTH ──
+// ── AUTH — Google Identity Services ──
+let tokenClient;
+
 function initGoogleAPI() {
-  gapi.load('auth2', async () => {
-    await gapi.auth2.init({ client_id: CONFIG.CLIENT_ID, scope: CONFIG.SCOPES });
-    const auth = gapi.auth2.getAuthInstance();
-    if (auth.isSignedIn.get()) await onSignIn(auth.currentUser.get());
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: CONFIG.CLIENT_ID,
+    scope: CONFIG.SCOPES,
+    callback: async (tokenResponse) => {
+      if (tokenResponse.error) { showToast('Error al iniciar sesión', 'error'); return; }
+      state.accessToken = tokenResponse.access_token;
+      try {
+        const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+          headers: { Authorization: 'Bearer ' + state.accessToken }
+        });
+        const profile = await res.json();
+        state.user = { email: profile.email, name: profile.name };
+        await completeSignIn();
+      } catch(e) { showToast('Error obteniendo perfil', 'error'); }
+    }
   });
 }
 
-async function handleLogin() {
-  try {
-    const user = await gapi.auth2.getAuthInstance().signIn();
-    await onSignIn(user);
-  } catch(e) { showToast('Error al iniciar sesión', 'error'); }
+function handleLogin() {
+  tokenClient.requestAccessToken({ prompt: 'select_account' });
 }
 
-async function onSignIn(googleUser) {
-  const profile = googleUser.getBasicProfile();
-  state.user = { email: profile.getEmail(), name: profile.getName() };
-  state.accessToken = googleUser.getAuthResponse().access_token;
-
+async function completeSignIn() {
   try {
     const usuarios = await api('getUsuarios');
     const u = usuarios.find(x => x.email.toLowerCase() === state.user.email.toLowerCase());
@@ -420,7 +426,7 @@ async function onSignIn(googleUser) {
 }
 
 function handleLogout() {
-  try { gapi.auth2.getAuthInstance().signOut(); } catch(e) {}
+  google.accounts.oauth2.revoke(state.accessToken, () => {});
   document.getElementById('login-screen').style.display = 'flex';
   document.getElementById('app').style.display = 'none';
   state.user = null; state.rol = null; state.accessToken = null;
@@ -862,6 +868,6 @@ function showToast(msg, type = 'success') {
 }
 document.querySelectorAll('.modal-overlay').forEach(o => o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); }));
 </script>
-<script src="https://apis.google.com/js/api.js" onload="initGoogleAPI()"></script>
+<script src="https://accounts.google.com/gsi/client" onload="initGoogleAPI()"></script>
 </body>
 </html>
