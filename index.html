@@ -7,14 +7,36 @@
 <link rel="icon" type="image/x-icon" href="favicon.ico">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --bg: #0f0f0f; --surface: #1a1a1a; --surface2: #222222;
-    --border: #2e2e2e; --border2: #3a3a3a;
-    --text: #f0f0f0; --text2: #a0a0a0; --text3: #606060;
-    --accent: #c8f03c; --accent2: #a8cc28;
-    --red: #ff4444; --yellow: #ffaa00; --green: #44cc88; --blue: #4488ff;
-    --radius: 6px; --mono: 'DM Mono', monospace; --sans: 'DM Sans', sans-serif;
-  }
+:root {
+  --bg: #0b0e14;
+  --surface: #161b22;
+  --surface2: #21262d;
+  
+  --border: #30363d;
+  --border2: #3d444d;
+  
+  --text: #e6edf3;   /* Off-white azulado */
+  --text2: #8b949e;  /* Gris medio */
+  --text3: #484f58;  /* Gris oscuro para deshabilitados */
+  
+  --accent: #58a6ff;  /* Azul brillante */
+  --accent2: #1f6feb; /* Azul profundo */
+  
+/* Semánticos para Dashboard (High Contrast / Eye-Friendly) */
+  --red: #ff6b6b;    /* Crítico / Retrasado */
+  --yellow: #e3b341; /* Riesgo / En Pausa */
+  --green: #44cc88;  /* Completado / A tiempo */
+  --blue: #58a6ff;   /* Informativo / En Proceso */
+
+  /* Variantes para backgrounds de etiquetas (Transparentes) */
+  --red-bg: rgba(255, 107, 107, 0.15);
+  --green-bg: rgba(78, 205, 196, 0.15);
+  --yellow-bg: rgba(227, 179, 65, 0.15);
+  
+  --radius: 8px;
+  --sans: 'DM Sans', system-ui, sans-serif;
+  --mono: 'DM Mono', monospace;
+}
   * { margin:0; padding:0; box-sizing:border-box; }
   body { background:var(--bg); color:var(--text); font-family:var(--sans); font-size:15px; line-height:1.6; min-height:100vh; }
   ::-webkit-scrollbar { width:4px; height:4px; }
