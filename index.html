@@ -176,7 +176,7 @@
   .col-header { font-family:var(--mono); font-size:10px; color:var(--text3); letter-spacing:0.5px; }
 
   /* NOTAS DEL PROYECTO */
-  .notas-section { margin-top:28px; }
+  .notas-section { margin-top:28px; margin-bottom:28px; }
   .notas-header { display:flex; align-items:center; justify-content:space-between; cursor:pointer; padding:10px 16px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); transition:background 0.15s; user-select:none; }
   .notas-header:hover { background:var(--surface2); }
   .notas-header.open { border-radius:var(--radius) var(--radius) 0 0; border-bottom-color:transparent; }
@@ -1013,7 +1013,7 @@ function renderNotas(proyecto) {
 
   return `
   <div class="notas-section">
-    <div class="notas-header" id="notas-toggle" onclick="toggleNotas()">
+    <div class="notas-header" id="notas-toggle" onclick="toggleNotas()" >
       <div style="display:flex;align-items:center;gap:10px">
         <span style="font-size:10px;color:var(--text3);transition:transform 0.15s" id="notas-chevron">▶</span>
         <span class="section-title" style="margin:0">Notas del proyecto</span>
@@ -1141,13 +1141,44 @@ async function obsoletarCriterio(id) {
 
 // ── TIMELINE / FECHAS ──
 const HITOS_TIMELINE = [
-  { id:'H00A', nombre:'Aprobación del Proyecto',     offset:0  },
-  { id:'H06',  nombre:'Día 1 de Diseño',             offset:10 },
-  { id:'H09',  nombre:'VoBo Layout — Dirección',     offset:14 },
-  { id:'H11',  nombre:'Liberación de Layout',        offset:20 },
-  { id:'H14',  nombre:'Cierre Arquitectura',         offset:23 },
-  { id:'H23',  nombre:'Cierre Instalaciones',        offset:33 },
-  { id:'H36',  nombre:'Entrega Proyecto Ejecutivo',  offset:43 },
+  { id:'H01',  nombre:'Aprobación de nuevo proyecto',                    offset:0  },
+  { id:'H02',  nombre:'Solicitud Requerimientos Comercial + Operaciones', offset:1  },
+  { id:'H0A',  nombre:'Recepción de info para Bubble Plan',              offset:null },
+  { id:'H0B',  nombre:'Envío de Bubble Plan a Control de Proyectos',     offset:null },
+  { id:'H03',  nombre:'Asignación de arquitecto',                        offset:5  },
+  { id:'H04',  nombre:'Recepción info preliminar',                       offset:8  },
+  { id:'H05',  nombre:'Envío Reporte de Levantamiento',                  offset:10 },
+  { id:'H06',  nombre:'Día 1 de Diseño',                                 offset:10 },
+  { id:'H07',  nombre:'Requerimientos Comercial + Operaciones cerrados', offset:null },
+  { id:'H08',  nombre:'Validaciones cerradas',                           offset:3  },
+  { id:'H09',  nombre:'VoBo Layout — Dirección',                         offset:14 },
+  { id:'H10',  nombre:'VoBo Fachada',                                    offset:14 },
+  { id:'H11',  nombre:'Liberación de Layout',                            offset:20 },
+  { id:'H12',  nombre:'Solicitud Proyecto Arquitectónico',               offset:15 },
+  { id:'H13',  nombre:'Recepción P. Arq. (planos + catálogo)',           offset:25 },
+  { id:'H14',  nombre:'Envío comentarios post-revisión P. Arq.',         offset:27 },
+  { id:'H15',  nombre:'Entrega preliminar P. Ejecutivo',                 offset:28 },
+  { id:'H16',  nombre:'Solicitud Etapa 1 — Zonificación',               offset:15 },
+  { id:'H17',  nombre:'Solicitud Etapa 2 — HVAC + Eléctrico',           offset:18 },
+  { id:'H18',  nombre:'Solicitud Etapa 3 — Pantallas, Cámaras, Aromas', offset:19 },
+  { id:'H19',  nombre:'Solicitud Etapa 4 — Redes, Prevención',          offset:19 },
+  { id:'H20',  nombre:'Solicitud Etapa 5 — Señalética, Insumos',        offset:20 },
+  { id:'H21',  nombre:'Solicitud Etapa 6 — Validaciones dependientes',  offset:21 },
+  { id:'H22',  nombre:'Cierre Mobiliario',                               offset:20 },
+  { id:'H23',  nombre:'Cierre Instalaciones',                            offset:33 },
+  { id:'H24',  nombre:'Cierre Redes / Sistemas',                         offset:24 },
+  { id:'H25',  nombre:'Cierre Prevención',                               offset:24 },
+  { id:'H26',  nombre:'Cierre Marketing Sensorial',                      offset:26 },
+  { id:'H27',  nombre:'Cierre Excelencia Operativa',                     offset:25 },
+  { id:'H28',  nombre:'Cierre Precios Unitarios',                        offset:24 },
+  { id:'H29',  nombre:'Cierre Control de Proyectos — Insumos',          offset:25 },
+  { id:'H30',  nombre:'Cruce Instalaciones cerrado',                     offset:33 },
+  { id:'H31',  nombre:'Cruce Redes / Sistemas cerrado',                  offset:24 },
+  { id:'H32',  nombre:'Cruce Prevención cerrado',                        offset:24 },
+  { id:'H33',  nombre:'Cruce Marketing Sensorial cerrado',               offset:26 },
+  { id:'H34',  nombre:'Cruce General cerrado',                           offset:34 },
+  { id:'H35',  nombre:'Recepción P. Arq. corregido',                     offset:38 },
+  { id:'H36',  nombre:'Entrega Proyecto Ejecutivo',                      offset:43 },
 ];
 
 function renderTimeline(proyecto) {
@@ -1158,23 +1189,23 @@ function renderTimeline(proyecto) {
   const log = state.logEventos.filter(e => e.proyecto_id === proyecto.proyecto_id);
 
   const rows = HITOS_TIMELINE.map(h => {
-    const fechaEsperada = addBusinessDays(base, h.offset);
+    const fechaEsperada = h.offset !== null ? addBusinessDays(base, h.offset) : null;
     const completado = log.some(e => e.hito_id === h.id);
-    const vencido = !completado && fechaEsperada < hoy;
+    const vencido = !completado && fechaEsperada && fechaEsperada < hoy;
     const estadoLabel = completado ? 'completado' : vencido ? 'en riesgo' : 'pendiente';
     const estadoClass = completado ? 'completado' : vencido ? 'en-riesgo' : 'pendiente';
     return `
     <div class="timeline-row">
       <div class="timeline-hito-id">${h.id}</div>
       <div class="timeline-hito-nombre">${h.nombre}</div>
-      <div class="timeline-fecha">${formatDate(fechaEsperada)}</div>
+      <div class="timeline-fecha">${fechaEsperada ? formatDate(fechaEsperada) : '<span style="color:var(--text3)">variable</span>'}</div>
       <div class="timeline-estado ${estadoClass}">${estadoLabel}</div>
     </div>`;
   }).join('');
 
   return `
   <div class="timeline-section">
-    <div class="section-title">Timeline</div>
+    <div class="section-title">Hitos del Proyecto</div>
     <div>
       <div class="timeline-row header">
         <div class="col-header">Hito</div>
