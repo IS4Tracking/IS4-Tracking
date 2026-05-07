@@ -158,6 +158,43 @@
   .log-tipo { font-family:var(--mono); font-size:10px; color:var(--text3); background:var(--surface2); padding:1px 5px; border-radius:2px; text-align:right; }
   .log-empty { color:var(--text3); font-size:12px; font-family:var(--mono); padding:8px 0; }
 
+  /* TIMELINE EN DETALLE */
+  .timeline-section { margin-top:28px; }
+  .timeline-table { width:100%; border-collapse:collapse; }
+  .timeline-row { display:grid; grid-template-columns:80px 1fr 130px 90px; gap:12px; align-items:center; padding:9px 16px; border-bottom:1px solid var(--border); font-size:13px; }
+  .timeline-row:last-child { border-bottom:none; }
+  .timeline-row.header { background:var(--surface2); border-radius:var(--radius) var(--radius) 0 0; border:1px solid var(--border); border-bottom:1px solid var(--border); }
+  .timeline-row:not(.header) { background:var(--surface); border-left:1px solid var(--border); border-right:1px solid var(--border); }
+  .timeline-row:not(.header):last-child { border-bottom:1px solid var(--border); border-radius:0 0 var(--radius) var(--radius); }
+  .timeline-hito-id { font-family:var(--mono); font-size:10px; color:var(--text3); }
+  .timeline-hito-nombre { font-size:13px; }
+  .timeline-fecha { font-family:var(--mono); font-size:12px; color:var(--text2); }
+  .timeline-estado { font-family:var(--mono); font-size:10px; padding:2px 7px; border-radius:3px; text-align:center; }
+  .timeline-estado.completado { background:rgba(68,204,136,0.15); color:var(--green); }
+  .timeline-estado.en-riesgo { background:rgba(255,107,107,0.15); color:var(--red); }
+  .timeline-estado.pendiente { background:var(--surface2); color:var(--text3); }
+  .col-header { font-family:var(--mono); font-size:10px; color:var(--text3); letter-spacing:0.5px; }
+
+  /* NOTAS DEL PROYECTO */
+  .notas-section { margin-top:28px; }
+  .notas-header { display:flex; align-items:center; justify-content:space-between; cursor:pointer; padding:10px 16px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); transition:background 0.15s; user-select:none; }
+  .notas-header:hover { background:var(--surface2); }
+  .notas-header.open { border-radius:var(--radius) var(--radius) 0 0; border-bottom-color:transparent; }
+  .notas-body { display:none; background:var(--surface); border:1px solid var(--border); border-top:none; border-radius:0 0 var(--radius) var(--radius); padding:16px; }
+  .notas-body.open { display:block; }
+  .nota-entry { padding:10px 0; border-bottom:1px solid var(--border); }
+  .nota-entry:last-of-type { border-bottom:none; }
+  .nota-meta { font-family:var(--mono); font-size:10px; color:var(--text3); margin-bottom:4px; }
+  .nota-texto { font-size:13px; line-height:1.6; color:var(--text); }
+  .nota-form { margin-top:16px; padding-top:16px; border-top:1px solid var(--border); display:none; }
+  .nota-form.open { display:block; }
+
+  /* SETTINGS MODAL — DANGER ZONE */
+  .danger-zone { margin-top:24px; padding-top:16px; border-top:1px solid var(--border); }
+  .danger-zone-title { font-size:11px; font-family:var(--mono); color:var(--red); letter-spacing:1px; text-transform:uppercase; margin-bottom:10px; }
+  .btn-danger { background:none; border:1px solid var(--red); color:var(--red); padding:8px 16px; border-radius:var(--radius); font-family:var(--sans); font-size:13px; cursor:pointer; transition:all 0.15s; }
+  .btn-danger:hover { background:rgba(255,107,107,0.1); }
+
   /* CRITERIOS */
   .criterio-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px; margin-bottom:8px; }
   .criterio-card.pendiente_vobo { border-left:3px solid var(--yellow); }
@@ -287,8 +324,13 @@
           <div class="project-detail-title" id="detail-title"></div>
           <div class="project-detail-meta" id="detail-meta"></div>
         </div>
-        <button class="btn-primary" onclick="openNuevoEntry()">+ Registrar evento</button>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn-secondary" onclick="openSettings()" style="font-size:13px">⚙️ Settings</button>
+          <button class="btn-primary" onclick="openNuevoEntry()">+ Registrar evento</button>
+        </div>
       </div>
+      <div id="detail-timeline"></div>
+      <div id="detail-notas"></div>
       <div class="groups-container" id="groups-container"></div>
     </div>
 
@@ -384,6 +426,41 @@
     <div class="modal-footer">
       <button class="btn-secondary" onclick="closeModal('modal-criterio')">Cancelar</button>
       <button class="btn-primary" id="btn-guardar-criterio" onclick="guardarCriterio()">Proponer Criterio</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: SETTINGS DEL PROYECTO -->
+<div class="modal-overlay" id="modal-settings">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title">Settings del Proyecto</div><button class="modal-close" onclick="closeModal('modal-settings')">×</button></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Nombre del proyecto</label><input class="form-input" id="s-nombre" placeholder="IS Nombre Sucursal"></div>
+        <div class="form-group"><label class="form-label">Clave Innovasport</label><input class="form-input" id="s-clave" placeholder="IS-XXX"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Tipo de proyecto</label>
+          <select class="form-select" id="s-tipo"><option value="">Seleccionar…</option><option>Apertura nueva</option><option>Reubicación</option><option>Remodelación</option></select>
+        </div>
+        <div class="form-group"><label class="form-label">Fecha de aprobación</label><input class="form-input" id="s-fecha" type="date"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Arquitecto asignado</label><select class="form-select" id="s-arquitecto"><option value="">Sin asignar</option></select></div>
+        <div class="form-group"><label class="form-label">Estado</label>
+          <select class="form-select" id="s-estado"><option value="Activo">Activo</option><option value="En pausa">En pausa</option><option value="Cerrado">Cerrado</option></select>
+        </div>
+      </div>
+      <div class="form-group"><div class="form-toggle" onclick="toggleSettingsBubble()"><div class="toggle-switch" id="toggle-settings-bubble"></div><div class="toggle-label">Bubble Plan aplica</div></div></div>
+      <div class="form-group"><label class="form-label">Notas</label><textarea class="form-textarea" id="s-notas" placeholder="Contexto del proyecto…"></textarea></div>
+      <div class="danger-zone">
+        <div class="danger-zone-title">Zona de peligro</div>
+        <button class="btn-danger" onclick="borrarProyecto()">Borrar proyecto…</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('modal-settings')">Cancelar</button>
+      <button class="btn-primary" id="btn-guardar-settings" onclick="guardarSettings()">Guardar cambios</button>
     </div>
   </div>
 </div>
@@ -599,6 +676,8 @@ function openProyecto(proyectoId) {
   document.getElementById('detail-title').textContent = p.nombre;
   document.getElementById('detail-meta').textContent = `${p.clave_innovasport ? p.clave_innovasport + ' · ' : ''}${p.tipo_proyecto || '—'} · Aprobación: ${formatDate(p.fecha_aprobacion)} · Entrega estimada: ${calcFechaEntrega(p.fecha_aprobacion)}`;
   renderGroups(p);
+  document.getElementById('detail-timeline').innerHTML = renderTimeline(p);
+  document.getElementById('detail-notas').innerHTML = renderNotas(p);
   showView('proyecto-detail');
 }
 
@@ -858,6 +937,144 @@ async function guardarEntry() {
   finally { btn.disabled = false; btn.textContent = 'Guardar Evento'; }
 }
 
+// ── SETTINGS ──
+function openSettings() {
+  const p = state.currentProyecto;
+  if (!p) return;
+  document.getElementById('s-nombre').value = p.nombre || '';
+  document.getElementById('s-clave').value = p.clave_innovasport || '';
+  document.getElementById('s-tipo').value = p.tipo_proyecto || '';
+  document.getElementById('s-fecha').value = p.fecha_aprobacion ? p.fecha_aprobacion.toString().split('T')[0].substring(0,10) : '';
+  document.getElementById('s-notas').value = p.notas || '';
+  document.getElementById('s-estado').value = p.estado || 'Activo';
+  const bubbleOn = p.bubble_plan_aplica === true || p.bubble_plan_aplica === 'TRUE';
+  document.getElementById('toggle-settings-bubble').classList.toggle('on', bubbleOn);
+  const sel = document.getElementById('s-arquitecto');
+  sel.innerHTML = '<option value="">Sin asignar</option>';
+  state.usuarios.filter(u => u.rol === 'Arquitecto').forEach(u => sel.innerHTML += `<option value="${u.email}">${u.nombre}</option>`);
+  sel.value = p.arquitecto_id || '';
+  openModal('modal-settings');
+}
+
+function toggleSettingsBubble() {
+  const toggle = document.getElementById('toggle-settings-bubble');
+  toggle.classList.toggle('on');
+}
+
+async function guardarSettings() {
+  const nombre = document.getElementById('s-nombre').value.trim();
+  if (!nombre) { showToast('El nombre es requerido', 'error'); return; }
+  const btn = document.getElementById('btn-guardar-settings');
+  btn.disabled = true; btn.textContent = 'Guardando…';
+  try {
+    await api('actualizarProyecto', {
+      proyecto_id: state.currentProyecto.proyecto_id,
+      nombre, clave_innovasport: document.getElementById('s-clave').value,
+      tipo_proyecto: document.getElementById('s-tipo').value,
+      fecha_aprobacion: document.getElementById('s-fecha').value,
+      arquitecto_id: document.getElementById('s-arquitecto').value,
+      estado: document.getElementById('s-estado').value,
+      bubble_plan_aplica: document.getElementById('toggle-settings-bubble').classList.contains('on'),
+      notas: document.getElementById('s-notas').value
+    });
+    closeModal('modal-settings');
+    showToast('Proyecto actualizado', 'success');
+    await loadAllData();
+    const updated = state.proyectos.find(p => p.proyecto_id === state.currentProyecto.proyecto_id);
+    if (updated) { state.currentProyecto = updated; openProyecto(updated.proyecto_id); }
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+  finally { btn.disabled = false; btn.textContent = 'Guardar cambios'; }
+}
+
+async function borrarProyecto() {
+  const p = state.currentProyecto;
+  if (!p) return;
+  if (!confirm(`¿Borrar "${p.nombre}"?\n\nEsta acción no se puede deshacer.`)) return;
+  try {
+    await api('borrarProyecto', { proyecto_id: p.proyecto_id });
+    closeModal('modal-settings');
+    showToast('Proyecto borrado', 'success');
+    state.currentProyecto = null;
+    await loadAllData();
+    showView('dashboard');
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+}
+
+// ── NOTAS ──
+function renderNotas(proyecto) {
+  const notas = state.logEventos.filter(e => e.proyecto_id === proyecto.proyecto_id && e.tipo_entry === 'nota');
+  const notasHTML = notas.length === 0
+    ? '<div style="color:var(--text3);font-family:var(--mono);font-size:12px;padding:4px 0">Sin notas registradas.</div>'
+    : notas.sort((a,b) => new Date(b.fecha_real) - new Date(a.fecha_real)).map(n => `
+        <div class="nota-entry">
+          <div class="nota-meta">${formatDate(n.fecha_real)} · ${n.registrado_por || state.user?.name || '—'}</div>
+          <div class="nota-texto">${n.nota || n.hito_id || ''}</div>
+        </div>`).join('');
+
+  return `
+  <div class="notas-section">
+    <div class="notas-header" id="notas-toggle" onclick="toggleNotas()">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:10px;color:var(--text3);transition:transform 0.15s" id="notas-chevron">▶</span>
+        <span class="section-title" style="margin:0">Notas del proyecto</span>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${notas.length}</span>
+      </div>
+      <button class="btn-ghost" style="font-size:11px" onclick="event.stopPropagation();abrirFormNota()">+ Nota</button>
+    </div>
+    <div class="notas-body" id="notas-body">
+      <div id="notas-lista">${notasHTML}</div>
+      <div class="nota-form" id="nota-form">
+        <textarea class="form-textarea" id="nota-texto-input" placeholder="Escribe la nota…" style="min-height:72px;margin-bottom:10px"></textarea>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button class="btn-secondary" style="font-size:12px" onclick="cerrarFormNota()">Cancelar</button>
+          <button class="btn-primary" id="btn-guardar-nota" style="font-size:12px" onclick="guardarNota()">Guardar nota</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function toggleNotas() {
+  document.getElementById('notas-toggle').classList.toggle('open');
+  document.getElementById('notas-body').classList.toggle('open');
+  const ch = document.getElementById('notas-chevron');
+  ch.style.transform = document.getElementById('notas-body').classList.contains('open') ? 'rotate(90deg)' : '';
+}
+
+function abrirFormNota() {
+  document.getElementById('notas-toggle').classList.add('open');
+  document.getElementById('notas-body').classList.add('open');
+  document.getElementById('notas-chevron').style.transform = 'rotate(90deg)';
+  document.getElementById('nota-form').classList.add('open');
+  document.getElementById('nota-texto-input').value = '';
+  document.getElementById('nota-texto-input').focus();
+}
+
+function cerrarFormNota() {
+  document.getElementById('nota-form').classList.remove('open');
+  document.getElementById('nota-texto-input').value = '';
+}
+
+async function guardarNota() {
+  const texto = document.getElementById('nota-texto-input').value.trim();
+  if (!texto) { showToast('Escribe algo antes de guardar', 'error'); return; }
+  const btn = document.getElementById('btn-guardar-nota');
+  btn.disabled = true; btn.textContent = 'Guardando…';
+  try {
+    await api('appendLogEvento', {
+      proyecto_id: state.currentProyecto.proyecto_id,
+      fecha_real: new Date().toISOString().split('T')[0],
+      disciplina_id: '', hito_id: '',
+      tipo_entry: 'nota', nota: texto, version_timeline_activa: '1'
+    });
+    cerrarFormNota();
+    showToast('Nota guardada', 'success');
+    await loadAllData();
+    document.getElementById('detail-notas').innerHTML = renderNotas(state.currentProyecto);
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+  finally { btn.disabled = false; btn.textContent = 'Guardar nota'; }
+}
+
 // ── CRITERIOS ──
 function renderCriteriosList() {
   const container = document.getElementById('criterios-list');
@@ -923,6 +1140,52 @@ async function obsoletarCriterio(id) {
 }
 
 // ── TIMELINE / FECHAS ──
+const HITOS_TIMELINE = [
+  { id:'H00A', nombre:'Aprobación del Proyecto',     offset:0  },
+  { id:'H06',  nombre:'Día 1 de Diseño',             offset:10 },
+  { id:'H09',  nombre:'VoBo Layout — Dirección',     offset:14 },
+  { id:'H11',  nombre:'Liberación de Layout',        offset:20 },
+  { id:'H14',  nombre:'Cierre Arquitectura',         offset:23 },
+  { id:'H23',  nombre:'Cierre Instalaciones',        offset:33 },
+  { id:'H36',  nombre:'Entrega Proyecto Ejecutivo',  offset:43 },
+];
+
+function renderTimeline(proyecto) {
+  if (!proyecto.fecha_aprobacion) return '<div style="color:var(--text3);font-family:var(--mono);font-size:12px;padding:12px 0">Sin fecha de aprobación — no se puede calcular el timeline.</div>';
+  const base = parseISODate(proyecto.fecha_aprobacion);
+  if (!base) return '';
+  const hoy = new Date();
+  const log = state.logEventos.filter(e => e.proyecto_id === proyecto.proyecto_id);
+
+  const rows = HITOS_TIMELINE.map(h => {
+    const fechaEsperada = addBusinessDays(base, h.offset);
+    const completado = log.some(e => e.hito_id === h.id);
+    const vencido = !completado && fechaEsperada < hoy;
+    const estadoLabel = completado ? 'completado' : vencido ? 'en riesgo' : 'pendiente';
+    const estadoClass = completado ? 'completado' : vencido ? 'en-riesgo' : 'pendiente';
+    return `
+    <div class="timeline-row">
+      <div class="timeline-hito-id">${h.id}</div>
+      <div class="timeline-hito-nombre">${h.nombre}</div>
+      <div class="timeline-fecha">${formatDate(fechaEsperada)}</div>
+      <div class="timeline-estado ${estadoClass}">${estadoLabel}</div>
+    </div>`;
+  }).join('');
+
+  return `
+  <div class="timeline-section">
+    <div class="section-title">Timeline</div>
+    <div>
+      <div class="timeline-row header">
+        <div class="col-header">Hito</div>
+        <div class="col-header">Descripción</div>
+        <div class="col-header">Fecha esperada</div>
+        <div class="col-header">Estado</div>
+      </div>
+      ${rows}
+    </div>
+  </div>`;
+}
 function calcFechaEntrega(fechaAprobacion) {
   if (!fechaAprobacion) return '—';
   try {
