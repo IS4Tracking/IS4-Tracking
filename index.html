@@ -448,14 +448,9 @@ function initGoogleAPI() {
   }
 }
 function handleLogin() {
-  const savedToken = sessionStorage.getItem('is4_token');
-  const savedUser = sessionStorage.getItem('is4_user');
-  if (savedToken && savedUser) {
-    state.accessToken = savedToken;
-    state.user = JSON.parse(savedUser);
-    completeSignIn();
-    return;
-  }
+  // Limpiar session storage antes de pedir token nuevo
+  sessionStorage.removeItem('is4_token');
+  sessionStorage.removeItem('is4_user');
   tokenClient.requestAccessToken({ prompt: 'select_account' });
 }
 
