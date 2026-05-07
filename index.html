@@ -319,7 +319,7 @@
         <div class="form-group"><label class="form-label">Tipo de proyecto</label>
           <select class="form-select" id="p-tipo"><option value="">Seleccionar…</option><option>Apertura nueva</option><option>Reubicación</option><option>Remodelación</option></select>
         </div>
-        <div class="form-group"><label class="form-label">Fecha de aprobación</label><input class="form-input" id="p-fecha" type="date" placeholder="DD/MM/AAAA"></div>
+        <div class="form-group"><label class="form-label">Fecha de aprobación</label><input class="form-input" id="p-fecha" type="text" placeholder="DD/MM/AAAA"></div>
       </div>
       <div class="form-group"><label class="form-label">Arquitecto asignado</label><select class="form-select" id="p-arquitecto"><option value="">Sin asignar</option></select></div>
       <div class="form-group"><div class="form-toggle" onclick="toggleBubblePlan()"><div class="toggle-switch" id="toggle-bubble"></div><div class="toggle-label">Bubble Plan aplica</div></div></div>
@@ -348,7 +348,7 @@
         <div class="form-group"><label class="form-label">Disciplina</label><select class="form-select" id="e-disciplina" onchange="updateEventos()"><option value="">Seleccionar disciplina…</option></select></div>
       </div>
       <div class="form-group"><label class="form-label">Evento</label><select class="form-select" id="e-evento"><option value="">Seleccionar evento…</option></select></div>
-      <div class="form-group"><label class="form-label">Fecha real</label><input class="form-input" id="e-fecha" type="date" placeholder="DD/MM/AAAA"></div>
+      <div class="form-group"><label class="form-label">Fecha real</label><input class="form-input" id="e-fecha" type="text" placeholder="DD/MM/AAAA"></div>
       <div id="cambio-fields" style="display:none">
         <div class="form-row">
           <div class="form-group"><label class="form-label">Tipo de cambio</label>
@@ -669,7 +669,7 @@ function openEntryForDisciplina(grupoId, disciplina) {
 
 // ── NUEVO PROYECTO ──
 function openNuevoProyecto() {
-  document.getElementById('p-fecha').value = new Date().toISOString().split('T')[0];
+  const hoy = new Date(); document.getElementById('p-fecha').value = `${String(hoy.getDate()).padStart(2,'0')}/${String(hoy.getMonth()+1).padStart(2,'0')}/${hoy.getFullYear()}`;
   ['p-nombre','p-clave','p-notas'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('p-tipo').value = '';
   state.bubblePlan = true;
@@ -769,8 +769,9 @@ function toggleBubblePlan() {
 
 async function guardarProyecto() {
   const nombre = document.getElementById('p-nombre').value.trim();
-  const fecha = document.getElementById('p-fecha').value;
-  if (!nombre || !fecha) { showToast('Nombre y fecha son requeridos', 'error'); return; }
+  const fechaRaw = document.getElementById('p-fecha').value;
+  const fecha = parseFecha(fechaRaw);
+  if (!nombre || !fecha) { showToast('Nombre y fecha requeridos — usa formato DD/MM/AAAA', 'error'); return; }
   const btn = document.getElementById('btn-guardar-proyecto');
   btn.disabled = true; btn.textContent = 'Guardando…';
   try {
@@ -790,7 +791,7 @@ async function guardarProyecto() {
 
 // ── NUEVO ENTRY ──
 function openNuevoEntry() {
-  document.getElementById('e-fecha').value = new Date().toISOString().split('T')[0];
+  const hoyE = new Date(); document.getElementById('e-fecha').value = `${String(hoyE.getDate()).padStart(2,'0')}/${String(hoyE.getMonth()+1).padStart(2,'0')}/${hoyE.getFullYear()}`;
   document.getElementById('e-nota').value = '';
   document.getElementById('e-grupo').value = '';
   document.getElementById('e-disciplina').innerHTML = '<option value="">Seleccionar disciplina…</option>';
@@ -832,11 +833,12 @@ function selectTipo(tipo) {
 }
 
 async function guardarEntry() {
-  const fecha = document.getElementById('e-fecha').value;
+  const fechaRaw = document.getElementById('e-fecha').value;
+  const fecha = parseFecha(fechaRaw);
   const grupo = document.getElementById('e-grupo').value;
   const disciplina = document.getElementById('e-disciplina').value;
   const evento = document.getElementById('e-evento').value;
-  if (!fecha || !grupo) { showToast('Grupo y fecha son requeridos', 'error'); return; }
+  if (!fecha || !grupo) { showToast('Grupo y fecha requeridos — usa formato DD/MM/AAAA', 'error'); return; }
   if (!state.currentProyecto) { showToast('Selecciona un proyecto primero', 'error'); return; }
   const btn = document.getElementById('btn-guardar-entry');
   btn.disabled = true; btn.textContent = 'Guardando…';
@@ -925,6 +927,17 @@ async function obsoletarCriterio(id) {
 }
 
 // ── TIMELINE / FECHAS ──
+function parseFecha(str) {
+  // Acepta DD/MM/AAAA o YYYY-MM-DD
+  if (!str) return '';
+  str = str.trim();
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(str)) {
+    const [d, m, y] = str.split('/');
+    return `${y}-${m}-${d}`;
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+  return '';
+}
 function calcFechaEntrega(fechaAprobacion) {
   if (!fechaAprobacion) return '—';
   try { return formatDate(addBusinessDays(new Date(fechaAprobacion + 'T12:00:00'), 43).toISOString().split('T')[0]); }
