@@ -409,7 +409,6 @@ function initGoogleAPI() {
   if (savedToken && savedUser) {
     state.accessToken = savedToken;
     state.user = JSON.parse(savedUser);
-    // Verificar que el token sigue válido
     fetch('https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=' + savedToken)
       .then(r => r.json())
       .then(info => {
@@ -425,7 +424,7 @@ function initGoogleAPI() {
         sessionStorage.removeItem('is4_user');
       });
   }
-
+}
 function handleLogin() {
   const savedToken = sessionStorage.getItem('is4_token');
   const savedUser = sessionStorage.getItem('is4_user');
