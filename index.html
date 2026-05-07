@@ -611,7 +611,7 @@ function renderDashboard() {
             <div class="meta-item"><span class="label">Tipo&nbsp;</span>${p.tipo_proyecto || '—'}</div>
             <div class="meta-item"><span class="label">Aprobación&nbsp;</span>${formatDate(p.fecha_aprobacion)}</div>
             <div class="meta-item"><span class="label">Entrega est.&nbsp;</span>${calcFechaEntrega(p.fecha_aprobacion)}</div>
-            ${p.arquitecto_id ? `<div class="meta-item"><span class="label">Arq.&nbsp;</span>${p.arquitecto_id}</div>` : ''}
+            ${p.arquitecto_id ? `<div class="meta-item"><span class="label">Arq.&nbsp;</span>${(state.usuarios.find(u => u.email === p.arquitecto_id)?.nombre) || p.arquitecto_id}</div>` : ''}
           </div>
         </div>
         <div class="project-right">
