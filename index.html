@@ -692,7 +692,10 @@ function buildDisciplinasChecklist() {
 
   state.disciplinasSeleccionadas = new Set();
   Object.entries(grupos).forEach(([gid, g]) => {
-    [...g.disciplinas].forEach(d => state.disciplinasSeleccionadas.add(`${gid}::${d}`));
+    [...g.disciplinas].forEach(d => {
+      if (gid === 'G1') return; // G1 lo controla el toggle — no se auto-selecciona
+      state.disciplinasSeleccionadas.add(`${gid}::${d}`);
+    });
   });
   if (state.bubblePlan) state.disciplinasSeleccionadas.add('G1::Bubble Plan');
 
@@ -927,14 +930,19 @@ async function obsoletarCriterio(id) {
 // ── TIMELINE / FECHAS ──
 function calcFechaEntrega(fechaAprobacion) {
   if (!fechaAprobacion) return '—';
-  try { return formatDate(addBusinessDays(new Date(fechaAprobacion + 'T12:00:00'), 43).toISOString().split('T')[0]); }
-  catch(e) { return '—'; }
+  try {
+    const dt = parseISODate(fechaAprobacion);
+    if (!dt) return '—';
+    return formatDate(addBusinessDays(dt, 43));
+  } catch(e) { return '—'; }
 }
 
 function calcRiesgo(proyecto) {
   if (!proyecto.fecha_aprobacion) return { nivel: 'gray', label: 'Sin fecha' };
+  const dt = parseISODate(proyecto.fecha_aprobacion);
+  if (!dt) return { nivel: 'gray', label: 'Sin fecha' };
   const hoy = new Date();
-  const fechaEntrega = addBusinessDays(new Date(proyecto.fecha_aprobacion + 'T12:00:00'), 43);
+  const fechaEntrega = addBusinessDays(dt, 43);
   const dias = Math.round((fechaEntrega - hoy) / (1000*60*60*24));
   if (dias < 0) return { nivel: 'red', label: Math.abs(dias) + 'd vencido' };
   if (dias < 7) return { nivel: 'yellow', label: dias + 'd' };
@@ -971,12 +979,23 @@ function showView(viewName) {
 }
 function openModal(id) { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function parseISODate(d) {
+  // Maneja YYYY-MM-DD, Date objects, y strings largos tipo "Tue May 05 2026..."
+  if (!d) return null;
+  if (d instanceof Date) return isNaN(d) ? null : d;
+  const s = d.toString().trim();
+  // Formato YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return new Date(s + 'T12:00:00');
+  // Cualquier otro string — intentar parsear directamente
+  const dt = new Date(s);
+  return isNaN(dt) ? null : dt;
+}
 function formatDate(d) {
   if (!d) return '—';
-  const p = d.toString().split('-');
-  if (p.length < 3) return d;
+  const dt = parseISODate(d);
+  if (!dt) return '—';
   const m = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
-  return `${parseInt(p[2])} ${m[parseInt(p[1])-1]} ${p[0]}`;
+  return `${dt.getDate()} ${m[dt.getMonth()]} ${dt.getFullYear()}`;
 }
 function showToast(msg, type = 'success') {
   const el = document.getElementById('toast');
