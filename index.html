@@ -159,7 +159,12 @@
   .log-empty { color:var(--text3); font-size:12px; font-family:var(--mono); padding:8px 0; }
 
   /* TIMELINE EN DETALLE */
-  .timeline-section { margin-top:28px; }
+  .timeline-section { margin-top:28px; margin-bottom:4px; }
+  .timeline-header { display:flex; align-items:center; justify-content:space-between; cursor:pointer; padding:10px 16px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); transition:background 0.15s; user-select:none; }
+  .timeline-header:hover { background:var(--surface2); }
+  .timeline-header.open { border-radius:var(--radius) var(--radius) 0 0; border-bottom-color:transparent; }
+  .timeline-body { display:none; }
+  .timeline-body.open { display:block; }
   .timeline-table { width:100%; border-collapse:collapse; }
   .timeline-row { display:grid; grid-template-columns:80px 1fr 130px 90px; gap:12px; align-items:center; padding:9px 16px; border-bottom:1px solid var(--border); font-size:13px; }
   .timeline-row:last-child { border-bottom:none; }
@@ -1034,6 +1039,12 @@ function renderNotas(proyecto) {
   </div>`;
 }
 
+function toggleTimeline() {
+  document.getElementById('timeline-toggle').classList.toggle('open');
+  document.getElementById('timeline-body').classList.toggle('open');
+  const ch = document.getElementById('timeline-chevron');
+  ch.style.transform = document.getElementById('timeline-body').classList.contains('open') ? 'rotate(90deg)' : '';
+}
 function toggleNotas() {
   document.getElementById('notas-toggle').classList.toggle('open');
   document.getElementById('notas-body').classList.toggle('open');
@@ -1203,9 +1214,16 @@ function renderTimeline(proyecto) {
     </div>`;
   }).join('');
 
-  return `
+return `
   <div class="timeline-section">
-    <div class="section-title">Hitos del Proyecto</div>
+    <div class="timeline-header" id="timeline-toggle" onclick="toggleTimeline()">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:10px;color:var(--text3);transition:transform 0.15s" id="timeline-chevron">▶</span>
+        <span class="section-title" style="margin:0">Hitos del Proyecto</span>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${HITOS_TIMELINE.length}</span>
+      </div>
+    </div>
+    <div class="timeline-body" id="timeline-body">
     <div>
       <div class="timeline-row header">
         <div class="col-header">Hito</div>
@@ -1214,6 +1232,7 @@ function renderTimeline(proyecto) {
         <div class="col-header">Estado</div>
       </div>
       ${rows}
+    </div>
     </div>
   </div>`;
 }
