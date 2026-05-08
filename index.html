@@ -673,7 +673,7 @@ function renderDashboard() {
     <div style="font-family:var(--mono);font-size:10px;color:#ff5050;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;margin-top:4px">⚠ Hitos vencidos — ${vencidos.length}</div>
     ${vencidos.map(h => `<div class="hito-row retrasado">
       <div class="hito-fecha" style="color:#ff5050">${formatDate(h.fecha)}</div>
-      <div class="hito-link" onclick="openProyectoEnHito('${h.proyectoId}','${h.hitoId}')">${h.hito}</div>
+      <div class="hito-link" onclick="openProyectoEnHito('${h.proyectoId}','${h.hitoId}')">${h.hitoId} — ${h.hito}</div>
       <div class="hito-link secondary" onclick="openProyecto('${h.proyectoId}')">${h.proyecto}</div>
       <div></div>
     </div>`).join('')}`;
@@ -789,17 +789,44 @@ function openEntryForDisciplina(grupoId, disciplina) {
   }, 60);
 }
 
+const HITO_DISCIPLINAS = {
+  'H22': [{ g:'G5', d:'Zonificación' }, { g:'G5', d:'Mueble de Gorras' }],
+  'H23': [{ g:'G6', d:'HVAC' }, { g:'G6', d:'Proyecto Eléctrico' }],
+  'H24': [{ g:'G7', d:'Pantallas' }, { g:'G7', d:'Antenas WiFi' }, { g:'G7', d:'Bocinas' }, { g:'G7', d:'Contador de Personas' }, { g:'G7', d:'Validación Contactos' }, { g:'G7', d:'Validación Voz y Datos' }, { g:'G7', d:'Validación Site' }, { g:'G7', d:'Validación Cámaras' }],
+  'H25': [{ g:'G8', d:'Cámaras de Seguridad' }, { g:'G8', d:'Antenas de Seguridad' }, { g:'G8', d:'Detección de Humos' }, { g:'G8', d:'Alarmas' }, { g:'G8', d:'Protección Contra Incendios' }, { g:'G8', d:'Lámparas de Emergencia' }, { g:'G8', d:'Señalética de Emergencia + Extintores' }, { g:'G8', d:'Alarma Sísmica' }],
+  'H26': [{ g:'G9', d:'Aromas' }, { g:'G9', d:'Validación Pantallas' }, { g:'G9', d:'Validación Bocinas' }],
+  'H27': [{ g:'G10', d:'Caminadora' }, { g:'G10', d:'Mueble de Servicios' }],
+  'H28': [{ g:'G11', d:'Iluminación' }, { g:'G11', d:'Estantería' }, { g:'G11', d:'Mezzanine' }],
+  'H29': [{ g:'G12', d:'Insumos' }],
+  'H36': [{ g:'G15', d:'Proyecto Ejecutivo' }],
+};
+
 async function openProyectoEnHito(proyectoId, hitoId) {
   await openProyecto(proyectoId);
+  const disciplinas = HITO_DISCIPLINAS[hitoId];
+  if (!disciplinas || disciplinas.length === 0) return;
   setTimeout(() => {
-    const rows = document.querySelectorAll('.timeline-row');
-    rows.forEach(row => {
-      if (row.querySelector('.timeline-hito-id')?.textContent === hitoId) { 
-        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        row.style.background = 'rgba(255,80,80,0.1)';
-        setTimeout(() => row.style.background = '', 2000);
+    // Expandir grupos relevantes
+    const gruposVistos = new Set();
+    disciplinas.forEach(({ g }) => {
+      if (!gruposVistos.has(g)) {
+        gruposVistos.add(g);
+        const groupEl = document.getElementById(`group-${g}`);
+        if (groupEl && !groupEl.classList.contains('open')) {
+          groupEl.classList.add('open');
+        }
       }
     });
+    // Scroll a la primera disciplina bloqueante
+    const { g, d } = disciplinas[0];
+    const safeId = `${proyectoId}_${g}_${d}`.replace(/[^a-zA-Z0-9_]/g, '_');
+    const discEl = document.getElementById(`log_${safeId}`)?.closest('.disciplina-row') || 
+                   document.getElementById(`log_${safeId}`);
+    if (discEl) {
+      discEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      discEl.style.background = 'rgba(255,80,80,0.08)';
+      setTimeout(() => discEl.style.background = '', 2000);
+    }
   }, 800);
 }
 
