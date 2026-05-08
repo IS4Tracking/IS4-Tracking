@@ -691,7 +691,7 @@ function renderCriteriosBanner() {
 }
 
 // ── PROYECTO DETAIL ──
-function openProyecto(proyectoId) {
+async function openProyecto(proyectoId) {
   const p = state.proyectos.find(x => x.proyecto_id === proyectoId);
   if (!p) return;
   state.currentProyecto = p;
@@ -701,6 +701,7 @@ function openProyecto(proyectoId) {
   document.getElementById('detail-timeline').innerHTML = renderTimeline(p);
   document.getElementById('detail-notas').innerHTML = renderNotas(p);
   showView('proyecto-detail');
+  await evaluarHitos(proyectoId);
 }
 
 function renderGroups(proyecto) {
@@ -961,6 +962,7 @@ async function guardarNotaCambio() {
         entry_id: res.entry_id,
         origen_cambio: document.getElementById('e-origen').value,
         disciplinas_afectadas: '',
+        hitos_afectados: '',
         impacto_tipo: document.getElementById('e-impacto-tipo').value
       });
     }
@@ -990,14 +992,84 @@ async function guardarEntry() {
     closeModal('modal-entry');
     showToast('Evento registrado', 'success');
     await loadAllData();
+    await evaluarHitos(state.currentProyecto.proyecto_id);
     if (state.currentProyecto) openProyecto(state.currentProyecto.proyecto_id);
   } catch(e) { showToast('Error: ' + e.message, 'error'); }
   finally { btn.disabled = false; btn.textContent = 'Guardar Evento'; }
 }
 
+// ── EVALUACIÓN DE HITOS ──
+async function evaluarHitos(proyectoId) {
+  const log = state.logEventos.filter(e => e.proyecto_id === proyectoId);
+  const hitsAlcanzados = new Set(log.filter(e => e.tipo_entry === 'hito_alcanzado').map(e => e.hito_id));
+  const nuevosHitos = [];
+
+  function tieneEvento(grupoId, disciplina, eventoNombre) {
+    const discKey = `${grupoId}::${disciplina}`;
+    return log.some(e => e.disciplina_id === discKey && e.hito_id === eventoNombre);
+  }
+  function tieneCierre(grupoId, disciplina) {
+    const cierre = state.eventosCatalogo.find(e => e.grupo_id === grupoId && e.disciplina_nombre === disciplina && e.es_cierre === 'TRUE');
+    if (!cierre) return false;
+    return tieneEvento(grupoId, disciplina, cierre.evento_nombre);
+  }
+  function todasCierran(grupoId, disciplinas) {
+    return disciplinas.every(d => tieneCierre(grupoId, d));
+  }
+  function algunaSolicitud(grupoId, disciplinas) {
+    return disciplinas.some(d => {
+      const discKey = `${grupoId}::${d}`;
+      return log.some(e => e.disciplina_id === discKey && e.hito_id && e.hito_id.toLowerCase().includes('solicitud'));
+    });
+  }
+
+  const TRIGGERS = {
+    'H01': () => true, // auto al crear — siempre alcanzado
+    'H22': () => todasCierran('G5', ['Zonificación','Mueble de Gorras']),
+    'H23': () => todasCierran('G6', ['HVAC','Proyecto Eléctrico']),
+    'H24': () => todasCierran('G7', ['Pantallas','Antenas WiFi','Bocinas','Contador de Personas','Validación Contactos','Validación Voz y Datos','Validación Site','Validación Cámaras']),
+    'H25': () => todasCierran('G8', state.eventosCatalogo.filter(e => e.grupo_id === 'G8').map(e => e.disciplina_nombre).filter((v,i,a) => a.indexOf(v) === i)),
+    'H26': () => todasCierran('G9', ['Aromas','Validación Pantallas','Validación Bocinas']),
+    'H27': () => todasCierran('G10', ['Caminadora','Mueble de Servicios']),
+    'H28': () => todasCierran('G11', state.eventosCatalogo.filter(e => e.grupo_id === 'G11').map(e => e.disciplina_nombre).filter((v,i,a) => a.indexOf(v) === i)),
+    'H29': () => tieneCierre('G12', 'Insumos'),
+    'H30': () => hitsAlcanzados.has('H23'),
+    'H31': () => hitsAlcanzados.has('H24'),
+    'H32': () => hitsAlcanzados.has('H25'),
+    'H33': () => hitsAlcanzados.has('H26'),
+    'H34': () => ['H30','H31','H32','H33'].every(h => hitsAlcanzados.has(h)),
+    'H36': () => tieneCierre('G15', 'Proyecto Ejecutivo'),
+  };
+
+  for (const [hitoId, condicion] of Object.entries(TRIGGERS)) {
+    if (!hitsAlcanzados.has(hitoId) && condicion()) {
+      nuevosHitos.push(hitoId);
+    }
+  }
+
+  for (const hitoId of nuevosHitos) {
+    await api('appendLogEvento', {
+      proyecto_id: proyectoId,
+      fecha_real: new Date().toISOString().split('T')[0],
+      disciplina_id: '', hito_id: hitoId,
+      tipo_entry: 'hito_alcanzado',
+      version_hito: calcVersionHito(log, hitoId),
+      nota: 'Alcanzado automáticamente', version_timeline_activa: '1'
+    });
+    showToast(`🎯 Hito ${hitoId} alcanzado`, 'success');
+  }
+
+  return nuevosHitos;
+}
+
+function calcVersionHito(log, hitoId) {
+  const anteriores = log.filter(e => e.hito_id === hitoId && e.tipo_entry === 'hito_alcanzado');
+  return anteriores.length + 1;
+}
+
 // ── SETTINGS ──
 function openSettings() {
-  const p = state.currentProyecto;
+    const p = state.currentProyecto;
   if (!p) return;
   document.getElementById('s-nombre').value = p.nombre || '';
   document.getElementById('s-clave').value = p.clave_innovasport || '';
