@@ -652,7 +652,7 @@ function renderDashboard() {
     HITOS_TIMELINE.filter(h => h.offset !== null).forEach(h => {
       const completado = logP.some(e => e.hito_id === h.id && e.tipo_entry === 'hito_alcanzado');
       if (completado) return;
-      const fecha = addBusinessDays(new Date(p.fecha_aprobacion + 'T12:00:00'), h.offset);
+      const fecha = addBusinessDays(parseISODate(p.fecha_aprobacion), h.offset);
       if (fecha < hoy) {
         vencidos.push({ proyecto: p.nombre, hito: h.nombre, fecha: fecha.toISOString().split('T')[0], proyectoId: p.proyecto_id });
       } else if (fecha <= limite) {
