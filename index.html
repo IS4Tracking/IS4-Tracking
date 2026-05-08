@@ -648,13 +648,12 @@ function renderDashboard() {
   activos.forEach(p => {
     if (!p.fecha_aprobacion) return;
     const logP = state.logEventos.filter(e => e.proyecto_id === p.proyecto_id);
-    console.log('dashboard — proyecto:', p.nombre, 'log entries:', logP.length, 'fecha_aprobacion:', p.fecha_aprobacion);
     HITOS_TIMELINE.filter(h => h.offset !== null).forEach(h => {
       const completado = logP.some(e => e.hito_id === h.id && e.tipo_entry === 'hito_alcanzado');
       if (completado) return;
       const fecha = addBusinessDays(parseISODate(p.fecha_aprobacion), h.offset);
       if (fecha < hoy) {
-        vencidos.push({ proyecto: p.nombre, hito: h.nombre, fecha: fecha.toISOString().split('T')[0], proyectoId: p.proyecto_id });
+        vencidos.push({ proyecto: p.nombre, hito: h.nombre, hitoId: h.id, fecha: fecha.toISOString().split('T')[0], proyectoId: p.proyecto_id });
       } else if (fecha <= limite) {
         proximos.push({ proyecto: p.nombre, hito: h.nombre, fecha: fecha.toISOString().split('T')[0], proyectoId: p.proyecto_id });
       }
@@ -667,10 +666,10 @@ function renderDashboard() {
   const hitosContainer = document.getElementById('hitos-proximos');
   const vencidosHTML = vencidos.length === 0 ? '' : `
     <div style="font-family:var(--mono);font-size:10px;color:#ff5050;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;margin-top:4px">⚠ Hitos vencidos — ${vencidos.length}</div>
-    ${vencidos.map(h => `<div class="hito-row retrasado" onclick="openProyecto('${h.proyectoId}')">
+    ${vencidos.map(h => `<div class="hito-row retrasado">
       <div class="hito-fecha" style="color:#ff5050">${formatDate(h.fecha)}</div>
-      <div style="font-weight:500">${h.proyecto}</div>
-      <div style="font-size:12px;color:var(--text2)">${h.hito}</div>
+      <div style="font-weight:500;cursor:pointer;text-decoration:underline;text-underline-offset:3px" onclick="openProyecto('${h.proyectoId}')">${h.proyecto}</div>
+      <div style="font-size:12px;color:var(--accent);cursor:pointer" onclick="openProyectoEnHito('${h.proyectoId}','${h.hitoId}')">${h.hito}</div>
       <div></div>
     </div>`).join('')}`;
 
@@ -783,6 +782,20 @@ function openEntryForDisciplina(grupoId, disciplina) {
     updateDisciplinas();
     setTimeout(() => { document.getElementById('e-disciplina').value = disciplina; updateEventos(); }, 60);
   }, 60);
+}
+
+async function openProyectoEnHito(proyectoId, hitoId) {
+  await openProyecto(proyectoId);
+  setTimeout(() => {
+    const rows = document.querySelectorAll('.timeline-row');
+    rows.forEach(row => {
+      if (row.querySelector('.timeline-hito-id')?.textContent === hitoId) { 
+        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        row.style.background = 'rgba(255,80,80,0.1)';
+        setTimeout(() => row.style.background = '', 2000);
+      }
+    });
+  }, 800);
 }
 
 // ── NUEVO PROYECTO ──
