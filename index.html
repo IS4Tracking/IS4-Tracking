@@ -176,7 +176,8 @@
   .timeline-fecha { font-family:var(--mono); font-size:12px; color:var(--text2); }
   .timeline-estado { font-family:var(--mono); font-size:10px; padding:2px 7px; border-radius:3px; text-align:center; }
   .timeline-estado.completado { background:rgba(68,204,136,0.15); color:var(--green); }
-  .timeline-estado.en-riesgo { background:rgba(255,107,107,0.15); color:var(--red); }
+  .timeline-estado.en-riesgo { background:rgba(255,200,0,0.15); color:var(--yellow); border-color:var(--yellow); }
+  .timeline-estado.retrasado { background:rgba(255,80,80,0.15); color:#ff5050; border-color:#ff5050; }
   .timeline-estado.pendiente { background:var(--surface2); color:var(--text3); }
   .col-header { font-family:var(--mono); font-size:10px; color:var(--text3); letter-spacing:0.5px; }
 
@@ -639,38 +640,60 @@ function renderDashboard() {
     }).join('')}</div>`;
   }
 
-  // Hitos próximos
+  // Hitos próximos y vencidos
   const hoy = new Date();
   const limite = new Date(); limite.setDate(limite.getDate() + 7);
   const proximos = [];
+  const vencidos = [];
+
   activos.forEach(p => {
     if (!p.fecha_aprobacion) return;
-    // Hitos de G0 con offsets conocidos
+    const logP = state.logEventos.filter(e => e.proyecto_id === p.proyecto_id);
     const hitosRef = [
       { id:'H06', nombre:'Día 1 de Diseño', offset:10 },
       { id:'H09', nombre:'VoBo Layout Dirección', offset:14 },
       { id:'H11', nombre:'Liberación de Layout', offset:20 },
+      { id:'H22', nombre:'Cierre Mobiliario', offset:24 },
       { id:'H23', nombre:'Cierre Instalaciones', offset:33 },
+      { id:'H24', nombre:'Cierre Redes / Sistemas', offset:28 },
       { id:'H36', nombre:'Entrega Proyecto Ejecutivo', offset:43 }
     ];
     hitosRef.forEach(h => {
+      const completado = logP.some(e => e.hito_id === h.id && e.tipo_entry === 'hito_alcanzado');
+      if (completado) return;
       const fecha = addBusinessDays(new Date(p.fecha_aprobacion + 'T12:00:00'), h.offset);
-      if (fecha >= hoy && fecha <= limite) {
+      if (fecha < hoy) {
+        vencidos.push({ proyecto: p.nombre, hito: h.nombre, fecha: fecha.toISOString().split('T')[0], proyectoId: p.proyecto_id });
+      } else if (fecha <= limite) {
         proximos.push({ proyecto: p.nombre, hito: h.nombre, fecha: fecha.toISOString().split('T')[0], proyectoId: p.proyecto_id });
       }
     });
   });
+
   proximos.sort((a,b) => new Date(a.fecha) - new Date(b.fecha));
+  vencidos.sort((a,b) => new Date(a.fecha) - new Date(b.fecha));
 
   const hitosContainer = document.getElementById('hitos-proximos');
-  hitosContainer.innerHTML = proximos.length === 0
-    ? `<div style="color:var(--text3);font-family:var(--mono);font-size:12px;padding:12px 0">Sin hitos en los próximos 7 días</div>`
-    : proximos.map(h => `<div class="hito-row" onclick="openProyecto('${h.proyectoId}')">
-        <div class="hito-fecha">${formatDate(h.fecha)}</div>
-        <div style="font-weight:500">${h.proyecto}</div>
-        <div style="font-size:12px;color:var(--text2)">${h.hito}</div>
-        <div></div>
-      </div>`).join('');
+  const vencidosHTML = vencidos.length === 0 ? '' : `
+    <div style="font-family:var(--mono);font-size:10px;color:#ff5050;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;margin-top:4px">⚠ Hitos vencidos — ${vencidos.length}</div>
+    ${vencidos.map(h => `<div class="hito-row retrasado" onclick="openProyecto('${h.proyectoId}')">
+      <div class="hito-fecha" style="color:#ff5050">${formatDate(h.fecha)}</div>
+      <div style="font-weight:500">${h.proyecto}</div>
+      <div style="font-size:12px;color:var(--text2)">${h.hito}</div>
+      <div></div>
+    </div>`).join('')}`;
+
+  const proximosHTML = proximos.length === 0
+    ? `<div style="color:var(--text3);font-family:var(--mono);font-size:12px;padding:8px 0">Sin hitos en los próximos 7 días</div>`
+    : `<div style="font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;margin-top:${vencidos.length > 0 ? '16px' : '4px'}">Próximos 7 días</div>
+    ${proximos.map(h => `<div class="hito-row" onclick="openProyecto('${h.proyectoId}')">
+      <div class="hito-fecha">${formatDate(h.fecha)}</div>
+      <div style="font-weight:500">${h.proyecto}</div>
+      <div style="font-size:12px;color:var(--text2)">${h.hito}</div>
+      <div></div>
+    </div>`).join('')}`;
+
+  hitosContainer.innerHTML = vencidosHTML + proximosHTML;
 }
 
 function renderCriteriosBanner() {
@@ -1300,10 +1323,11 @@ function renderTimeline(proyecto) {
 
   const rows = HITOS_TIMELINE.map(h => {
     const fechaEsperada = h.offset !== null ? addBusinessDays(base, h.offset) : null;
-    const completado = log.some(e => e.hito_id === h.id);
-    const vencido = !completado && fechaEsperada && fechaEsperada < hoy;
-    const estadoLabel = completado ? 'completado' : vencido ? 'en riesgo' : 'pendiente';
-    const estadoClass = completado ? 'completado' : vencido ? 'en-riesgo' : 'pendiente';
+    const completado = log.some(e => e.hito_id === h.id && e.tipo_entry === 'hito_alcanzado');
+    const retrasado = !completado && fechaEsperada && fechaEsperada < hoy;
+    const enRiesgo = !completado && !retrasado && fechaEsperada && (fechaEsperada - hoy) < 7 * 24 * 60 * 60 * 1000;
+    const estadoLabel = completado ? 'completado' : retrasado ? 'retrasado' : enRiesgo ? 'en riesgo' : 'pendiente';
+    const estadoClass = completado ? 'completado' : retrasado ? 'retrasado' : enRiesgo ? 'en-riesgo' : 'pendiente';
     return `
     <div class="timeline-row">
       <div class="timeline-hito-id">${h.id}</div>
@@ -1371,7 +1395,7 @@ function getGruposUnicos() {
 }
 function getDisciplinasGrupo(gid) { return [...new Set(state.eventosCatalogo.filter(e => e.grupo_id === gid).map(e => e.disciplina_nombre))]; }
 function isDisciplinaCompleta(disciplina, grupoId, log) {
-  const cierre = state.eventosCatalogo.find(e => e.grupo_id === grupoId && e.disciplina_nombre === disciplina && e.es_cierre === 'TRUE');
+  const cierre = state.eventosCatalogo.find(e => e.grupo_id === grupoId && e.disciplina_nombre === disciplina && (e.es_cierre === 'TRUE' || e.es_cierre === 'true' || e.es_cierre === true));
   if (!cierre) return false;
   const discKey = `${grupoId}::${disciplina}`;
   return log.some(e => e.disciplina_id === discKey && e.hito_id === cierre.evento_nombre && e.tipo_entry === 'evento');
