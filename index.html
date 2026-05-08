@@ -716,8 +716,8 @@ function renderGroups(proyecto) {
   );
   document.getElementById('groups-container').innerHTML = grupos.map(g => {
     const disciplinas = getDisciplinasGrupo(g.grupo_id).filter(d => activasSet.has(`${g.grupo_id}::${d}`));
-    const completadas = disciplinas.filter(d => isDisciplinaCompleta(d, log)).length;
-    const enProceso = disciplinas.filter(d => !isDisciplinaCompleta(d, log) && log.some(e => e.disciplina_id === `${g.grupo_id}::${d}`)).length;
+    const completadas = disciplinas.filter(d => isDisciplinaCompleta(d, g.grupo_id, log)).length;
+    const enProceso = disciplinas.filter(d => !isDisciplinaCompleta(d, g.grupo_id, log) && log.some(e => e.disciplina_id === `${g.grupo_id}::${d}`)).length;
     const nivel = completadas === disciplinas.length && disciplinas.length > 0 ? 'green' : enProceso > 0 ? 'yellow' : 'gray';
     return `
     <div class="group-row" id="group-${g.grupo_id}">
@@ -737,7 +737,7 @@ function renderDisciplina(proyecto, grupo, disciplina, log) {
   const discKey = `${grupo.grupo_id}::${disciplina}`;
   const safeId = `${proyecto.proyecto_id}_${grupo.grupo_id}_${disciplina}`.replace(/[^a-zA-Z0-9_]/g, '_');
   const eventos = log.filter(e => e.disciplina_id === discKey);
-  const completa = isDisciplinaCompleta(disciplina, log);
+  const completa = isDisciplinaCompleta(disciplina, grupo.grupo_id, log);
   const estado = completa ? 'completado' : eventos.length > 0 ? 'en-proceso' : 'pendiente';
   return `
   <div>
@@ -1364,10 +1364,11 @@ function getGruposUnicos() {
   return grupos;
 }
 function getDisciplinasGrupo(gid) { return [...new Set(state.eventosCatalogo.filter(e => e.grupo_id === gid).map(e => e.disciplina_nombre))]; }
-function isDisciplinaCompleta(disciplina, log) {
-  const cierre = state.eventosCatalogo.find(e => e.disciplina_nombre === disciplina && e.es_cierre === 'TRUE');
+function isDisciplinaCompleta(disciplina, grupoId, log) {
+  const cierre = state.eventosCatalogo.find(e => e.grupo_id === grupoId && e.disciplina_nombre === disciplina && e.es_cierre === 'TRUE');
   if (!cierre) return false;
-  return log.some(e => e.hito_id === cierre.evento_nombre);
+  const discKey = `${grupoId}::${disciplina}`;
+  return log.some(e => e.disciplina_id === discKey && e.hito_id === cierre.evento_nombre && e.tipo_entry === 'evento');
 }
 
 // ── UI ──
