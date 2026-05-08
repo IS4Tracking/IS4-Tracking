@@ -497,7 +497,7 @@ let state = {
   user: null, rol: null, accessToken: null,
   proyectos: [], eventosCatalogo: [], logEventos: [], criterios: [], usuarios: [],
   disciplinasProyecto: [],
-  currentProyecto: null, entryTipo: 'hito_completado',
+  currentProyecto: null, entryTipo: 'nota',
   bubblePlan: false, disciplinasSeleccionadas: new Set()
 };
 
@@ -1060,12 +1060,12 @@ async function borrarProyecto() {
 
 // ── NOTAS ──
 function renderNotas(proyecto) {
-  const notas = state.logEventos.filter(e => e.proyecto_id === proyecto.proyecto_id && e.tipo_entry === 'nota');
+  const notas = state.logEventos.filter(e => e.proyecto_id === proyecto.proyecto_id && (e.tipo_entry === 'nota' || e.tipo_entry === 'cambio_registrado'));
   const notasHTML = notas.length === 0
     ? '<div style="color:var(--text3);font-family:var(--mono);font-size:12px;padding:4px 0">Sin notas registradas.</div>'
     : notas.sort((a,b) => new Date(b.fecha_real) - new Date(a.fecha_real)).map(n => `
         <div class="nota-entry">
-          <div class="nota-meta">${formatDate(n.fecha_real)} · ${n.registrado_por || state.user?.name || '—'}</div>
+          <div class="nota-meta">${formatDate(n.fecha_real)} · ${n.registrado_por || state.user?.name || '—'}${n.tipo_entry === 'cambio_registrado' ? ' · <span style="color:var(--yellow);font-family:var(--mono);font-size:10px">⚡ cambio</span>' : ''}</div>
           <div class="nota-texto">${n.nota || n.hito_id || ''}</div>
         </div>`).join('');
 
@@ -1103,40 +1103,6 @@ function toggleNotas() {
   document.getElementById('notas-body').classList.toggle('open');
   const ch = document.getElementById('notas-chevron');
   ch.style.transform = document.getElementById('notas-body').classList.contains('open') ? 'rotate(90deg)' : '';
-}
-
-function abrirFormNota() {
-  document.getElementById('notas-toggle').classList.add('open');
-  document.getElementById('notas-body').classList.add('open');
-  document.getElementById('notas-chevron').style.transform = 'rotate(90deg)';
-  document.getElementById('nota-form').classList.add('open');
-  document.getElementById('nota-texto-input').value = '';
-  document.getElementById('nota-texto-input').focus();
-}
-
-function cerrarFormNota() {
-  document.getElementById('nota-form').classList.remove('open');
-  document.getElementById('nota-texto-input').value = '';
-}
-
-async function guardarNota() {
-  const texto = document.getElementById('nota-texto-input').value.trim();
-  if (!texto) { showToast('Escribe algo antes de guardar', 'error'); return; }
-  const btn = document.getElementById('btn-guardar-nota');
-  btn.disabled = true; btn.textContent = 'Guardando…';
-  try {
-    await api('appendLogEvento', {
-      proyecto_id: state.currentProyecto.proyecto_id,
-      fecha_real: new Date().toISOString().split('T')[0],
-      disciplina_id: '', hito_id: '',
-      tipo_entry: 'nota', nota: texto, version_timeline_activa: '1'
-    });
-    cerrarFormNota();
-    showToast('Nota guardada', 'success');
-    await loadAllData();
-    document.getElementById('detail-notas').innerHTML = renderNotas(state.currentProyecto);
-  } catch(e) { showToast('Error: ' + e.message, 'error'); }
-  finally { btn.disabled = false; btn.textContent = 'Guardar nota'; }
 }
 
 // ── CRITERIOS ──
