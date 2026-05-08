@@ -1017,7 +1017,7 @@ async function evaluarHitos(proyectoId, logOverride) {
     return log.some(e => e.disciplina_id === discKey && e.hito_id === eventoNombre);
   }
   function tieneCierre(grupoId, disciplina) {
-    const cierre = state.eventosCatalogo.find(e => e.grupo_id === grupoId && e.disciplina_nombre === disciplina && e.es_cierre === 'TRUE');
+    const cierre = state.eventosCatalogo.find(e => e.grupo_id === grupoId && e.disciplina_nombre === disciplina && (e.es_cierre === 'TRUE' || e.es_cierre === 'true' || e.es_cierre === true));
     if (!cierre) return false;
     return tieneEvento(grupoId, disciplina, cierre.evento_nombre);
   }
