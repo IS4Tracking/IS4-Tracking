@@ -1,0 +1,1450 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IS4 · Store Planning Tracking</title>
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0b0e14;
+  --surface: #161b22;
+  --surface2: #21262d;
+  
+  --border: #30363d;
+  --border2: #3d444d;
+  
+  --text: #e6edf3;   /* Off-white azulado */
+  --text2: #8b949e;  /* Gris medio */
+  --text3: #6e7681;  /* Gris oscuro para deshabilitados */
+  
+  --accent: #58a6ff;  /* Azul brillante */
+  --accent2: #1f6feb; /* Azul profundo */
+  
+/* Semánticos para Dashboard (High Contrast / Eye-Friendly) */
+  --red: #ff6b6b;    /* Crítico / Retrasado */
+  --yellow: #e3b341; /* Riesgo / En Pausa */
+  --green: #44cc88;  /* Completado / A tiempo */
+  --blue: #58a6ff;   /* Informativo / En Proceso */
+
+  /* Variantes para backgrounds de etiquetas (Transparentes) */
+  --red-bg: rgba(255, 107, 107, 0.15);
+  --green-bg: rgba(78, 205, 196, 0.15);
+  --yellow-bg: rgba(227, 179, 65, 0.15);
+  
+  --radius: 8px;
+  --sans: 'DM Sans', system-ui, sans-serif;
+  --mono: 'DM Mono', monospace;
+}
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--text); font-family:var(--sans); font-size:15px; line-height:1.6; min-height:100vh; }
+  ::-webkit-scrollbar { width:4px; height:4px; }
+  ::-webkit-scrollbar-track { background:var(--bg); }
+  ::-webkit-scrollbar-thumb { background:var(--border2); border-radius:2px; }
+
+  /* LOGIN */
+  #login-screen { min-height:100vh; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:32px; }
+  .login-badge { font-family:var(--mono); font-size:11px; color:var(--accent); letter-spacing:3px; text-transform:uppercase; }
+  .login-title { font-size:28px; font-weight:300; letter-spacing:-0.5px; }
+  .login-title span { color:var(--accent); font-weight:600; }
+  .login-sub { font-size:13px; color:var(--text2); font-family:var(--mono); }
+  .btn-google { display:flex; align-items:center; gap:10px; background:#e6edf3; color:#0f0f0f; border:none; padding:12px 24px; border-radius:var(--radius); font-family:var(--sans); font-size:14px; font-weight:600; cursor:pointer; transition:background 0.15s; }
+  .btn-google:hover { background:#c9d1d9; }
+  .login-note { font-size:12px; color:var(--text2); font-family:var(--mono); text-align:center; }
+
+  /* APP */
+  #app { display:none; flex-direction:column; min-height:100vh; }
+  .topbar { height:48px; background:var(--surface); border-bottom:1px solid var(--border); display:flex; align-items:center; padding:0 20px; gap:16px; position:sticky; top:0; z-index:100; }
+  .topbar-brand { font-family:var(--mono); font-size:12px; color:var(--accent); letter-spacing:2px; font-weight:500; }
+  .topbar-sep { width:1px; height:20px; background:var(--border); }
+  .topbar-nav { display:flex; gap:4px; flex:1; }
+  .nav-btn { background:none; border:none; color:var(--text2); font-family:var(--sans); font-size:13px; padding:6px 12px; border-radius:var(--radius); cursor:pointer; transition:all 0.15s; }
+  .nav-btn:hover { background:var(--surface2); color:var(--text); }
+  .nav-btn.active { background:var(--surface2); color:var(--accent); }
+  .topbar-user { display:flex; align-items:center; gap:8px; margin-left:auto; }
+  .user-name { font-size:12px; color:var(--text2); }
+  .user-role { font-family:var(--mono); font-size:10px; color:var(--text3); background:var(--surface2); padding:2px 6px; border-radius:3px; border:1px solid var(--border); }
+  .btn-logout { background:none; border:1px solid var(--border); color:var(--text3); font-size:11px; padding:4px 8px; border-radius:var(--radius); cursor:pointer; transition:all 0.15s; }
+  .btn-logout:hover { border-color:var(--red); color:var(--red); }
+
+  .main { flex:1; padding:24px; max-width:1200px; margin:0 auto; width:100%; }
+  .view { display:none; }
+  .view.active { display:block; }
+  .page-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:24px; }
+  .page-title { font-size:20px; font-weight:500; letter-spacing:-0.3px; }
+  .page-sub { font-size:12px; color:var(--text2); font-family:var(--mono); margin-top:2px; }
+
+  /* BUTTONS */
+  .btn-primary { background:var(--accent); color:#0f0f0f; border:none; padding:8px 16px; border-radius:var(--radius); font-family:var(--sans); font-size:13px; font-weight:600; cursor:pointer; transition:background 0.15s; }
+  .btn-primary:hover { background:var(--accent2); }
+  .btn-primary:disabled { opacity:0.5; cursor:not-allowed; }
+  .btn-secondary { background:none; border:1px solid var(--border); color:var(--text2); padding:8px 16px; border-radius:var(--radius); font-family:var(--sans); font-size:13px; cursor:pointer; transition:all 0.15s; }
+  .btn-secondary:hover { border-color:var(--border2); color:var(--text); }
+  .btn-ghost { background:none; border:1px solid var(--accent2); color:var(--accent); font-size:11px; cursor:pointer; padding:3px 10px; border-radius:var(--radius); transition:all 0.15s; font-family:var(--sans); }
+  .btn-ghost:hover { background:rgba(31,111,235,0.15); color:var(--text); border-color:var(--accent); }
+
+  /* PROJECT CARDS */
+  .project-grid { display:flex; flex-direction:column; gap:8px; }
+  .project-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px 20px; cursor:pointer; transition:border-color 0.15s; display:grid; grid-template-columns:1fr auto; gap:12px; align-items:center; }
+  .project-card:hover { border-color:var(--border2); }
+  .project-card.risk-red { border-left:3px solid var(--red); }
+  .project-card.risk-yellow { border-left:3px solid var(--yellow); }
+  .project-card.risk-green { border-left:3px solid var(--green); }
+  .project-name { font-size:15px; font-weight:500; margin-bottom:4px; }
+  .project-meta { display:flex; gap:16px; flex-wrap:wrap; }
+  .meta-item { font-size:11px; color:var(--text2); font-family:var(--mono); display:flex; align-items:center; gap:4px; }
+  .meta-item .label { color:var(--text2); }
+  .project-right { display:flex; flex-direction:column; align-items:flex-end; gap:6px; }
+  .semaforo { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+  .semaforo.red { background:var(--red); box-shadow:0 0 6px var(--red); }
+  .semaforo.yellow { background:var(--yellow); box-shadow:0 0 6px var(--yellow); }
+  .semaforo.green { background:var(--green); box-shadow:0 0 6px var(--green); }
+  .semaforo.gray { background:var(--text3); }
+  .desvio-badge { font-family:var(--mono); font-size:11px; padding:2px 6px; border-radius:3px; }
+  .desvio-badge.red { background:rgba(255,68,68,0.15); color:var(--red); }
+  .desvio-badge.yellow { background:rgba(255,170,0,0.15); color:var(--yellow); }
+  .desvio-badge.green { background:rgba(68,204,136,0.15); color:var(--green); }
+  .desvio-badge.gray { background:var(--surface2); color:var(--text3); }
+
+  /* HITOS */
+  .hitos-section { margin-top:32px; }
+  .section-title { font-size:11px; font-family:var(--mono); color:var(--text3); letter-spacing:2px; text-transform:uppercase; margin-bottom:12px; }
+  .hito-row { display:grid; grid-template-columns:120px 1fr 200px 80px; gap:12px; align-items:center; padding:10px 16px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); margin-bottom:4px; font-size:13px; cursor:pointer; transition:border-color 0.15s; }
+  .hito-row:hover { border-color:var(--border2); }
+  .hito-fecha { font-family:var(--mono); font-size:12px; color:var(--text2); }
+  .hito-row.retrasado { border-left:2px solid #ff5050; cursor:default; }
+  .hito-link { font-weight:500; cursor:pointer; color:var(--text); transition:color 0.15s; }
+  .hito-link:hover { color:var(--accent); }
+  .hito-link.secondary { font-size:12px; font-weight:400; color:var(--text2); }
+  .hito-link.secondary:hover { color:var(--accent); }
+
+  /* CRITERIOS BANNER */
+  .criterios-banner { background:rgba(200,240,60,0.06); border:1px solid rgba(200,240,60,0.2); border-radius:var(--radius); padding:12px 16px; margin-bottom:20px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  .criterios-banner-text { font-size:13px; color:var(--accent); }
+  .criterios-banner-sub { font-size:11px; color:var(--text2); font-family:var(--mono); margin-top:2px; }
+
+  /* DETAIL */
+  .back-btn { display:flex; align-items:center; gap:6px; color:var(--text2); font-size:12px; cursor:pointer; margin-bottom:20px; background:none; border:none; font-family:var(--sans); transition:color 0.15s; }
+  .back-btn:hover { color:var(--text); }
+  .project-detail-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:24px; }
+  .project-detail-title { font-size:22px; font-weight:500; }
+  .project-detail-meta { font-size:12px; color:var(--text2); font-family:var(--mono); margin-top:4px; }
+
+  /* GROUPS */
+  .groups-container { display:flex; flex-direction:column; gap:4px; }
+  .group-row { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; }
+  .group-header { display:grid; grid-template-columns:24px 60px 1fr auto auto; gap:12px; align-items:center; padding:12px 16px; cursor:pointer; transition:background 0.15s; user-select:none; }
+  .group-header:hover { background:var(--surface2); }
+  .group-chevron { font-size:10px; color:var(--text3); transition:transform 0.15s; }
+  .group-row.open .group-chevron { transform:rotate(90deg); }
+  .group-id { font-family:var(--mono); font-size:10px; color:var(--text3); background:var(--surface2); padding:2px 6px; border-radius:3px; }
+  .group-name { font-size:13px; font-weight:500; }
+  .group-progress { font-family:var(--mono); font-size:11px; color:var(--text3); }
+  .group-body { display:none; border-top:1px solid var(--border); }
+  .group-row.open .group-body { display:block; }
+
+  .disciplina-row { display:grid; grid-template-columns:1fr auto auto auto; gap:12px; align-items:center; padding:10px 16px 10px 52px; border-bottom:1px solid var(--border); cursor:pointer; transition:background 0.15s; }
+  .disciplina-row:last-child { border-bottom:none; }
+  .disciplina-row:hover { background:var(--surface2); }
+  .disciplina-estado { font-family:var(--mono); font-size:10px; padding:2px 6px; border-radius:3px; }
+  .disciplina-estado.pendiente { background:var(--surface2); color:var(--text3); }
+  .disciplina-estado.en-proceso { background:rgba(68,136,255,0.15); color:var(--blue); }
+  .disciplina-estado.completado { background:rgba(68,204,136,0.15); color:var(--green); }
+
+  /* LOG PANEL */
+  .log-panel { display:none; background:var(--bg); border-top:1px solid var(--border); padding:16px 16px 16px 52px; }
+  .log-panel.open { display:block; }
+  .log-entry { display:grid; grid-template-columns:100px 180px 1fr 100px; gap:12px; align-items:start; padding:8px 0; border-bottom:1px solid var(--border); font-size:12px; }
+  .log-entry:last-child { border-bottom:none; }
+  .log-fecha { font-family:var(--mono); color:var(--text3); }
+  .log-evento { color:var(--text); font-weight:500; }
+  .log-nota { color:var(--text3); font-style:italic; }
+  .log-tipo { font-family:var(--mono); font-size:10px; color:var(--text3); background:var(--surface2); padding:1px 5px; border-radius:2px; text-align:right; }
+  .log-empty { color:var(--text3); font-size:12px; font-family:var(--mono); padding:8px 0; }
+
+  /* TIMELINE EN DETALLE */
+  .timeline-section { margin-top:28px; margin-bottom:4px; }
+  .timeline-header { display:flex; align-items:center; justify-content:space-between; cursor:pointer; padding:10px 16px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); transition:background 0.15s; user-select:none; }
+  .timeline-header:hover { background:var(--surface2); }
+  .timeline-header.open { border-radius:var(--radius) var(--radius) 0 0; border-bottom-color:transparent; }
+  .timeline-body { display:none; }
+  .timeline-body.open { display:block; }
+  .timeline-table { width:100%; border-collapse:collapse; }
+  .timeline-row { display:grid; grid-template-columns:80px 1fr 130px 90px; gap:12px; align-items:center; padding:9px 16px; border-bottom:1px solid var(--border); font-size:13px; }
+  .timeline-row:last-child { border-bottom:none; }
+  .timeline-row.header { background:var(--surface2); border-radius:var(--radius) var(--radius) 0 0; border:1px solid var(--border); border-bottom:1px solid var(--border); }
+  .timeline-row:not(.header) { background:var(--surface); border-left:1px solid var(--border); border-right:1px solid var(--border); }
+  .timeline-row:not(.header):last-child { border-bottom:1px solid var(--border); border-radius:0 0 var(--radius) var(--radius); }
+  .timeline-hito-id { font-family:var(--mono); font-size:10px; color:var(--text3); }
+  .timeline-hito-nombre { font-size:13px; }
+  .timeline-fecha { font-family:var(--mono); font-size:12px; color:var(--text2); }
+  .timeline-estado { font-family:var(--mono); font-size:10px; padding:2px 7px; border-radius:3px; text-align:center; }
+  .timeline-estado.completado { background:rgba(68,204,136,0.15); color:var(--green); }
+  .timeline-estado.en-riesgo { background:rgba(255,200,0,0.15); color:var(--yellow); border-color:var(--yellow); }
+  .timeline-estado.retrasado { background:rgba(255,80,80,0.15); color:#ff5050; border-color:#ff5050; }
+  .timeline-estado.pendiente { background:var(--surface2); color:var(--text3); }
+  .col-header { font-family:var(--mono); font-size:10px; color:var(--text3); letter-spacing:0.5px; }
+
+  /* NOTAS DEL PROYECTO */
+  .notas-section { margin-top:28px; margin-bottom:28px; }
+  .notas-header { display:flex; align-items:center; justify-content:space-between; cursor:pointer; padding:10px 16px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); transition:background 0.15s; user-select:none; }
+  .notas-header:hover { background:var(--surface2); }
+  .notas-header.open { border-radius:var(--radius) var(--radius) 0 0; border-bottom-color:transparent; }
+  .notas-body { display:none; background:var(--surface); border:1px solid var(--border); border-top:none; border-radius:0 0 var(--radius) var(--radius); padding:16px; }
+  .notas-body.open { display:block; }
+  .nota-entry { padding:10px 0; border-bottom:1px solid var(--border); }
+  .nota-entry:last-of-type { border-bottom:none; }
+  .nota-meta { font-family:var(--mono); font-size:10px; color:var(--text3); margin-bottom:4px; }
+  .nota-texto { font-size:13px; line-height:1.6; color:var(--text); }
+  .nota-form { margin-top:16px; padding-top:16px; border-top:1px solid var(--border); display:none; }
+  .nota-form.open { display:block; }
+
+  /* SETTINGS MODAL — DANGER ZONE */
+  .danger-zone { margin-top:24px; padding-top:16px; border-top:1px solid var(--border); }
+  .danger-zone-title { font-size:11px; font-family:var(--mono); color:var(--red); letter-spacing:1px; text-transform:uppercase; margin-bottom:10px; }
+  .btn-danger { background:none; border:1px solid var(--red); color:var(--red); padding:8px 16px; border-radius:var(--radius); font-family:var(--sans); font-size:13px; cursor:pointer; transition:all 0.15s; }
+  .btn-danger:hover { background:rgba(255,107,107,0.1); }
+
+  /* CRITERIOS */
+  .criterio-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px; margin-bottom:8px; }
+  .criterio-card.pendiente_vobo { border-left:3px solid var(--yellow); }
+  .criterio-card.vigente { border-left:3px solid var(--green); }
+  .criterio-concepto { font-family:var(--mono); font-size:10px; color:var(--text3); margin-bottom:6px; text-transform:uppercase; letter-spacing:1px; }
+  .criterio-desc { font-size:13px; margin-bottom:8px; line-height:1.6; }
+  .criterio-meta { font-size:11px; color:var(--text3); font-family:var(--mono); }
+  .criterio-actions { display:flex; gap:8px; margin-top:10px; }
+
+  /* MODAL */
+  .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:200; align-items:center; justify-content:center; padding:20px; }
+  .modal-overlay.open { display:flex; }
+  .modal { background:var(--surface); border:1px solid var(--border2); border-radius:8px; width:100%; max-width:800px; max-height:90vh; overflow-y:auto; }
+  .modal-header { padding:20px 24px 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+  .modal-title { font-size:16px; font-weight:500; }
+  .modal-close { background:none; border:none; color:var(--text3); font-size:18px; cursor:pointer; line-height:1; transition:color 0.15s; }
+  .modal-close:hover { color:var(--text); }
+  .modal-body { padding:20px 24px; }
+  .modal-footer { padding:16px 24px; border-top:1px solid var(--border); display:flex; gap:8px; justify-content:flex-end; }
+
+  /* FORM */
+  .form-group { margin-bottom:16px; }
+  .form-row { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .form-label { display:block; font-size:12px; font-family:var(--mono); color:var(--text2); margin-bottom:6px; letter-spacing:0.5px; }
+  .form-input, .form-select, .form-textarea { width:100%; background:var(--bg); border:1px solid var(--border); color:var(--text); padding:8px 12px; border-radius:var(--radius); font-family:var(--sans); font-size:13px; transition:border-color 0.15s; outline:none; }
+  .form-input:focus, .form-select:focus, .form-textarea:focus { border-color:var(--accent); }
+  .form-textarea { resize:vertical; min-height:80px; }
+  .form-select option { background:var(--surface); }
+  .form-toggle { display:flex; align-items:center; gap:10px; cursor:pointer; }
+  .toggle-switch { width:36px; height:20px; background:var(--border2); border-radius:10px; position:relative; transition:background 0.2s; }
+  .toggle-switch.on { background:var(--accent); }
+  .toggle-switch::after { content:''; position:absolute; width:14px; height:14px; background:white; border-radius:50%; top:3px; left:3px; transition:left 0.2s; }
+  .toggle-switch.on::after { left:19px; }
+  .toggle-label { font-size:13px; color:var(--text2); }
+
+  /* CHIPS */
+  .disc-group { margin-bottom:12px; }
+  .disc-group-title { font-size:10px; font-family:var(--mono); color:var(--text3); letter-spacing:1px; text-transform:uppercase; margin-bottom:6px; }
+  .disc-items { display:flex; flex-wrap:wrap; gap:6px; }
+  .disc-chip { display:flex; align-items:center; gap:6px; background:var(--surface2); border:1px solid var(--border); border-radius:4px; padding:4px 8px; font-size:13px; cursor:pointer; transition:all 0.15s; user-select:none; }
+  .disc-chip.selected { background:rgba(200,240,60,0.1); border-color:var(--accent); color:var(--accent); }
+  .disc-chip-dot { width:6px; height:6px; border-radius:50%; background:var(--border2); }
+  .disc-chip.selected .disc-chip-dot { background:var(--accent); }
+
+  /* ENTRY TYPE */
+  .entry-tipo-selector { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:16px; }
+  .tipo-btn { background:var(--bg); border:1px solid var(--border); border-radius:var(--radius); padding:10px; text-align:center; cursor:pointer; transition:all 0.15s; }
+  .tipo-btn.selected { border-color:var(--accent); background:rgba(200,240,60,0.08); }
+  .tipo-btn-icon { font-size:16px; margin-bottom:4px; }
+  .tipo-btn-label { font-size:11px; font-family:var(--mono); color:var(--text2); }
+  .tipo-btn.selected .tipo-btn-label { color:var(--accent); }
+
+  /* LOADING / EMPTY */
+  .loading { display:flex; align-items:center; justify-content:center; padding:48px; color:var(--text3); font-family:var(--mono); font-size:12px; gap:10px; }
+  .spinner { width:16px; height:16px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.8s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .empty-state { text-align:center; padding:48px; color:var(--text3); font-family:var(--mono); font-size:12px; }
+  .empty-state-icon { font-size:32px; margin-bottom:12px; }
+
+  /* TOAST */
+  #toast { position:fixed; bottom:24px; right:24px; background:var(--surface); border:1px solid var(--border2); border-radius:var(--radius); padding:12px 16px; font-size:13px; z-index:999; transform:translateY(80px); opacity:0; transition:all 0.3s; max-width:320px; }
+  #toast.show { transform:translateY(0); opacity:1; }
+  #toast.success { border-left:3px solid var(--green); }
+  #toast.error { border-left:3px solid var(--red); }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div style="display:flex;flex-direction:column;align-items:center;gap:8px">
+    <div class="login-badge">JLL · Innovasport</div>
+    <div class="login-title">IS4 <span>Tracking</span></div>
+    <div class="login-sub">Store Planning · Project Management</div>
+  </div>
+  <button class="btn-google" onclick="handleLogin()">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+    </svg>
+    Continuar con Google
+  </button>
+  <div class="login-note">Acceso restringido · Solo usuarios autorizados</div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="topbar">
+    <div class="topbar-brand">IS4</div>
+    <div class="topbar-sep"></div>
+    <div class="topbar-nav">
+      <button class="nav-btn active" onclick="showView('dashboard')" id="nav-dashboard">Dashboard</button>
+      <button class="nav-btn" onclick="showView('criterios')" id="nav-criterios">Criterios</button>
+    </div>
+    <div class="topbar-user">
+      <span class="user-name" id="user-name-display"></span>
+      <span class="user-role" id="user-role-display"></span>
+      <button class="btn-logout" onclick="handleLogout()">Salir</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <!-- DASHBOARD -->
+    <div class="view active" id="view-dashboard">
+      <div id="criterios-banner-container"></div>
+      <div class="page-header">
+        <div>
+          <div class="page-title">Dashboard</div>
+          <div class="page-sub" id="dashboard-date"></div>
+        </div>
+        <button class="btn-primary" onclick="openNuevoProyecto()" id="btn-nuevo-proyecto">+ Nuevo Proyecto</button>
+      </div>
+      <div id="proyectos-list"><div class="loading"><div class="spinner"></div>Cargando proyectos…</div></div>
+      <div class="hitos-section">
+        <div id="hitos-proximos"><div class="loading"><div class="spinner"></div>Calculando…</div></div>
+      </div>
+    </div>
+
+    <!-- PROYECTO DETAIL -->
+    <div class="view" id="view-proyecto-detail">
+      <button class="back-btn" onclick="showView('dashboard')">← Volver al dashboard</button>
+      <div class="project-detail-header">
+        <div>
+          <div class="project-detail-title" id="detail-title"></div>
+          <div class="project-detail-meta" id="detail-meta"></div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn-secondary" onclick="openSettings()" style="font-size:13px">⚙️ Settings</button>
+          <button class="btn-primary" onclick="openNuevoEntry()">+ Registrar evento</button>
+        </div>
+      </div>
+      <div id="detail-timeline"></div>
+      <div id="detail-notas"></div>
+      <div class="groups-container" id="groups-container"></div>
+    </div>
+
+    <!-- CRITERIOS -->
+    <div class="view" id="view-criterios">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Criterios del Programa</div>
+          <div class="page-sub">IS 4.0 · Innovasport · Definiciones de diseño vigentes</div>
+        </div>
+        <button class="btn-primary" onclick="openNuevoCriterio()">+ Nuevo Criterio</button>
+      </div>
+      <div id="criterios-list"><div class="loading"><div class="spinner"></div>Cargando…</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: NUEVO PROYECTO -->
+<div class="modal-overlay" id="modal-proyecto">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title">Nuevo Proyecto</div><button class="modal-close" onclick="closeModal('modal-proyecto')">×</button></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Nombre del proyecto</label><input class="form-input" id="p-nombre" placeholder="IS Nombre Sucursal"></div>
+        <div class="form-group"><label class="form-label">Clave Innovasport</label><input class="form-input" id="p-clave" placeholder="IS-XXX"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Tipo de proyecto</label>
+          <select class="form-select" id="p-tipo"><option value="">Seleccionar…</option><option>Apertura nueva</option><option>Reubicación</option><option>Remodelación</option></select>
+        </div>
+        <div class="form-group"><label class="form-label">Fecha de aprobación</label><input class="form-input" id="p-fecha" type="date" placeholder="DD/MM/AAAA"></div>
+      </div>
+      <div class="form-group"><label class="form-label">Arquitecto asignado</label><select class="form-select" id="p-arquitecto"><option value="">Sin asignar</option></select></div>
+      <div class="form-group"><div class="form-toggle" onclick="toggleBubblePlan()"><div class="toggle-switch" id="toggle-bubble"></div><div class="toggle-label">Bubble Plan aplica</div></div></div>
+      <div class="form-group"><label class="form-label">Disciplinas que aplican</label><div id="disciplinas-checklist"></div></div>
+      <div class="form-group"><label class="form-label">Notas</label><textarea class="form-textarea" id="p-notas" placeholder="Contexto del proyecto…"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('modal-proyecto')">Cancelar</button>
+      <button class="btn-primary" id="btn-guardar-proyecto" onclick="guardarProyecto()">Crear Proyecto</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: EVENTO DEL LOG (tarea) -->
+<div class="modal-overlay" id="modal-entry">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title">Registrar Evento</div><button class="modal-close" onclick="closeModal('modal-entry')">×</button></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Grupo</label><select class="form-select" id="e-grupo" onchange="updateDisciplinas()"><option value="">Seleccionar grupo…</option></select></div>
+        <div class="form-group"><label class="form-label">Tarea</label><select class="form-select" id="e-disciplina" onchange="updateEventos()"><option value="">Seleccionar tarea…</option></select></div>
+      </div>
+      <div class="form-group"><label class="form-label">Evento</label><select class="form-select" id="e-evento"><option value="">Seleccionar evento…</option></select></div>
+      <div class="form-group"><label class="form-label">Fecha real</label><input class="form-input" id="e-fecha" type="date" placeholder="DD/MM/AAAA"></div>
+      <div class="form-group"><label class="form-label">Nota <span style="color:var(--text3)">(opcional)</span></label><textarea class="form-textarea" id="e-nota" placeholder="Contexto, observaciones, riesgos…" style="min-height:60px"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('modal-entry')">Cancelar</button>
+      <button class="btn-primary" id="btn-guardar-entry" onclick="guardarEntry()">Guardar Evento</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: NOTA / CAMBIO DEL PROYECTO -->
+<div class="modal-overlay" id="modal-nota-cambio">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title" id="nota-cambio-title">Agregar nota o cambio</div><button class="modal-close" onclick="closeModal('modal-nota-cambio')">×</button></div>
+    <div class="modal-body">
+      <div class="entry-tipo-selector">
+        <div class="tipo-btn selected" id="tipo-nota-btn" onclick="selectNotaCambioTipo('nota')"><div class="tipo-btn-icon">📝</div><div class="tipo-btn-label">Nota</div></div>
+        <div class="tipo-btn" id="tipo-cambio-btn" onclick="selectNotaCambioTipo('cambio_registrado')"><div class="tipo-btn-icon">⚡</div><div class="tipo-btn-label">Cambio</div></div>
+      </div>
+      <div id="cambio-fields" style="display:none">
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Tipo de cambio</label>
+            <select class="form-select" id="e-impacto-tipo"><option value="">Seleccionar…</option><option>Cambio Menor</option><option>Cambio Arquitectónico</option><option>Cambio de Ingenierías</option><option>Cambio Mayor</option></select>
+          </div>
+          <div class="form-group"><label class="form-label">Origen del cambio</label>
+            <select class="form-select" id="e-origen"><option value="">Seleccionar…</option><option>Comercial</option><option>Operaciones</option><option>Dirección</option><option>Marketing</option><option>Marca</option><option>Interno SP</option></select>
+          </div>
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Fecha</label><input class="form-input" id="nc-fecha" type="date"></div>
+      <div class="form-group"><label class="form-label">Texto</label><textarea class="form-textarea" id="nc-texto" placeholder="Escribe la nota o descripción del cambio…" style="min-height:80px"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('modal-nota-cambio')">Cancelar</button>
+      <button class="btn-primary" id="btn-guardar-nc" onclick="guardarNotaCambio()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: NUEVO CRITERIO -->
+<div class="modal-overlay" id="modal-criterio">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title">Nuevo Criterio de Programa</div><button class="modal-close" onclick="closeModal('modal-criterio')">×</button></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Concepto</label>
+          <select class="form-select" id="c-concepto"><option value="">Seleccionar…</option><option>Acabados</option><option>Estructura</option><option>MEP</option><option>Mobiliario</option><option>Iluminación</option><option>Señalética</option><option>Fachada</option><option>Costos</option><option>Proceso</option><option>General</option></select>
+        </div>
+        <div class="form-group"><label class="form-label">Proyecto detonador</label><select class="form-select" id="c-proyecto"><option value="">Ninguno / General</option></select></div>
+      </div>
+      <div class="form-group"><label class="form-label">Descripción del criterio</label><textarea class="form-textarea" id="c-descripcion" placeholder="Describe el criterio de diseño, decisión o ajuste…" style="min-height:100px"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('modal-criterio')">Cancelar</button>
+      <button class="btn-primary" id="btn-guardar-criterio" onclick="guardarCriterio()">Proponer Criterio</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: SETTINGS DEL PROYECTO -->
+<div class="modal-overlay" id="modal-settings">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title">Settings del Proyecto</div><button class="modal-close" onclick="closeModal('modal-settings')">×</button></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Nombre del proyecto</label><input class="form-input" id="s-nombre" placeholder="IS Nombre Sucursal"></div>
+        <div class="form-group"><label class="form-label">Clave Innovasport</label><input class="form-input" id="s-clave" placeholder="IS-XXX"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Tipo de proyecto</label>
+          <select class="form-select" id="s-tipo"><option value="">Seleccionar…</option><option>Apertura nueva</option><option>Reubicación</option><option>Remodelación</option></select>
+        </div>
+        <div class="form-group"><label class="form-label">Fecha de aprobación</label><input class="form-input" id="s-fecha" type="date"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Arquitecto asignado</label><select class="form-select" id="s-arquitecto"><option value="">Sin asignar</option></select></div>
+        <div class="form-group"><label class="form-label">Estado</label>
+          <select class="form-select" id="s-estado"><option value="Activo">Activo</option><option value="En pausa">En pausa</option><option value="Cerrado">Cerrado</option></select>
+        </div>
+      </div>
+      <div class="form-group"><div class="form-toggle" onclick="toggleSettingsBubble()"><div class="toggle-switch" id="toggle-settings-bubble"></div><div class="toggle-label">Bubble Plan aplica</div></div></div>
+      <div class="form-group"><label class="form-label">Notas</label><textarea class="form-textarea" id="s-notas" placeholder="Contexto del proyecto…"></textarea></div>
+      <div class="danger-zone">
+        <div class="danger-zone-title">Zona de peligro</div>
+        <button class="btn-danger" onclick="borrarProyecto()">Borrar proyecto…</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('modal-settings')">Cancelar</button>
+      <button class="btn-primary" id="btn-guardar-settings" onclick="guardarSettings()">Guardar cambios</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const CONFIG = {
+  CLIENT_ID: '917190875425-0ccso9k1pthi9imfsrjd39dc4jvg9run.apps.googleusercontent.com',
+  WEBAPP_URL: 'https://script.google.com/macros/s/AKfycbwN8LLJ3FXEb4M4qVINDQLmx60D4mXP57QMvsSTelwe71lXzu5Dvuae94TJgWignmFh/exec',
+  SCOPES: 'https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile openid'
+};
+
+let state = {
+  user: null, rol: null, accessToken: null,
+  proyectos: [], eventosCatalogo: [], logEventos: [], criterios: [], usuarios: [],
+  disciplinasProyecto: [],
+  currentProyecto: null, entryTipo: 'nota',
+  bubblePlan: false, disciplinasSeleccionadas: new Set()
+};
+
+// ── AUTH — Google Identity Services ──
+let tokenClient;
+
+function initGoogleAPI() {
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: CONFIG.CLIENT_ID,
+    scope: CONFIG.SCOPES,
+    callback: async (tokenResponse) => {
+      if (tokenResponse.error) { showToast('Error al iniciar sesión', 'error'); return; }
+      state.accessToken = tokenResponse.access_token;
+      sessionStorage.setItem('is4_token', tokenResponse.access_token);
+      try {
+        const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+          headers: { Authorization: 'Bearer ' + state.accessToken }
+        });
+        const profile = await res.json();
+        state.user = { email: profile.email, name: profile.name };
+        await completeSignIn();
+      } catch(e) { showToast('Error obteniendo perfil', 'error'); }
+    }
+  });
+  // Auto-restore session on page load
+  const savedToken = sessionStorage.getItem('is4_token');
+  const savedUser = sessionStorage.getItem('is4_user');
+  if (savedToken && savedUser) {
+    state.accessToken = savedToken;
+    state.user = JSON.parse(savedUser);
+    fetch('https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=' + savedToken)
+      .then(r => r.json())
+      .then(info => {
+        if (info.error) {
+          sessionStorage.removeItem('is4_token');
+          sessionStorage.removeItem('is4_user');
+        } else {
+          completeSignIn();
+        }
+      })
+      .catch(() => {
+        sessionStorage.removeItem('is4_token');
+        sessionStorage.removeItem('is4_user');
+      });
+  }
+}
+function handleLogin() {
+  // Limpiar session storage antes de pedir token nuevo
+  sessionStorage.removeItem('is4_token');
+  sessionStorage.removeItem('is4_user');
+  tokenClient.requestAccessToken({ prompt: 'select_account' });
+}
+
+async function completeSignIn() {
+  try {
+    const usuarios = await api('getUsuarios');
+    const u = usuarios.find(x => x.email.toLowerCase() === state.user.email.toLowerCase());
+    if (!u) { showToast('Acceso no autorizado. Contacta al PM.', 'error'); handleLogout(); return; }
+    state.rol = u.rol;
+    state.usuarios = usuarios;
+  } catch(e) { showToast('Error verificando acceso: ' + e.message, 'error'); return; }
+
+  document.getElementById('user-name-display').textContent = state.user.name.split(' ')[0];
+  document.getElementById('user-role-display').textContent = state.rol;
+  if (state.rol !== 'PM') document.getElementById('btn-nuevo-proyecto').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  document.getElementById('dashboard-date').textContent = new Date().toLocaleDateString('es-MX', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+  sessionStorage.setItem('is4_user', JSON.stringify(state.user));
+  await loadAllData();
+}
+
+function handleLogout() {
+  sessionStorage.removeItem('is4_token');
+  sessionStorage.removeItem('is4_user');
+  google.accounts.oauth2.revoke(state.accessToken, () => {});
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+  state.user = null; state.rol = null; state.accessToken = null;
+}
+
+// ── API ──
+async function api(action, body = {}) {
+  const payload = { action, token: state.accessToken, ...body };
+  const res = await fetch(CONFIG.WEBAPP_URL, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    headers: { 'Content-Type': 'text/plain' }
+  });
+  const data = await res.json();
+  if (data && data.error) throw new Error(data.error);
+  return data;
+}
+
+// ── DATA ──
+async function loadAllData() {
+  try {
+    const [proyectos, eventos, log, criterios, disciplinas] = await Promise.all([
+      api('getProyectos'), api('getEventosCatalogo'),
+      api('getLogEventos'), api('getCriteriosPrograma'),
+      api('getDisciplinasProyecto')
+    ]);
+    state.proyectos = proyectos || [];
+    state.eventosCatalogo = eventos || [];
+    state.logEventos = log || [];
+    state.criterios = criterios || [];
+    state.disciplinasProyecto = disciplinas || [];
+    renderDashboard();
+    renderCriteriosBanner();
+  } catch(e) { showToast('Error cargando datos: ' + e.message, 'error'); console.error(e); }
+}
+
+// ── DASHBOARD ──
+function renderDashboard() {
+  const activos = state.proyectos.filter(p => !p.estado || p.estado === 'Activo');
+  const container = document.getElementById('proyectos-list');
+
+  if (activos.length === 0) {
+    container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📋</div>No hay proyectos activos.<br>Crea el primero con el botón de arriba.</div>`;
+  } else {
+    container.innerHTML = `<div class="project-grid">${activos.map(p => {
+      const { nivel, label } = calcRiesgo(p);
+      return `<div class="project-card risk-${nivel}" onclick="openProyecto('${p.proyecto_id}')">
+        <div>
+          <div class="project-name">${p.nombre || '—'}</div>
+          <div class="project-meta">
+            ${p.clave_innovasport ? `<div class="meta-item"><span class="label">Clave&nbsp;</span>${p.clave_innovasport}</div>` : ''}
+            <div class="meta-item"><span class="label">Tipo&nbsp;</span>${p.tipo_proyecto || '—'}</div>
+            <div class="meta-item"><span class="label">Aprobación&nbsp;</span>${formatDate(p.fecha_aprobacion)}</div>
+            <div class="meta-item"><span class="label">Entrega est.&nbsp;</span>${calcFechaEntrega(p.fecha_aprobacion)}</div>
+            ${p.arquitecto_id ? `<div class="meta-item"><span class="label">Arq.&nbsp;</span>${(state.usuarios.find(u => u.email === p.arquitecto_id)?.nombre) || p.arquitecto_id}</div>` : ''}
+          </div>
+        </div>
+        <div class="project-right">
+          <div class="semaforo ${nivel}"></div>
+          <div class="desvio-badge ${nivel}">${label}</div>
+        </div>
+      </div>`;
+    }).join('')}</div>`;
+  }
+
+  // Hitos próximos y vencidos
+  const hoy = new Date();
+  const limite = new Date(); limite.setDate(limite.getDate() + 7);
+  const proximos = [];
+  const vencidos = [];
+
+  activos.forEach(p => {
+    if (!p.fecha_aprobacion) return;
+    const logP = state.logEventos.filter(e => e.proyecto_id === p.proyecto_id);
+    HITOS_TIMELINE.filter(h => h.offset !== null).forEach(h => {
+      const completado = logP.some(e => e.hito_id === h.id && e.tipo_entry === 'hito_alcanzado');
+      if (completado) return;
+      const fecha = addBusinessDays(parseISODate(p.fecha_aprobacion), h.offset);
+      if (fecha < hoy) {
+        vencidos.push({ proyecto: p.nombre, hito: h.nombre, hitoId: h.id, fecha: fecha.toISOString().split('T')[0], proyectoId: p.proyecto_id });
+      } else if (fecha <= limite) {
+        proximos.push({ proyecto: p.nombre, hito: h.nombre, fecha: fecha.toISOString().split('T')[0], proyectoId: p.proyecto_id });
+      }
+    });
+  });
+
+  proximos.sort((a,b) => new Date(a.fecha) - new Date(b.fecha));
+  vencidos.sort((a,b) => new Date(a.fecha) - new Date(b.fecha));
+
+  const hitosContainer = document.getElementById('hitos-proximos');
+  const vencidosHTML = vencidos.length === 0 ? '' : `
+    <div style="font-family:var(--mono);font-size:10px;color:#ff5050;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;margin-top:4px">⚠ Hitos vencidos — ${vencidos.length}</div>
+    ${vencidos.map(h => `<div class="hito-row retrasado">
+      <div class="hito-fecha" style="color:#ff5050">${formatDate(h.fecha)}</div>
+      <div class="hito-link" onclick="openProyectoEnHito('${h.proyectoId}','${h.hitoId}')">${h.hito}</div>
+      <div class="hito-link secondary" onclick="openProyecto('${h.proyectoId}')">${h.proyecto}</div>
+      <div></div>
+    </div>`).join('')}`;
+
+  const proximosHTML = proximos.length === 0
+    ? `<div style="color:var(--text3);font-family:var(--mono);font-size:12px;padding:8px 0">Sin hitos en los próximos 7 días</div>`
+    : `<div style="font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;margin-top:${vencidos.length > 0 ? '16px' : '4px'}">Próximos 7 días</div>
+    ${proximos.map(h => `<div class="hito-row" onclick="openProyecto('${h.proyectoId}')">
+      <div class="hito-fecha">${formatDate(h.fecha)}</div>
+      <div style="font-weight:500">${h.proyecto}</div>
+      <div style="font-size:12px;color:var(--text2)">${h.hito}</div>
+      <div></div>
+    </div>`).join('')}`;
+
+  hitosContainer.innerHTML = vencidosHTML + proximosHTML;
+}
+
+function renderCriteriosBanner() {
+  const container = document.getElementById('criterios-banner-container');
+  if (!state.user) return;
+  const pendientes = state.criterios.filter(c => {
+    if (c.estado !== 'vigente') return false;
+    try { return !JSON.parse(c.confirmaciones || '{}')[state.user.email]; } catch(e) { return true; }
+  });
+  container.innerHTML = pendientes.length === 0 ? '' : `
+    <div class="criterios-banner">
+      <div>
+        <div class="criterios-banner-text">📌 ${pendientes.length} criterio${pendientes.length > 1 ? 's' : ''} pendiente${pendientes.length > 1 ? 's' : ''} de confirmar</div>
+        <div class="criterios-banner-sub">Nuevas definiciones de diseño que aplican a todos los proyectos activos</div>
+      </div>
+      <button class="btn-primary" onclick="showView('criterios')" style="white-space:nowrap;font-size:12px">Ver criterios</button>
+    </div>`;
+}
+
+// ── PROYECTO DETAIL ──
+async function openProyecto(proyectoId) {
+  const p = state.proyectos.find(x => x.proyecto_id === proyectoId);
+  if (!p) return;
+  state.currentProyecto = p;
+  document.getElementById('detail-title').textContent = p.nombre;
+  document.getElementById('detail-meta').textContent = `${p.clave_innovasport ? p.clave_innovasport + ' · ' : ''}${p.tipo_proyecto || '—'} · Aprobación: ${formatDate(p.fecha_aprobacion)} · Entrega estimada: ${calcFechaEntrega(p.fecha_aprobacion)}`;
+  renderGroups(p);
+  document.getElementById('detail-timeline').innerHTML = renderTimeline(p);
+  document.getElementById('detail-notas').innerHTML = renderNotas(p);
+  showView('proyecto-detail');
+  await evaluarHitos(proyectoId);
+}
+
+function renderGroups(proyecto) {
+  const log = state.logEventos.filter(e => e.proyecto_id === proyecto.proyecto_id);
+  const activasSet = new Set(
+    state.disciplinasProyecto
+      .filter(d => d.proyecto_id === proyecto.proyecto_id)
+      .map(d => d.disciplina_id)
+  );
+  const grupos = getGruposUnicos().filter(g =>
+    state.eventosCatalogo.some(e => e.grupo_id === g.grupo_id && activasSet.has(`${e.grupo_id}::${e.disciplina_nombre}`))
+  );
+  document.getElementById('groups-container').innerHTML = grupos.map(g => {
+    const disciplinas = getDisciplinasGrupo(g.grupo_id).filter(d => activasSet.has(`${g.grupo_id}::${d}`));
+    const completadas = disciplinas.filter(d => isDisciplinaCompleta(d, g.grupo_id, log)).length;
+    const enProceso = disciplinas.filter(d => !isDisciplinaCompleta(d, g.grupo_id, log) && log.some(e => e.disciplina_id === `${g.grupo_id}::${d}`)).length;
+    const nivel = completadas === disciplinas.length && disciplinas.length > 0 ? 'green' : enProceso > 0 ? 'yellow' : 'gray';
+    return `
+    <div class="group-row" id="group-${g.grupo_id}">
+      <div class="group-header" onclick="toggleGroup('${g.grupo_id}')">
+        <span class="group-chevron">▶</span>
+        <span class="group-id">${g.grupo_id}</span>
+        <span class="group-name">${g.grupo_nombre}</span>
+        <span class="group-progress">${completadas}/${disciplinas.length}</span>
+        <div class="semaforo ${nivel}"></div>
+      </div>
+      <div class="group-body">${disciplinas.map(d => renderDisciplina(proyecto, g, d, log)).join('')}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderDisciplina(proyecto, grupo, disciplina, log) {
+  const discKey = `${grupo.grupo_id}::${disciplina}`;
+  const safeId = `${proyecto.proyecto_id}_${grupo.grupo_id}_${disciplina}`.replace(/[^a-zA-Z0-9_]/g, '_');
+  const eventos = log.filter(e => e.disciplina_id === discKey);
+  const completa = isDisciplinaCompleta(disciplina, grupo.grupo_id, log);
+  const estado = completa ? 'completado' : eventos.length > 0 ? 'en-proceso' : 'pendiente';
+  return `
+  <div>
+    <div class="disciplina-row" onclick="toggleLogPanel('log_${safeId}')">
+      <div>${disciplina}</div>
+      <div class="disciplina-estado ${estado}">${estado.replace('-',' ')}</div>
+      <div style="font-size:11px;color:var(--text3);font-family:var(--mono)">${eventos.length} eventos</div>
+      <button class="btn-ghost" onclick="event.stopPropagation();openEntryForDisciplina('${grupo.grupo_id}','${disciplina}')">+ Evento</button>
+    </div>
+    <div class="log-panel" id="log_${safeId}">
+      ${eventos.length === 0 ? '<div class="log-empty">Sin eventos registrados</div>'
+        : eventos.sort((a,b) => new Date(a.fecha_real)-new Date(b.fecha_real)).map(e => `
+          <div class="log-entry">
+            <div class="log-fecha">${formatDate(e.fecha_real)}</div>
+            <div class="log-evento">${e.hito_id || '—'}</div>
+            <div class="log-nota">${e.nota || ''}</div>
+            <div class="log-tipo">${e.tipo_entry}</div>
+          </div>`).join('')}
+    </div>
+  </div>`;
+}
+
+function toggleGroup(id) { document.getElementById(`group-${id}`)?.classList.toggle('open'); }
+function toggleLogPanel(id) { document.getElementById(id)?.classList.toggle('open'); }
+function openEntryForDisciplina(grupoId, disciplina) {
+  openNuevoEntry();
+  setTimeout(() => {
+    document.getElementById('e-grupo').value = grupoId;
+    updateDisciplinas();
+    setTimeout(() => { document.getElementById('e-disciplina').value = disciplina; updateEventos(); }, 60);
+  }, 60);
+}
+
+async function openProyectoEnHito(proyectoId, hitoId) {
+  await openProyecto(proyectoId);
+  setTimeout(() => {
+    const rows = document.querySelectorAll('.timeline-row');
+    rows.forEach(row => {
+      if (row.querySelector('.timeline-hito-id')?.textContent === hitoId) { 
+        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        row.style.background = 'rgba(255,80,80,0.1)';
+        setTimeout(() => row.style.background = '', 2000);
+      }
+    });
+  }, 800);
+}
+
+// ── NUEVO PROYECTO ──
+function openNuevoProyecto() {
+  document.getElementById('p-fecha').value = new Date().toISOString().split('T')[0];
+  ['p-nombre','p-clave','p-notas'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('p-tipo').value = '';
+  state.bubblePlan = true;
+  state.disciplinasSeleccionadas = new Set();
+  document.getElementById('toggle-bubble').classList.add('on');
+  const sel = document.getElementById('p-arquitecto');
+  sel.innerHTML = '<option value="">Sin asignar</option>';
+  state.usuarios.filter(u => u.rol === 'Arquitecto').forEach(u => sel.innerHTML += `<option value="${u.email}">${u.nombre}</option>`);
+  buildDisciplinasChecklist();
+  openModal('modal-proyecto');
+}
+
+function buildDisciplinasChecklist() {
+  const grupos = {};
+  state.eventosCatalogo.forEach(e => {
+    if (!e.grupo_id || e.grupo_id === 'G0') return;
+    if (!grupos[e.grupo_id]) grupos[e.grupo_id] = { nombre: e.grupo_nombre, disciplinas: new Set() };
+    if (e.disciplina_nombre) grupos[e.grupo_id].disciplinas.add(e.disciplina_nombre);
+  });
+
+  state.disciplinasSeleccionadas = new Set();
+  Object.entries(grupos).forEach(([gid, g]) => {
+    [...g.disciplinas].forEach(d => {
+      if (gid === 'G1') return; // G1 lo controla el toggle — no se auto-selecciona
+      state.disciplinasSeleccionadas.add(`${gid}::${d}`);
+    });
+  });
+  if (state.bubblePlan) state.disciplinasSeleccionadas.add('G1::Bubble Plan');
+
+  document.getElementById('disciplinas-checklist').innerHTML = `
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <button type="button" class="btn-ghost" style="font-size:11px;border:1px solid var(--border);padding:3px 10px" onclick="selectAllDisciplinas()">Seleccionar todo</button>
+      <button type="button" class="btn-ghost" style="font-size:11px;border:1px solid var(--border);padding:3px 10px" onclick="deselectAllDisciplinas()">Deseleccionar todo</button>
+    </div>
+  ` + Object.entries(grupos).map(([gid, g]) => `
+    <div class="disc-group">
+      <div class="disc-group-title">${gid} — ${g.nombre}</div>
+      <div class="disc-items">${[...g.disciplinas].map(d => {
+        const cid = `chip_${gid}_${d.replace(/\W+/g,'_')}`;
+        const selected = state.disciplinasSeleccionadas.has(`${gid}::${d}`);
+        return `<div class="disc-chip${selected ? ' selected' : ''}" id="${cid}" onclick="toggleDisciplina('${gid}','${d}','${cid}')"><div class="disc-chip-dot"></div>${d}</div>`;
+      }).join('')}</div>
+    </div>`).join('');
+}
+
+function selectAllDisciplinas() {
+  const grupos = {};
+  state.eventosCatalogo.forEach(e => {
+    if (!e.grupo_id || e.grupo_id === 'G0') return;
+    if (!grupos[e.grupo_id]) grupos[e.grupo_id] = new Set();
+    if (e.disciplina_nombre) grupos[e.grupo_id].add(e.disciplina_nombre);
+  });
+  Object.entries(grupos).forEach(([gid, discs]) => {
+    [...discs].forEach(d => {
+      state.disciplinasSeleccionadas.add(`${gid}::${d}`);
+      document.getElementById(`chip_${gid}_${d.replace(/\W+/g,'_')}`)?.classList.add('selected');
+    });
+  });
+  state.bubblePlan = true;
+  document.getElementById('toggle-bubble').classList.add('on');
+  state.disciplinasSeleccionadas.add('G1::Bubble Plan');
+  document.getElementById('chip_G1_Bubble_Plan')?.classList.add('selected');
+}
+
+function deselectAllDisciplinas() {
+  state.disciplinasSeleccionadas.clear();
+  document.querySelectorAll('.disc-chip').forEach(c => c.classList.remove('selected'));
+}
+
+function toggleDisciplina(gid, d, cid) {
+  const key = `${gid}::${d}`;
+  const chip = document.getElementById(cid);
+  if (state.disciplinasSeleccionadas.has(key)) {
+    state.disciplinasSeleccionadas.delete(key);
+    chip.classList.remove('selected');
+    if (gid === 'G1' && d === 'Bubble Plan') {
+      state.bubblePlan = false;
+      document.getElementById('toggle-bubble').classList.remove('on');
+    }
+  } else {
+    state.disciplinasSeleccionadas.add(key);
+    chip.classList.add('selected');
+    if (gid === 'G1' && d === 'Bubble Plan') {
+      state.bubblePlan = true;
+      document.getElementById('toggle-bubble').classList.add('on');
+    }
+  }
+}
+
+function toggleBubblePlan() {
+  state.bubblePlan = !state.bubblePlan;
+  document.getElementById('toggle-bubble').classList.toggle('on', state.bubblePlan);
+  const cid = 'chip_G1_Bubble_Plan';
+  const chip = document.getElementById(cid);
+  if (chip) {
+    if (state.bubblePlan) { chip.classList.add('selected'); state.disciplinasSeleccionadas.add('G1::Bubble Plan'); }
+    else { chip.classList.remove('selected'); state.disciplinasSeleccionadas.delete('G1::Bubble Plan'); }
+  }
+}
+
+async function guardarProyecto() {
+  const nombre = document.getElementById('p-nombre').value.trim();
+  const fecha = document.getElementById('p-fecha').value;
+  if (!nombre || !fecha) { showToast('Nombre y fecha son requeridos', 'error'); return; }
+  const btn = document.getElementById('btn-guardar-proyecto');
+  btn.disabled = true; btn.textContent = 'Guardando…';
+  try {
+    await api('crearProyecto', {
+      nombre, clave_innovasport: document.getElementById('p-clave').value,
+      arquitecto_id: document.getElementById('p-arquitecto').value,
+      fecha_aprobacion: fecha, tipo_proyecto: document.getElementById('p-tipo').value,
+      bubble_plan_aplica: state.bubblePlan, notas: document.getElementById('p-notas').value,
+      disciplinas: [...state.disciplinasSeleccionadas].map(k => { const [g,d] = k.split('::'); return { disciplina_id: k, grupo_id: g }; })
+    });
+    closeModal('modal-proyecto');
+    showToast(`Proyecto "${nombre}" creado`, 'success');
+    await loadAllData();
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+  finally { btn.disabled = false; btn.textContent = 'Crear Proyecto'; }
+}
+
+// ── NUEVO ENTRY ──
+function openNuevoEntry() {
+  document.getElementById('e-fecha').value = new Date().toISOString().split('T')[0];
+  document.getElementById('e-nota').value = '';
+  document.getElementById('e-grupo').value = '';
+  document.getElementById('e-disciplina').innerHTML = '<option value="">Seleccionar tarea…</option>';
+  document.getElementById('e-evento').innerHTML = '<option value="">Seleccionar evento…</option>';
+  const sel = document.getElementById('e-grupo');
+  sel.innerHTML = '<option value="">Seleccionar grupo…</option>';
+  const grupos = {};
+  state.eventosCatalogo.forEach(e => { if (!grupos[e.grupo_id]) grupos[e.grupo_id] = e.grupo_nombre; });
+  Object.entries(grupos).forEach(([id, n]) => sel.innerHTML += `<option value="${id}">${id} — ${n}</option>`);
+  openModal('modal-entry');
+}
+
+function openNotaCambio() {
+  document.getElementById('nc-fecha').value = new Date().toISOString().split('T')[0];
+  document.getElementById('nc-texto').value = '';
+  document.getElementById('e-impacto-tipo').value = '';
+  document.getElementById('e-origen').value = '';
+  selectNotaCambioTipo('nota');
+  openModal('modal-nota-cambio');
+}
+
+function selectNotaCambioTipo(tipo) {
+  state.entryTipo = tipo;
+  document.getElementById('tipo-nota-btn').classList.toggle('selected', tipo === 'nota');
+  document.getElementById('tipo-cambio-btn').classList.toggle('selected', tipo === 'cambio_registrado');
+  document.getElementById('cambio-fields').style.display = tipo === 'cambio_registrado' ? 'block' : 'none';
+}
+
+function updateDisciplinas() {
+  const gid = document.getElementById('e-grupo').value;
+  const sel = document.getElementById('e-disciplina');
+  sel.innerHTML = '<option value="">Seleccionar disciplina…</option>';
+  if (!gid) return;
+  [...new Set(state.eventosCatalogo.filter(e => e.grupo_id === gid).map(e => e.disciplina_nombre))].forEach(d => sel.innerHTML += `<option value="${d}">${d}</option>`);
+}
+
+function updateEventos() {
+  const gid = document.getElementById('e-grupo').value;
+  const disc = document.getElementById('e-disciplina').value;
+  const sel = document.getElementById('e-evento');
+  sel.innerHTML = '<option value="">Seleccionar evento…</option>';
+  if (!gid || !disc) return;
+  state.eventosCatalogo.filter(e => e.grupo_id === gid && e.disciplina_nombre === disc)
+    .forEach(e => sel.innerHTML += `<option value="${e.evento_nombre}">${e.evento_nombre}${e.direccion ? ' · ' + e.direccion : ''}</option>`);
+}
+
+async function guardarNotaCambio() {
+  const texto = document.getElementById('nc-texto').value.trim();
+  const fecha = document.getElementById('nc-fecha').value;
+  if (!texto || !fecha) { showToast('Fecha y texto son requeridos', 'error'); return; }
+  if (!state.currentProyecto) { showToast('Selecciona un proyecto primero', 'error'); return; }
+  const btn = document.getElementById('btn-guardar-nc');
+  btn.disabled = true; btn.textContent = 'Guardando…';
+  try {
+    const res = await api('appendLogEvento', {
+      proyecto_id: state.currentProyecto.proyecto_id,
+      fecha_real: fecha, disciplina_id: '', hito_id: '',
+      tipo_entry: state.entryTipo, nota: texto, version_timeline_activa: '1'
+    });
+    if (state.entryTipo === 'cambio_registrado') {
+      await api('appendCambioDetalle', {
+        entry_id: res.entry_id,
+        origen_cambio: document.getElementById('e-origen').value,
+        disciplinas_afectadas: '',
+        hitos_afectados: '',
+        impacto_tipo: document.getElementById('e-impacto-tipo').value
+      });
+    }
+    closeModal('modal-nota-cambio');
+    showToast(state.entryTipo === 'nota' ? 'Nota guardada' : 'Cambio registrado', 'success');
+    await loadAllData();
+    if (state.currentProyecto) openProyecto(state.currentProyecto.proyecto_id);
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+  finally { btn.disabled = false; btn.textContent = 'Guardar'; }
+}
+
+async function guardarEntry() {
+  const fecha = document.getElementById('e-fecha').value;
+  const grupo = document.getElementById('e-grupo').value;
+  const disciplina = document.getElementById('e-disciplina').value;
+  const evento = document.getElementById('e-evento').value;
+  if (!fecha || !grupo || !disciplina || !evento) { showToast('Todos los campos son requeridos', 'error'); return; }
+  if (!state.currentProyecto) { showToast('Selecciona un proyecto primero', 'error'); return; }
+  const btn = document.getElementById('btn-guardar-entry');
+  btn.disabled = true; btn.textContent = 'Guardando…';
+  try {
+    await api('appendLogEvento', {
+      proyecto_id: state.currentProyecto.proyecto_id, fecha_real: fecha,
+      disciplina_id: `${grupo}::${disciplina}`, hito_id: evento,
+      tipo_entry: 'evento', nota: document.getElementById('e-nota').value, version_timeline_activa: '1'
+    });
+    closeModal('modal-entry');
+    showToast('Evento registrado', 'success');
+    const logFresco = await api('getLogEventos', { proyecto_id: state.currentProyecto.proyecto_id });
+    state.logEventos = [...state.logEventos.filter(e => e.proyecto_id !== state.currentProyecto.proyecto_id), ...(logFresco || [])];
+    await evaluarHitos(state.currentProyecto.proyecto_id, state.logEventos);
+    await loadAllData();
+    if (state.currentProyecto) openProyecto(state.currentProyecto.proyecto_id);
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+  finally { btn.disabled = false; btn.textContent = 'Guardar Evento'; }
+}
+
+// ── EVALUACIÓN DE HITOS ──
+async function evaluarHitos(proyectoId, logOverride) {
+  const log = (logOverride || state.logEventos).filter(e => e.proyecto_id === proyectoId);
+  const hitsAlcanzados = new Set(log.filter(e => e.tipo_entry === 'hito_alcanzado').map(e => e.hito_id));
+  console.log('evaluarHitos — proyectoId:', proyectoId);
+  console.log('log entries:', log.length);
+  console.log('muestra disciplina_id:', log.map(e => e.disciplina_id));
+  console.log('G5 Zonificación cierre:', log.some(e => e.disciplina_id === 'G5::Zonificación' && e.hito_id === 'Visto Bueno'));
+  console.log('G5 Mueble de Gorras cierre:', log.some(e => e.disciplina_id === 'G5::Mueble de Gorras' && e.hito_id === 'Visto Bueno'));
+  console.log('es_cierre G5 Zonificación:', state.eventosCatalogo.find(e => e.grupo_id === 'G5' && e.disciplina_nombre === 'Zonificación' && e.es_cierre === 'TRUE'));
+  const nuevosHitos = [];
+
+  function tieneEvento(grupoId, disciplina, eventoNombre) {
+    const discKey = `${grupoId}::${disciplina}`;
+    return log.some(e => e.disciplina_id === discKey && e.hito_id === eventoNombre);
+  }
+  function tieneCierre(grupoId, disciplina) {
+    const cierre = state.eventosCatalogo.find(e => e.grupo_id === grupoId && e.disciplina_nombre === disciplina && (e.es_cierre === 'TRUE' || e.es_cierre === 'true' || e.es_cierre === true));
+    if (!cierre) return false;
+    return tieneEvento(grupoId, disciplina, cierre.evento_nombre);
+  }
+  function todasCierran(grupoId, disciplinas) {
+    return disciplinas.every(d => tieneCierre(grupoId, d));
+  }
+  function algunaSolicitud(grupoId, disciplinas) {
+    return disciplinas.some(d => {
+      const discKey = `${grupoId}::${d}`;
+      return log.some(e => e.disciplina_id === discKey && e.hito_id && e.hito_id.toLowerCase().includes('solicitud'));
+    });
+  }
+
+  const TRIGGERS = {
+    'H01': () => true, // auto al crear — siempre alcanzado
+    'H22': () => todasCierran('G5', ['Zonificación','Mueble de Gorras']),
+    'H23': () => todasCierran('G6', ['HVAC','Proyecto Eléctrico']),
+    'H24': () => todasCierran('G7', ['Pantallas','Antenas WiFi','Bocinas','Contador de Personas','Validación Contactos','Validación Voz y Datos','Validación Site','Validación Cámaras']),
+    'H25': () => todasCierran('G8', state.eventosCatalogo.filter(e => e.grupo_id === 'G8').map(e => e.disciplina_nombre).filter((v,i,a) => a.indexOf(v) === i)),
+    'H26': () => todasCierran('G9', ['Aromas','Validación Pantallas','Validación Bocinas']),
+    'H27': () => todasCierran('G10', ['Caminadora','Mueble de Servicios']),
+    'H28': () => todasCierran('G11', state.eventosCatalogo.filter(e => e.grupo_id === 'G11').map(e => e.disciplina_nombre).filter((v,i,a) => a.indexOf(v) === i)),
+    'H29': () => tieneCierre('G12', 'Insumos'),
+    'H30': () => hitsAlcanzados.has('H23'),
+    'H31': () => hitsAlcanzados.has('H24'),
+    'H32': () => hitsAlcanzados.has('H25'),
+    'H33': () => hitsAlcanzados.has('H26'),
+    'H34': () => ['H30','H31','H32','H33'].every(h => hitsAlcanzados.has(h)),
+    'H36': () => tieneCierre('G15', 'Proyecto Ejecutivo'),
+  };
+
+  for (const [hitoId, condicion] of Object.entries(TRIGGERS)) {
+    if (!hitsAlcanzados.has(hitoId) && condicion()) {
+      nuevosHitos.push(hitoId);
+    }
+  }
+
+  for (const hitoId of nuevosHitos) {
+    await api('appendLogEvento', {
+      proyecto_id: proyectoId,
+      fecha_real: new Date().toISOString().split('T')[0],
+      disciplina_id: '', hito_id: hitoId,
+      tipo_entry: 'hito_alcanzado',
+      version_hito: calcVersionHito(log, hitoId),
+      nota: 'Alcanzado automáticamente', version_timeline_activa: '1'
+    });
+    showToast(`🎯 Hito ${hitoId} alcanzado`, 'success');
+  }
+
+  return nuevosHitos;
+}
+
+function calcVersionHito(log, hitoId) {
+  const anteriores = log.filter(e => e.hito_id === hitoId && e.tipo_entry === 'hito_alcanzado');
+  return anteriores.length + 1;
+}
+
+// ── SETTINGS ──
+function openSettings() {
+    const p = state.currentProyecto;
+  if (!p) return;
+  document.getElementById('s-nombre').value = p.nombre || '';
+  document.getElementById('s-clave').value = p.clave_innovasport || '';
+  document.getElementById('s-tipo').value = p.tipo_proyecto || '';
+  document.getElementById('s-fecha').value = p.fecha_aprobacion ? p.fecha_aprobacion.toString().split('T')[0].substring(0,10) : '';
+  document.getElementById('s-notas').value = p.notas || '';
+  document.getElementById('s-estado').value = p.estado || 'Activo';
+  const bubbleOn = p.bubble_plan_aplica === true || p.bubble_plan_aplica === 'TRUE';
+  document.getElementById('toggle-settings-bubble').classList.toggle('on', bubbleOn);
+  const sel = document.getElementById('s-arquitecto');
+  sel.innerHTML = '<option value="">Sin asignar</option>';
+  state.usuarios.filter(u => u.rol === 'Arquitecto').forEach(u => sel.innerHTML += `<option value="${u.email}">${u.nombre}</option>`);
+  sel.value = p.arquitecto_id || '';
+  openModal('modal-settings');
+}
+
+function toggleSettingsBubble() {
+  const toggle = document.getElementById('toggle-settings-bubble');
+  toggle.classList.toggle('on');
+}
+
+async function guardarSettings() {
+  const nombre = document.getElementById('s-nombre').value.trim();
+  if (!nombre) { showToast('El nombre es requerido', 'error'); return; }
+  const btn = document.getElementById('btn-guardar-settings');
+  btn.disabled = true; btn.textContent = 'Guardando…';
+  try {
+    await api('actualizarProyecto', {
+      proyecto_id: state.currentProyecto.proyecto_id,
+      nombre, clave_innovasport: document.getElementById('s-clave').value,
+      tipo_proyecto: document.getElementById('s-tipo').value,
+      fecha_aprobacion: document.getElementById('s-fecha').value,
+      arquitecto_id: document.getElementById('s-arquitecto').value,
+      estado: document.getElementById('s-estado').value,
+      bubble_plan_aplica: document.getElementById('toggle-settings-bubble').classList.contains('on'),
+      notas: document.getElementById('s-notas').value
+    });
+    closeModal('modal-settings');
+    showToast('Proyecto actualizado', 'success');
+    await loadAllData();
+    const updated = state.proyectos.find(p => p.proyecto_id === state.currentProyecto.proyecto_id);
+    if (updated) { state.currentProyecto = updated; openProyecto(updated.proyecto_id); }
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+  finally { btn.disabled = false; btn.textContent = 'Guardar cambios'; }
+}
+
+async function borrarProyecto() {
+  const p = state.currentProyecto;
+  if (!p) return;
+  if (!confirm(`¿Borrar "${p.nombre}"?\n\nEsta acción no se puede deshacer.`)) return;
+  try {
+    await api('borrarProyecto', { proyecto_id: p.proyecto_id });
+    closeModal('modal-settings');
+    showToast('Proyecto borrado', 'success');
+    state.currentProyecto = null;
+    await loadAllData();
+    showView('dashboard');
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+}
+
+// ── NOTAS ──
+function renderNotas(proyecto) {
+  const notas = state.logEventos.filter(e => e.proyecto_id === proyecto.proyecto_id && (e.tipo_entry === 'nota' || e.tipo_entry === 'cambio_registrado'));
+  const notasHTML = notas.length === 0
+    ? '<div style="color:var(--text3);font-family:var(--mono);font-size:12px;padding:4px 0">Sin notas registradas.</div>'
+    : notas.sort((a,b) => new Date(b.fecha_real) - new Date(a.fecha_real)).map(n => `
+        <div class="nota-entry">
+          <div class="nota-meta">${formatDate(n.fecha_real)} · ${n.registrado_por || state.user?.name || '—'}${n.tipo_entry === 'cambio_registrado' ? ' · <span style="color:var(--yellow);font-family:var(--mono);font-size:10px">⚡ cambio</span>' : ''}</div>
+          <div class="nota-texto">${n.nota || n.hito_id || ''}</div>
+        </div>`).join('');
+
+  return `
+  <div class="notas-section">
+    <div class="notas-header" id="notas-toggle" onclick="toggleNotas()" >
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:10px;color:var(--text3);transition:transform 0.15s" id="notas-chevron">▶</span>
+        <span class="section-title" style="margin:0">Notas del proyecto</span>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${notas.length}</span>
+      </div>
+      <button class="btn-ghost" style="font-size:11px" onclick="event.stopPropagation();openNotaCambio()">+ Nota / Cambio</button>
+    </div>
+    <div class="notas-body" id="notas-body">
+      <div id="notas-lista">${notasHTML}</div>
+      <div class="nota-form" id="nota-form">
+        <textarea class="form-textarea" id="nota-texto-input" placeholder="Escribe la nota…" style="min-height:72px;margin-bottom:10px"></textarea>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button class="btn-secondary" style="font-size:12px" onclick="cerrarFormNota()">Cancelar</button>
+          <button class="btn-primary" id="btn-guardar-nota" style="font-size:12px" onclick="guardarNota()">Guardar nota</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function toggleTimeline() {
+  document.getElementById('timeline-toggle').classList.toggle('open');
+  document.getElementById('timeline-body').classList.toggle('open');
+  const ch = document.getElementById('timeline-chevron');
+  ch.style.transform = document.getElementById('timeline-body').classList.contains('open') ? 'rotate(90deg)' : '';
+}
+function toggleNotas() {
+  document.getElementById('notas-toggle').classList.toggle('open');
+  document.getElementById('notas-body').classList.toggle('open');
+  const ch = document.getElementById('notas-chevron');
+  ch.style.transform = document.getElementById('notas-body').classList.contains('open') ? 'rotate(90deg)' : '';
+}
+
+// ── CRITERIOS ──
+function renderCriteriosList() {
+  const container = document.getElementById('criterios-list');
+  const lista = state.criterios.filter(c => c.estado !== 'obsoleto');
+  if (lista.length === 0) { container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📌</div>Sin criterios registrados.</div>`; return; }
+  container.innerHTML = lista.map(c => {
+    let confirmado = false;
+    try { confirmado = state.user && JSON.parse(c.confirmaciones || '{}')[state.user.email]; } catch(e) {}
+    const esPM = state.rol === 'PM';
+    return `
+    <div class="criterio-card ${c.estado}">
+      <div class="criterio-concepto">${c.concepto || 'General'}${c.proyecto_detonador ? ' · ' + c.proyecto_detonador : ''}</div>
+      <div class="criterio-desc">${c.descripcion}</div>
+      <div class="criterio-meta">Registrado por ${c.registrado_por} · ${formatDate(c.fecha_registro)}
+        ${c.estado === 'vigente' ? ` · Aprobado ${formatDate(c.fecha_aprobacion)}` : ''}
+        ${c.estado === 'vigente' && confirmado ? ' · <span style="color:var(--green)">✓ Leído</span>' : ''}
+        ${c.estado === 'pendiente_vobo' ? ' · <span style="color:var(--yellow)">Pendiente VoBo PM</span>' : ''}
+      </div>
+      <div class="criterio-actions">
+        ${c.estado === 'pendiente_vobo' && esPM ? `<button class="btn-primary" style="font-size:12px" onclick="aprobarCriterio('${c.criterio_id}')">Aprobar</button>` : ''}
+        ${c.estado === 'vigente' && !confirmado ? `<button class="btn-secondary" style="font-size:12px" onclick="confirmarLectura('${c.criterio_id}')">Confirmar lectura</button>` : ''}
+        ${c.estado === 'vigente' && esPM ? `<button class="btn-ghost" style="color:var(--text3);font-size:12px" onclick="obsoletarCriterio('${c.criterio_id}')">Obsoletizar</button>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openNuevoCriterio() {
+  document.getElementById('c-descripcion').value = '';
+  document.getElementById('c-concepto').value = '';
+  const sel = document.getElementById('c-proyecto');
+  sel.innerHTML = '<option value="">Ninguno / General</option>';
+  state.proyectos.forEach(p => sel.innerHTML += `<option value="${p.proyecto_id}">${p.nombre}</option>`);
+  openModal('modal-criterio');
+}
+
+async function guardarCriterio() {
+  const desc = document.getElementById('c-descripcion').value.trim();
+  if (!desc) { showToast('La descripción es requerida', 'error'); return; }
+  const btn = document.getElementById('btn-guardar-criterio');
+  btn.disabled = true; btn.textContent = 'Guardando…';
+  try {
+    await api('crearCriterio', { concepto: document.getElementById('c-concepto').value, descripcion: desc, proyecto_detonador: document.getElementById('c-proyecto').value });
+    closeModal('modal-criterio');
+    showToast('Criterio propuesto — pendiente VoBo PM', 'success');
+    await loadAllData(); renderCriteriosList();
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+  finally { btn.disabled = false; btn.textContent = 'Proponer Criterio'; }
+}
+
+async function aprobarCriterio(id) {
+  try { await api('aprobarCriterio', { criterio_id: id }); showToast('Criterio aprobado', 'success'); await loadAllData(); renderCriteriosList(); renderCriteriosBanner(); }
+  catch(e) { showToast('Error: ' + e.message, 'error'); }
+}
+async function confirmarLectura(id) {
+  try { await api('confirmarLecturaCriterio', { criterio_id: id }); showToast('Lectura confirmada', 'success'); await loadAllData(); renderCriteriosList(); renderCriteriosBanner(); }
+  catch(e) { showToast('Error: ' + e.message, 'error'); }
+}
+async function obsoletarCriterio(id) {
+  if (!confirm('¿Marcar este criterio como obsoleto?')) return;
+  try { await api('obsoletarCriterio', { criterio_id: id }); showToast('Criterio obsoletado', 'success'); await loadAllData(); renderCriteriosList(); }
+  catch(e) { showToast('Error: ' + e.message, 'error'); }
+}
+
+// ── TIMELINE / FECHAS ──
+const HITOS_TIMELINE = [
+  { id:'H01',  nombre:'Aprobación de nuevo proyecto',                    offset:0  },
+  { id:'H02',  nombre:'Solicitud Requerimientos Comercial + Operaciones', offset:1  },
+  { id:'H0A',  nombre:'Recepción de info para Bubble Plan',              offset:null },
+  { id:'H0B',  nombre:'Envío de Bubble Plan a Control de Proyectos',     offset:null },
+  { id:'H03',  nombre:'Asignación de arquitecto',                        offset:5  },
+  { id:'H04',  nombre:'Recepción info preliminar',                       offset:8  },
+  { id:'H05',  nombre:'Envío Reporte de Levantamiento',                  offset:10 },
+  { id:'H06',  nombre:'Día 1 de Diseño',                                 offset:10 },
+  { id:'H07',  nombre:'Requerimientos Comercial + Operaciones cerrados', offset:null },
+  { id:'H08',  nombre:'Validaciones cerradas',                           offset:3  },
+  { id:'H09',  nombre:'VoBo Layout — Dirección',                         offset:14 },
+  { id:'H10',  nombre:'VoBo Fachada',                                    offset:14 },
+  { id:'H11',  nombre:'Liberación de Layout',                            offset:20 },
+  { id:'H12',  nombre:'Solicitud Proyecto Arquitectónico',               offset:15 },
+  { id:'H13',  nombre:'Recepción P. Arq. (planos + catálogo)',           offset:25 },
+  { id:'H14',  nombre:'Envío comentarios post-revisión P. Arq.',         offset:27 },
+  { id:'H15',  nombre:'Entrega preliminar P. Ejecutivo',                 offset:28 },
+  { id:'H16',  nombre:'Solicitud Etapa 1 — Zonificación',               offset:15 },
+  { id:'H17',  nombre:'Solicitud Etapa 2 — HVAC + Eléctrico',           offset:18 },
+  { id:'H18',  nombre:'Solicitud Etapa 3 — Pantallas, Cámaras, Aromas', offset:19 },
+  { id:'H19',  nombre:'Solicitud Etapa 4 — Redes, Prevención',          offset:19 },
+  { id:'H20',  nombre:'Solicitud Etapa 5 — Señalética, Insumos',        offset:20 },
+  { id:'H21',  nombre:'Solicitud Etapa 6 — Validaciones dependientes',  offset:21 },
+  { id:'H22',  nombre:'Cierre Mobiliario',                               offset:20 },
+  { id:'H23',  nombre:'Cierre Instalaciones',                            offset:33 },
+  { id:'H24',  nombre:'Cierre Redes / Sistemas',                         offset:24 },
+  { id:'H25',  nombre:'Cierre Prevención',                               offset:24 },
+  { id:'H26',  nombre:'Cierre Marketing Sensorial',                      offset:26 },
+  { id:'H27',  nombre:'Cierre Excelencia Operativa',                     offset:25 },
+  { id:'H28',  nombre:'Cierre Precios Unitarios',                        offset:24 },
+  { id:'H29',  nombre:'Cierre Control de Proyectos — Insumos',          offset:25 },
+  { id:'H30',  nombre:'Cruce Instalaciones cerrado',                     offset:33 },
+  { id:'H31',  nombre:'Cruce Redes / Sistemas cerrado',                  offset:24 },
+  { id:'H32',  nombre:'Cruce Prevención cerrado',                        offset:24 },
+  { id:'H33',  nombre:'Cruce Marketing Sensorial cerrado',               offset:26 },
+  { id:'H34',  nombre:'Cruce General cerrado',                           offset:34 },
+  { id:'H35',  nombre:'Recepción P. Arq. corregido',                     offset:38 },
+  { id:'H36',  nombre:'Entrega Proyecto Ejecutivo',                      offset:43 },
+];
+
+function renderTimeline(proyecto) {
+  if (!proyecto.fecha_aprobacion) return '<div style="color:var(--text3);font-family:var(--mono);font-size:12px;padding:12px 0">Sin fecha de aprobación — no se puede calcular el timeline.</div>';
+  const base = parseISODate(proyecto.fecha_aprobacion);
+  if (!base) return '';
+  const hoy = new Date();
+  const log = state.logEventos.filter(e => e.proyecto_id === proyecto.proyecto_id);
+
+  const rows = HITOS_TIMELINE.map(h => {
+    const fechaEsperada = h.offset !== null ? addBusinessDays(base, h.offset) : null;
+    const completado = log.some(e => e.hito_id === h.id && e.tipo_entry === 'hito_alcanzado');
+    const retrasado = !completado && fechaEsperada && fechaEsperada < hoy;
+    const enRiesgo = !completado && !retrasado && fechaEsperada && (fechaEsperada - hoy) < 7 * 24 * 60 * 60 * 1000;
+    const estadoLabel = completado ? 'completado' : retrasado ? 'retrasado' : enRiesgo ? 'en riesgo' : 'pendiente';
+    const estadoClass = completado ? 'completado' : retrasado ? 'retrasado' : enRiesgo ? 'en-riesgo' : 'pendiente';
+    return `
+    <div class="timeline-row">
+      <div class="timeline-hito-id">${h.id}</div>
+      <div class="timeline-hito-nombre">${h.nombre}</div>
+      <div class="timeline-fecha">${fechaEsperada ? formatDate(fechaEsperada) : '<span style="color:var(--text3)">variable</span>'}</div>
+      <div class="timeline-estado ${estadoClass}">${estadoLabel}</div>
+    </div>`;
+  }).join('');
+
+return `
+  <div class="timeline-section">
+    <div class="timeline-header" id="timeline-toggle" onclick="toggleTimeline()">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:10px;color:var(--text3);transition:transform 0.15s" id="timeline-chevron">▶</span>
+        <span class="section-title" style="margin:0">Hitos del Proyecto</span>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${HITOS_TIMELINE.length}</span>
+      </div>
+    </div>
+    <div class="timeline-body" id="timeline-body">
+    <div>
+      <div class="timeline-row header">
+        <div class="col-header">Hito</div>
+        <div class="col-header">Descripción</div>
+        <div class="col-header">Fecha esperada</div>
+        <div class="col-header">Estado</div>
+      </div>
+      ${rows}
+    </div>
+    </div>
+  </div>`;
+}
+function calcFechaEntrega(fechaAprobacion) {
+  if (!fechaAprobacion) return '—';
+  try {
+    const dt = parseISODate(fechaAprobacion);
+    if (!dt) return '—';
+    return formatDate(addBusinessDays(dt, 43));
+  } catch(e) { return '—'; }
+}
+
+function calcRiesgo(proyecto) {
+  if (!proyecto.fecha_aprobacion) return { nivel: 'gray', label: 'Sin fecha' };
+  const dt = parseISODate(proyecto.fecha_aprobacion);
+  if (!dt) return { nivel: 'gray', label: 'Sin fecha' };
+  const hoy = new Date();
+  const fechaEntrega = addBusinessDays(dt, 43);
+  const dias = Math.round((fechaEntrega - hoy) / (1000*60*60*24));
+  if (dias < 0) return { nivel: 'red', label: Math.abs(dias) + 'd vencido' };
+  if (dias < 7) return { nivel: 'yellow', label: dias + 'd' };
+  return { nivel: 'green', label: dias + 'd' };
+}
+
+function addBusinessDays(startDate, days) {
+  const date = new Date(startDate);
+  let added = 0;
+  while (added < days) { date.setDate(date.getDate() + 1); if (date.getDay() !== 0 && date.getDay() !== 6) added++; }
+  return date;
+}
+
+// ── HELPERS ──
+function getGruposUnicos() {
+  const grupos = []; const seen = new Set();
+  state.eventosCatalogo.forEach(e => { if (!seen.has(e.grupo_id)) { seen.add(e.grupo_id); grupos.push({ grupo_id: e.grupo_id, grupo_nombre: e.grupo_nombre }); } });
+  return grupos;
+}
+function getDisciplinasGrupo(gid) { return [...new Set(state.eventosCatalogo.filter(e => e.grupo_id === gid).map(e => e.disciplina_nombre))]; }
+function isDisciplinaCompleta(disciplina, grupoId, log) {
+  const cierre = state.eventosCatalogo.find(e => e.grupo_id === grupoId && e.disciplina_nombre === disciplina && (e.es_cierre === 'TRUE' || e.es_cierre === 'true' || e.es_cierre === true));
+  if (!cierre) return false;
+  const discKey = `${grupoId}::${disciplina}`;
+  return log.some(e => e.disciplina_id === discKey && e.hito_id === cierre.evento_nombre && e.tipo_entry === 'evento');
+}
+
+// ── UI ──
+function showView(viewName) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(`view-${viewName}`)?.classList.add('active');
+  document.getElementById(`nav-${viewName}`)?.classList.add('active');
+  if (viewName === 'criterios') renderCriteriosList();
+}
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function parseISODate(d) {
+  // Maneja YYYY-MM-DD, Date objects, y strings largos tipo "Tue May 05 2026..."
+  if (!d) return null;
+  if (d instanceof Date) return isNaN(d) ? null : d;
+  const s = d.toString().trim();
+  // Formato YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return new Date(s + 'T12:00:00');
+  // Cualquier otro string — intentar parsear directamente
+  const dt = new Date(s);
+  return isNaN(dt) ? null : dt;
+}
+function formatDate(d) {
+  if (!d) return '—';
+  const dt = parseISODate(d);
+  if (!dt) return '—';
+  const m = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  return `${dt.getDate()} ${m[dt.getMonth()]} ${dt.getFullYear()}`;
+}
+function showToast(msg, type = 'success') {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.className = `show ${type}`;
+  setTimeout(() => el.className = '', 3500);
+}
+document.querySelectorAll('.modal-overlay').forEach(o => o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); }));
+</script>
+<script src="https://accounts.google.com/gsi/client" onload="initGoogleAPI()"></script>
+</body>
+</html>
