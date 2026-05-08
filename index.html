@@ -648,6 +648,7 @@ function renderDashboard() {
   activos.forEach(p => {
     if (!p.fecha_aprobacion) return;
     const logP = state.logEventos.filter(e => e.proyecto_id === p.proyecto_id);
+    console.log('dashboard — proyecto:', p.nombre, 'log entries:', logP.length, 'fecha_aprobacion:', p.fecha_aprobacion);
     HITOS_TIMELINE.filter(h => h.offset !== null).forEach(h => {
       const completado = logP.some(e => e.hito_id === h.id && e.tipo_entry === 'hito_alcanzado');
       if (completado) return;
