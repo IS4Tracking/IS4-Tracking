@@ -648,16 +648,7 @@ function renderDashboard() {
   activos.forEach(p => {
     if (!p.fecha_aprobacion) return;
     const logP = state.logEventos.filter(e => e.proyecto_id === p.proyecto_id);
-    const hitosRef = [
-      { id:'H06', nombre:'Día 1 de Diseño', offset:10 },
-      { id:'H09', nombre:'VoBo Layout Dirección', offset:14 },
-      { id:'H11', nombre:'Liberación de Layout', offset:20 },
-      { id:'H22', nombre:'Cierre Mobiliario', offset:24 },
-      { id:'H23', nombre:'Cierre Instalaciones', offset:33 },
-      { id:'H24', nombre:'Cierre Redes / Sistemas', offset:28 },
-      { id:'H36', nombre:'Entrega Proyecto Ejecutivo', offset:43 }
-    ];
-    hitosRef.forEach(h => {
+    HITOS_TIMELINE.filter(h => h.offset !== null).forEach(h => {
       const completado = logP.some(e => e.hito_id === h.id && e.tipo_entry === 'hito_alcanzado');
       if (completado) return;
       const fecha = addBusinessDays(new Date(p.fecha_aprobacion + 'T12:00:00'), h.offset);
