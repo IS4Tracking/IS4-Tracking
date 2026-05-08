@@ -991,16 +991,18 @@ async function guardarEntry() {
     });
     closeModal('modal-entry');
     showToast('Evento registrado', 'success');
+    const logFresco = await api('getLogEventos');
+    state.logEventos = logFresco || [];
+    await evaluarHitos(state.currentProyecto.proyecto_id, logFresco);
     await loadAllData();
-    await evaluarHitos(state.currentProyecto.proyecto_id);
     if (state.currentProyecto) openProyecto(state.currentProyecto.proyecto_id);
   } catch(e) { showToast('Error: ' + e.message, 'error'); }
   finally { btn.disabled = false; btn.textContent = 'Guardar Evento'; }
 }
 
 // ── EVALUACIÓN DE HITOS ──
-async function evaluarHitos(proyectoId) {
-  const log = state.logEventos.filter(e => e.proyecto_id === proyectoId);
+async function evaluarHitos(proyectoId, logOverride) {
+  const log = (logOverride || state.logEventos).filter(e => e.proyecto_id === proyectoId);
   const hitsAlcanzados = new Set(log.filter(e => e.tipo_entry === 'hito_alcanzado').map(e => e.hito_id));
   const nuevosHitos = [];
 
