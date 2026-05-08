@@ -113,6 +113,11 @@
   .hito-row { display:grid; grid-template-columns:120px 1fr 200px 80px; gap:12px; align-items:center; padding:10px 16px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); margin-bottom:4px; font-size:13px; cursor:pointer; transition:border-color 0.15s; }
   .hito-row:hover { border-color:var(--border2); }
   .hito-fecha { font-family:var(--mono); font-size:12px; color:var(--text2); }
+  .hito-row.retrasado { border-left:2px solid #ff5050; cursor:default; }
+  .hito-link { font-weight:500; cursor:pointer; color:var(--text); transition:color 0.15s; }
+  .hito-link:hover { color:var(--accent); }
+  .hito-link.secondary { font-size:12px; font-weight:400; color:var(--text2); }
+  .hito-link.secondary:hover { color:var(--accent); }
 
   /* CRITERIOS BANNER */
   .criterios-banner { background:rgba(200,240,60,0.06); border:1px solid rgba(200,240,60,0.2); border-radius:var(--radius); padding:12px 16px; margin-bottom:20px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
@@ -668,8 +673,8 @@ function renderDashboard() {
     <div style="font-family:var(--mono);font-size:10px;color:#ff5050;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;margin-top:4px">⚠ Hitos vencidos — ${vencidos.length}</div>
     ${vencidos.map(h => `<div class="hito-row retrasado">
       <div class="hito-fecha" style="color:#ff5050">${formatDate(h.fecha)}</div>
-      <div style="font-weight:500;cursor:pointer;text-decoration:underline;text-underline-offset:3px" onclick="openProyecto('${h.proyectoId}')">${h.proyecto}</div>
-      <div style="font-size:12px;color:var(--accent);cursor:pointer" onclick="openProyectoEnHito('${h.proyectoId}','${h.hitoId}')">${h.hito}</div>
+      <div class="hito-link" onclick="openProyectoEnHito('${h.proyectoId}','${h.hitoId}')">${h.hito}</div>
+      <div class="hito-link secondary" onclick="openProyecto('${h.proyectoId}')">${h.proyecto}</div>
       <div></div>
     </div>`).join('')}`;
 
