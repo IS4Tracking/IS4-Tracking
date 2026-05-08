@@ -991,9 +991,9 @@ async function guardarEntry() {
     });
     closeModal('modal-entry');
     showToast('Evento registrado', 'success');
-    const logFresco = await api('getLogEventos');
-    state.logEventos = logFresco || [];
-    await evaluarHitos(state.currentProyecto.proyecto_id, logFresco);
+    const logFresco = await api('getLogEventos', { proyecto_id: state.currentProyecto.proyecto_id });
+    state.logEventos = [...state.logEventos.filter(e => e.proyecto_id !== state.currentProyecto.proyecto_id), ...(logFresco || [])];
+    await evaluarHitos(state.currentProyecto.proyecto_id, state.logEventos);
     await loadAllData();
     if (state.currentProyecto) openProyecto(state.currentProyecto.proyecto_id);
   } catch(e) { showToast('Error: ' + e.message, 'error'); }
@@ -1004,6 +1004,12 @@ async function guardarEntry() {
 async function evaluarHitos(proyectoId, logOverride) {
   const log = (logOverride || state.logEventos).filter(e => e.proyecto_id === proyectoId);
   const hitsAlcanzados = new Set(log.filter(e => e.tipo_entry === 'hito_alcanzado').map(e => e.hito_id));
+  console.log('evaluarHitos — proyectoId:', proyectoId);
+  console.log('log entries:', log.length);
+  console.log('muestra disciplina_id:', log.map(e => e.disciplina_id));
+  console.log('G5 Zonificación cierre:', log.some(e => e.disciplina_id === 'G5::Zonificación' && e.hito_id === 'Visto Bueno'));
+  console.log('G5 Mueble de Gorras cierre:', log.some(e => e.disciplina_id === 'G5::Mueble de Gorras' && e.hito_id === 'Visto Bueno'));
+  console.log('es_cierre G5 Zonificación:', state.eventosCatalogo.find(e => e.grupo_id === 'G5' && e.disciplina_nombre === 'Zonificación' && e.es_cierre === 'TRUE'));
   const nuevosHitos = [];
 
   function tieneEvento(grupoId, disciplina, eventoNombre) {
