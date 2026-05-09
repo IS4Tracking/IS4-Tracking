@@ -581,20 +581,15 @@ function initGoogleAPI() {
   if (savedToken && savedUser) {
     state.accessToken = savedToken;
     state.user = JSON.parse(savedUser);
-    fetch('https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=' + savedToken)
-      .then(r => r.json())
-      .then(info => {
-        if (info.error) {
-          sessionStorage.removeItem('is4_token');
-          sessionStorage.removeItem('is4_user');
-        } else {
-          completeSignIn();
-        }
-      })
-      .catch(() => {
-        sessionStorage.removeItem('is4_token');
-        sessionStorage.removeItem('is4_user');
-      });
+    // Intentar restaurar directamente — si el token expiró, Apps Script lo rechazará
+    // y el usuario verá el error en el toast en lugar de ser expulsado silenciosamente
+    completeSignIn().catch(() => {
+      // Token inválido — limpiar y mostrar login
+      sessionStorage.removeItem('is4_token');
+      sessionStorage.removeItem('is4_user');
+      state.accessToken = null;
+      state.user = null;
+    });
   }
 }
 function handleLogin() {
