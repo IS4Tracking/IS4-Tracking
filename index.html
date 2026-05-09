@@ -156,13 +156,20 @@
   .group-body { display:none; border-top:1px solid var(--border); }
   .group-row.open .group-body { display:block; }
 
-  .disciplina-row { display:grid; grid-template-columns:1fr auto auto auto; gap:12px; align-items:center; padding:10px 16px 10px 52px; border-bottom:1px solid var(--border); cursor:pointer; transition:background 0.15s; }
+  .disciplina-row { display:grid; grid-template-columns:1fr auto auto auto auto; gap:12px; align-items:center; padding:10px 16px 10px 52px; border-bottom:1px solid var(--border); cursor:pointer; transition:background 0.15s; }
   .disciplina-row:last-child { border-bottom:none; }
   .disciplina-row:hover { background:var(--surface2); }
   .disciplina-estado { font-family:var(--mono); font-size:10px; padding:2px 6px; border-radius:3px; }
   .disciplina-estado.pendiente { background:var(--surface2); color:var(--text3); }
   .disciplina-estado.en-proceso { background:rgba(68,136,255,0.15); color:var(--blue); }
   .disciplina-estado.completado { background:rgba(68,204,136,0.15); color:var(--green); }
+  .disciplina-estado.afectado { background:rgba(255,170,0,0.15); color:var(--yellow); }
+  .vobo-badge { font-family:var(--mono); font-size:10px; padding:2px 6px; border-radius:3px; white-space:nowrap; }
+  .vobo-badge.v1 { background:var(--surface2); color:var(--text3); }
+  .vobo-badge.v2 { background:rgba(120,120,120,0.2); color:#aaa; }
+  .vobo-badge.v3 { background:rgba(234,179,8,0.15); color:var(--yellow); }
+  .vobo-badge.v4 { background:rgba(249,115,22,0.15); color:#f97316; }
+  .vobo-badge.v5plus { background:rgba(239,68,68,0.15); color:#ef4444; }
 
   /* LOG PANEL */
   .log-panel { display:none; background:var(--bg); border-top:1px solid var(--border); padding:16px 16px 16px 52px; }
@@ -902,17 +909,29 @@ function contarVoBos(disciplina, grupoId, log) {
 function renderDisciplina(proyecto, grupo, disciplina, log) {
   const discKey = `${grupo.grupo_id}::${disciplina}`;
   const safeId = `${proyecto.proyecto_id}_${grupo.grupo_id}_${disciplina}`.replace(/[^a-zA-Z0-9_]/g, '_');
-  const eventos = log.filter(e => e.disciplina_id === discKey);
+  const eventos = log.filter(e => e.disciplina_id === discKey && e.tipo_entry !== 'cambio_aplicado');
   const completa = isDisciplinaCompleta(disciplina, grupo.grupo_id, log);
-  const estado = completa ? 'completado' : eventos.length > 0 ? 'en-proceso' : 'pendiente';
+  const ultimoEvento = (() => {
+    const evs = log.filter(e => e.disciplina_id === discKey && e.tipo_entry === 'evento')
+      .sort((a,b) => {
+        const ta = a.timestamp ? new Date(a.timestamp) : new Date(a.fecha_real + 'T12:00:00Z');
+        const tb = b.timestamp ? new Date(b.timestamp) : new Date(b.fecha_real + 'T12:00:00Z');
+        return ta - tb;
+      });
+    return evs.length > 0 ? evs[evs.length - 1] : null;
+  })();
+  const afectado = !completa && ultimoEvento && ultimoEvento.hito_id && ultimoEvento.hito_id.startsWith('Afectado por Cambio');
+  const estado = completa ? 'completado' : afectado ? 'afectado' : eventos.length > 0 ? 'en-proceso' : 'pendiente';
+  const estadoLabel = completa ? 'completado' : afectado ? 'afectado' : eventos.length > 0 ? 'en proceso' : 'pendiente';
   const vobos = contarVoBos(disciplina, grupo.grupo_id, log);
-  const voboColor = vobos === 0 ? 'var(--text3)' : vobos === 1 ? 'var(--text3)' : vobos === 2 ? 'var(--yellow)' : vobos === 3 ? '#f97316' : '#ef4444';
-  const voboHTML = vobos > 0 ? `<div style="font-size:10px;font-family:var(--mono);color:${voboColor};min-width:28px;text-align:center" title="${vobos === 1 ? 'Sin retrabajo' : vobos - 1 + ' retrabajo(s)'}">${'●'.repeat(Math.min(vobos,4))}</div>` : `<div style="min-width:28px"></div>`;
+  const voboBadgeClass = vobos === 0 ? '' : vobos === 1 ? 'v1' : vobos === 2 ? 'v2' : vobos === 3 ? 'v3' : vobos === 4 ? 'v4' : 'v5plus';
+  const voboLabel = vobos === 1 ? '1 visto bueno' : vobos > 1 ? `${vobos} vistos buenos` : '';
+  const voboHTML = vobos > 0 ? `<div class="vobo-badge ${voboBadgeClass}" title="${vobos === 1 ? 'Sin retrabajo' : vobos - 1 + ' retrabajo(s)'}">${voboLabel}</div>` : `<div></div>`;
   return `
   <div>
     <div class="disciplina-row" onclick="toggleLogPanel('log_${safeId}')">
       <div>${disciplina}</div>
-      <div class="disciplina-estado ${estado}">${estado.replace('-',' ')}</div>
+      <div class="disciplina-estado ${estado}">${estadoLabel}</div>
       ${voboHTML}
       <div style="font-size:11px;color:var(--text3);font-family:var(--mono)">${eventos.length} eventos</div>
       <button class="btn-ghost" onclick="event.stopPropagation();openEntryForDisciplina('${grupo.grupo_id}','${disciplina}')">+ Evento</button>
@@ -1398,14 +1417,27 @@ function updateDisciplinas() {
   [...new Set(state.eventosCatalogo.filter(e => e.grupo_id === gid).map(e => e.disciplina_nombre))].forEach(d => sel.innerHTML += `<option value="${d}">${d}</option>`);
 }
 
+const VOBO_AREA_LABEL = {
+  'G5': 'Mobiliario', 'G6': 'Instalaciones', 'G7': 'Redes / Sistemas',
+  'G8': 'Prevención', 'G9': 'Mkt Sensorial', 'G10': 'Excelencia Operativa',
+  'G11': 'Precios Unitarios', 'G14': 'SP'
+};
+
 function updateEventos() {
   const gid = document.getElementById('e-grupo').value;
   const disc = document.getElementById('e-disciplina').value;
   const sel = document.getElementById('e-evento');
   sel.innerHTML = '<option value="">Seleccionar evento…</option>';
   if (!gid || !disc) return;
-  state.eventosCatalogo.filter(e => e.grupo_id === gid && e.disciplina_nombre === disc)
-    .forEach(e => sel.innerHTML += `<option value="${e.evento_nombre}">${e.evento_nombre}${e.direccion ? ' · ' + e.direccion : ''}</option>`);
+  state.eventosCatalogo
+    .filter(e => e.grupo_id === gid && e.disciplina_nombre === disc && e.evento_nombre !== 'Afectado por Cambio')
+    .forEach(e => {
+      const areaLabel = VOBO_AREA_LABEL[gid];
+      let label = e.evento_nombre;
+      if (label === 'Visto Bueno' && areaLabel) label = `Visto Bueno ${areaLabel}`;
+      const dir = e.direccion && e.direccion !== '[Área]' ? ' · ' + e.direccion : '';
+      sel.innerHTML += `<option value="${e.evento_nombre}">${label}${dir}</option>`;
+    });
 }
 
 async function guardarNotaCambio() {
@@ -1823,7 +1855,7 @@ function renderNotas(proyecto) {
 
         const notaTipoAbrev = { 'Riesgo': 'RSG', 'Lección aprendida': 'LA', 'Decisión': 'DEC', 'Pendiente externo': 'PE', 'General': 'GEN' };
         const tipoTag = notaData?.tipo ? `<span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${notaTipoAbrev[notaData.tipo] || notaData.tipo}</span>` : '';
-        const claveTag = esCambio && claveCambio ? `<span style="font-family:var(--mono);font-size:10px;color:var(--yellow)">⚡ ${claveCambio}</span>` : esCambio ? `<span style="color:var(--yellow);font-family:var(--mono);font-size:10px">⚡ cambio</span>` : '';
+        const claveTag = esCambio && claveCambio ? `<span style="font-family:var(--mono);font-size:10px;color:var(--yellow);cursor:pointer" onclick="scrollToCambio('${n.entry_id}')" title="Ver detalle del cambio">⚡ ${claveCambio}</span>` : esCambio ? `<span style="color:var(--yellow);font-family:var(--mono);font-size:10px">⚡ cambio</span>` : '';
         const tituloNota = notaData?.titulo ? `<div class="nota-titulo" style="font-weight:500;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%" title="${notaData.titulo}">${notaData.titulo}</div>` : '';
         const textoNota = esCambio ? (cd?.alcance || n.nota || '') : (notaData?.contenido || n.nota || n.hito_id || '');
         const claveNota = !esCambio && n.hito_id ? `<span style="font-family:var(--mono);font-size:10px;color:var(--text3);cursor:pointer" title="Ver nota">${n.hito_id}</span>` : '';
@@ -1858,6 +1890,27 @@ function renderNotas(proyecto) {
       </div>
     </div>
   </div>`;
+}
+
+function scrollToCambio(entryId) {
+  const notasBody = document.getElementById('notas-body');
+  if (notasBody && !notasBody.classList.contains('open')) {
+    document.getElementById('notas-toggle')?.click();
+  }
+  setTimeout(() => {
+    const panelId = `cambio-panel-${entryId}`;
+    const panel = document.getElementById(panelId);
+    if (panel) {
+      panel.closest('.nota-entry')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      if (!panel.classList.contains('open')) {
+        panel.classList.add('open');
+        const chevron = document.getElementById(`chevron-${panelId}`);
+        if (chevron) chevron.style.transform = 'rotate(90deg)';
+      }
+      panel.closest('.nota-entry').style.outline = '1px solid var(--yellow)';
+      setTimeout(() => { panel.closest('.nota-entry').style.outline = ''; }, 1500);
+    }
+  }, 200);
 }
 
 function scrollToNota(claveNota) {
