@@ -588,15 +588,18 @@ function initGoogleAPI() {
     state.user = JSON.parse(savedUser);
     // Ocultar login screen mientras restauramos — evita flash visible
     document.getElementById('login-screen').classList.add('restoring');
-    completeSignIn().catch(() => {
-      sessionStorage.removeItem('is4_token');
-      sessionStorage.removeItem('is4_user');
-      state.accessToken = null;
-      state.user = null;
-      const ls = document.getElementById('login-screen');
-      ls.classList.remove('restoring');
-      ls.style.display = 'flex';
-    });
+    completeSignIn()
+      .then(() => console.log('auto-restore OK'))
+      .catch((err) => {
+        console.log('auto-restore FAILED:', err);
+        sessionStorage.removeItem('is4_token');
+        sessionStorage.removeItem('is4_user');
+        state.accessToken = null;
+        state.user = null;
+        const ls = document.getElementById('login-screen');
+        ls.classList.remove('restoring');
+        ls.style.display = 'flex';
+      });
   }
 }
 function handleLogin() {
