@@ -561,15 +561,29 @@ let state = {
 
 // ── AUTH — Google Identity Services ──
 let tokenClient;
+let tokenRenewalTimer = null;
 
 function initGoogleAPI() {
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: CONFIG.CLIENT_ID,
     scope: CONFIG.SCOPES,
     callback: async (tokenResponse) => {
-      if (tokenResponse.error) { showToast('Error al iniciar sesión', 'error'); return; }
+      if (tokenResponse.error) {
+        // Si falla renovación silenciosa, pedir login explícito
+        if (tokenResponse.error === 'user_logged_out' || tokenResponse.error === 'interaction_required') {
+          showLoginScreen();
+        } else {
+          showToast('Error al iniciar sesión', 'error');
+        }
+        return;
+      }
       state.accessToken = tokenResponse.access_token;
       sessionStorage.setItem('is4_token', tokenResponse.access_token);
+      // Programar renovación automática antes de que expire (55 min)
+      scheduleTokenRenewal();
+      // Si ya estamos en la app, no re-inicializar — solo actualizar el token
+      if (document.getElementById('app').style.display === 'flex') return;
+      // Primera vez — obtener perfil y entrar
       try {
         const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
           headers: { Authorization: 'Bearer ' + state.accessToken }
@@ -580,32 +594,37 @@ function initGoogleAPI() {
       } catch(e) { showToast('Error obteniendo perfil', 'error'); }
     }
   });
-  // Auto-restore session on page load
-  const savedToken = sessionStorage.getItem('is4_token');
+
+  // Auto-restore: intentar renovar token silenciosamente al cargar
   const savedUser = sessionStorage.getItem('is4_user');
-  if (savedToken && savedUser) {
-    state.accessToken = savedToken;
+  if (savedUser) {
     state.user = JSON.parse(savedUser);
-    // Ocultar login screen mientras restauramos — evita flash visible
     document.getElementById('login-screen').classList.add('restoring');
-    completeSignIn()
-      .then(() => console.log('auto-restore OK'))
-      .catch((err) => {
-        console.log('auto-restore FAILED:', err);
-        sessionStorage.removeItem('is4_token');
-        sessionStorage.removeItem('is4_user');
-        state.accessToken = null;
-        state.user = null;
-        const ls = document.getElementById('login-screen');
-        ls.classList.remove('restoring');
-        ls.style.display = 'flex';
-      });
+    // Renovar token silenciosamente — sin popup, sin interacción
+    tokenClient.requestAccessToken({ prompt: '' });
   }
 }
-function handleLogin() {
-  // Limpiar session storage antes de pedir token nuevo
+
+function scheduleTokenRenewal() {
+  if (tokenRenewalTimer) clearTimeout(tokenRenewalTimer);
+  // Renovar a los 55 minutos (token dura 60)
+  tokenRenewalTimer = setTimeout(() => {
+    tokenClient.requestAccessToken({ prompt: '' });
+  }, 55 * 60 * 1000);
+}
+
+function showLoginScreen() {
   sessionStorage.removeItem('is4_token');
   sessionStorage.removeItem('is4_user');
+  state.accessToken = null; state.user = null; state.rol = null;
+  if (tokenRenewalTimer) clearTimeout(tokenRenewalTimer);
+  const ls = document.getElementById('login-screen');
+  ls.classList.remove('restoring');
+  ls.style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+}
+
+function handleLogin() {
   tokenClient.requestAccessToken({ prompt: 'select_account' });
 }
 
@@ -613,10 +632,18 @@ async function completeSignIn() {
   try {
     const usuarios = await api('getUsuarios');
     const u = usuarios.find(x => x.email.toLowerCase() === state.user.email.toLowerCase());
-    if (!u) { showToast('Acceso no autorizado. Contacta al PM.', 'error'); handleLogout(); return; }
+    if (!u) {
+      showToast('Acceso no autorizado. Contacta al PM.', 'error');
+      showLoginScreen();
+      return;
+    }
     state.rol = u.rol;
     state.usuarios = usuarios;
-  } catch(e) { showToast('Error verificando acceso: ' + e.message, 'error'); return; }
+  } catch(e) {
+    showToast('Error verificando acceso: ' + e.message, 'error');
+    showLoginScreen();
+    return;
+  }
 
   document.getElementById('user-name-display').textContent = state.user.name.split(' ')[0];
   document.getElementById('user-role-display').textContent = state.rol;
@@ -631,12 +658,9 @@ async function completeSignIn() {
 }
 
 function handleLogout() {
-  sessionStorage.removeItem('is4_token');
-  sessionStorage.removeItem('is4_user');
+  if (tokenRenewalTimer) clearTimeout(tokenRenewalTimer);
   google.accounts.oauth2.revoke(state.accessToken, () => {});
-  document.getElementById('login-screen').style.display = 'flex';
-  document.getElementById('app').style.display = 'none';
-  state.user = null; state.rol = null; state.accessToken = null;
+  showLoginScreen();
 }
 
 // ── API ──
