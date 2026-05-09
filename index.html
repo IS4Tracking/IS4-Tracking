@@ -463,6 +463,23 @@
         <div class="tipo-btn selected" id="tipo-nota-btn" onclick="selectNotaCambioTipo('nota')"><div class="tipo-btn-icon">📝</div><div class="tipo-btn-label">Nota</div></div>
         <div class="tipo-btn" id="tipo-cambio-btn" onclick="selectNotaCambioTipo('cambio_registrado')"><div class="tipo-btn-icon">⚡</div><div class="tipo-btn-label">Cambio</div></div>
       </div>
+      <!-- Campos solo para NOTA -->
+      <div id="nota-fields" style="display:none">
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Clasificación <span style="color:var(--accent)">*</span></label>
+            <select class="form-select" id="nc-tipo-nota"><option value="">Seleccionar…</option><option value="Riesgo">Riesgo</option><option value="Lección aprendida">Lección aprendida</option><option value="Decisión">Decisión</option><option value="Pendiente externo">Pendiente externo</option><option value="General">General</option></select>
+          </div>
+        </div>
+        <div class="form-group"><label class="form-label">Título <span style="color:var(--accent)">*</span></label><input class="form-input" id="nc-titulo" placeholder="Título corto de la nota…" maxlength="80"></div>
+        <div class="form-group cambio-disc-section">
+          <div class="cambio-disc-label">Disciplina relacionada <span>opcional</span></div>
+          <div class="form-row" style="gap:8px">
+            <select class="form-select" id="nc-nota-grupo" onchange="updateNotaGrupo()" style="flex:1"><option value="">Sin referencia</option></select>
+            <select class="form-select" id="nc-nota-disciplina" style="flex:1"><option value="">—</option></select>
+          </div>
+        </div>
+      </div>
+      <!-- Campos solo para CAMBIO -->
       <div id="cambio-fields" style="display:none">
         <div class="form-row">
           <div class="form-group"><label class="form-label">Tipo de cambio</label>
@@ -477,8 +494,9 @@
           <div id="cambio-disc-container"></div>
         </div>
       </div>
+      <!-- Campos comunes -->
       <div class="form-group"><label class="form-label">Fecha</label><input class="form-input" id="nc-fecha" type="date"></div>
-      <div class="form-group"><label class="form-label">Texto</label><textarea class="form-textarea" id="nc-texto" placeholder="Escribe la nota o descripción del cambio…" style="min-height:80px"></textarea></div>
+      <div class="form-group"><label class="form-label" id="nc-texto-label">Texto</label><textarea class="form-textarea" id="nc-texto" placeholder="Escribe la nota o descripción del cambio…" style="min-height:80px"></textarea></div>
     </div>
     <div class="modal-footer">
       <button class="btn-secondary" onclick="closeModal('modal-nota-cambio')">Cancelar</button>
@@ -556,7 +574,9 @@ let state = {
   proyectos: [], eventosCatalogo: [], logEventos: [], criterios: [], usuarios: [],
   disciplinasProyecto: [],
   currentProyecto: null, entryTipo: 'nota',
-  bubblePlan: false, disciplinasSeleccionadas: new Set()
+  bubblePlan: false, disciplinasSeleccionadas: new Set(),
+  cambioDiscsSeleccionadas: new Set(), editandoCambioId: null,
+  cambiosEliminados: []
 };
 
 // ── AUTH — Google Identity Services ──
@@ -872,31 +892,61 @@ function renderGroups(proyecto) {
   }).join('');
 }
 
+function contarVoBos(disciplina, grupoId, log) {
+  const cierre = state.eventosCatalogo.find(e => e.grupo_id === grupoId && e.disciplina_nombre === disciplina && (e.es_cierre === 'TRUE' || e.es_cierre === 'true' || e.es_cierre === true));
+  if (!cierre) return 0;
+  const discKey = `${grupoId}::${disciplina}`;
+  return log.filter(e => e.disciplina_id === discKey && e.tipo_entry === 'evento' && e.hito_id === cierre.evento_nombre).length;
+}
+
 function renderDisciplina(proyecto, grupo, disciplina, log) {
   const discKey = `${grupo.grupo_id}::${disciplina}`;
   const safeId = `${proyecto.proyecto_id}_${grupo.grupo_id}_${disciplina}`.replace(/[^a-zA-Z0-9_]/g, '_');
   const eventos = log.filter(e => e.disciplina_id === discKey);
   const completa = isDisciplinaCompleta(disciplina, grupo.grupo_id, log);
   const estado = completa ? 'completado' : eventos.length > 0 ? 'en-proceso' : 'pendiente';
+  const vobos = contarVoBos(disciplina, grupo.grupo_id, log);
+  const voboColor = vobos === 0 ? 'var(--text3)' : vobos === 1 ? 'var(--text3)' : vobos === 2 ? 'var(--yellow)' : vobos === 3 ? '#f97316' : '#ef4444';
+  const voboHTML = vobos > 0 ? `<div style="font-size:10px;font-family:var(--mono);color:${voboColor};min-width:28px;text-align:center" title="${vobos === 1 ? 'Sin retrabajo' : vobos - 1 + ' retrabajo(s)'}">${'●'.repeat(Math.min(vobos,4))}</div>` : `<div style="min-width:28px"></div>`;
   return `
   <div>
     <div class="disciplina-row" onclick="toggleLogPanel('log_${safeId}')">
       <div>${disciplina}</div>
       <div class="disciplina-estado ${estado}">${estado.replace('-',' ')}</div>
+      ${voboHTML}
       <div style="font-size:11px;color:var(--text3);font-family:var(--mono)">${eventos.length} eventos</div>
       <button class="btn-ghost" onclick="event.stopPropagation();openEntryForDisciplina('${grupo.grupo_id}','${disciplina}')">+ Evento</button>
     </div>
     <div class="log-panel" id="log_${safeId}">
       ${eventos.length === 0 ? '<div class="log-empty">Sin eventos registrados</div>'
-        : eventos.sort((a,b) => new Date(a.fecha_real)-new Date(b.fecha_real)).map(e => `
-          <div class="log-entry-wrap">
-            <div class="log-entry">
-              <div class="log-fecha">${formatDate(e.fecha_real)}</div>
-              <div class="log-evento">${e.hito_id || '—'}</div>
-              <div class="log-nota">${e.nota || ''}</div>
-            </div>
-            ${state.rol === 'PM' ? `<button class="btn-borrar-entry" onclick="borrarEntry('${e.entry_id}')" title="Borrar entrada">✕</button>` : ''}
-          </div>`).join('')}
+        : eventos.sort((a,b) => {
+            const ta = a.timestamp ? new Date(a.timestamp) : new Date(a.fecha_real + 'T12:00:00Z');
+            const tb = b.timestamp ? new Date(b.timestamp) : new Date(b.fecha_real + 'T12:00:00Z');
+            return ta - tb;
+          }).map(e => {
+            const esNotaRef = e.tipo_entry === 'nota_ref';
+            let notaRef = null;
+            if (esNotaRef) { try { notaRef = JSON.parse(e.nota || '{}'); } catch(x) {} }
+            const notaTipoAbrev = { 'Riesgo': 'RSG', 'Lección aprendida': 'LA', 'Decisión': 'DEC', 'Pendiente externo': 'PE', 'General': 'GEN' };
+            const tituloMaxLen = 38;
+            const tituloDisplay = notaRef?.titulo ? (notaRef.titulo.length > tituloMaxLen ? notaRef.titulo.slice(0, tituloMaxLen) + '…' : notaRef.titulo) : '';
+            return `
+            <div class="log-entry-wrap">
+              <div class="log-entry${esNotaRef ? ' log-entry-nota-ref' : ''}">
+                <div class="log-fecha">${formatDate(e.fecha_real)}${e.timestamp ? '<span style="color:var(--text3);font-size:9px;margin-left:3px">' + new Date(e.timestamp).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}) + '</span>' : ''}</div>
+                ${esNotaRef
+                  ? `<div class="log-evento" style="display:flex;align-items:center;gap:6px">
+                      <span style="font-family:var(--mono);font-size:10px;color:var(--text3);cursor:pointer" onclick="scrollToNota('${e.hito_id}')" title="Ver nota completa">${e.hito_id}</span>
+                      <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px" title="${notaRef?.titulo || ''}">${tituloDisplay}</span>
+                      ${notaRef?.tipo ? `<span style="font-family:var(--mono);font-size:9px;color:var(--text3)">${notaTipoAbrev[notaRef.tipo] || ''}</span>` : ''}
+                    </div>`
+                  : `<div class="log-evento">${e.hito_id || '—'}</div>`
+                }
+                <div class="log-nota">${esNotaRef ? '' : (e.nota || '')}</div>
+              </div>
+              ${state.rol === 'PM' ? `<button class="btn-borrar-entry" onclick="borrarEntry('${e.entry_id}')" title="Borrar entrada">✕</button>` : ''}
+            </div>`;
+          }).join('')}
     </div>
   </div>`;
 }
@@ -1185,6 +1235,10 @@ function openNotaCambio(modoEdicion = false, cambioData = null) {
   document.getElementById('nc-texto').value = cambioData?.texto || '';
   document.getElementById('e-impacto-tipo').value = cambioData?.impacto_tipo || '';
   document.getElementById('e-origen').value = cambioData?.origen || '';
+  document.getElementById('nc-titulo').value = cambioData?.titulo || '';
+  document.getElementById('nc-tipo-nota').value = cambioData?.tipo_nota || '';
+  document.getElementById('nc-nota-grupo').value = '';
+  document.getElementById('nc-nota-disciplina').innerHTML = '<option value="">—</option>';
   state.cambioDiscsSeleccionadas = new Set();
   state.editandoCambioId = modoEdicion ? cambioData?.entry_id : null;
 
@@ -1211,8 +1265,50 @@ function selectNotaCambioTipo(tipo) {
   state.entryTipo = tipo;
   document.getElementById('tipo-nota-btn').classList.toggle('selected', tipo === 'nota');
   document.getElementById('tipo-cambio-btn').classList.toggle('selected', tipo === 'cambio_registrado');
+  document.getElementById('nota-fields').style.display = tipo === 'nota' ? 'block' : 'none';
   document.getElementById('cambio-fields').style.display = tipo === 'cambio_registrado' ? 'block' : 'none';
+  const label = document.getElementById('nc-texto-label');
+  if (label) label.textContent = tipo === 'nota' ? 'Detalle / contenido' : 'Texto';
   if (tipo === 'cambio_registrado') buildCambioDiscSelector();
+  if (tipo === 'nota') buildNotaGrupoSelector();
+}
+
+function buildNotaGrupoSelector() {
+  if (!state.currentProyecto) return;
+  const activasSet = new Set(
+    state.disciplinasProyecto
+      .filter(d => d.proyecto_id === state.currentProyecto.proyecto_id)
+      .map(d => d.disciplina_id)
+  );
+  const grupos = {};
+  state.eventosCatalogo.forEach(e => {
+    if (!e.grupo_id || e.grupo_id === 'G0') return;
+    const key = `${e.grupo_id}::${e.disciplina_nombre}`;
+    if (!activasSet.has(key)) return;
+    if (!grupos[e.grupo_id]) grupos[e.grupo_id] = e.grupo_nombre;
+  });
+  const sel = document.getElementById('nc-nota-grupo');
+  sel.innerHTML = '<option value="">Sin referencia</option>' +
+    Object.entries(grupos).map(([gid, nombre]) => `<option value="${gid}">${gid} — ${nombre}</option>`).join('');
+  document.getElementById('nc-nota-disciplina').innerHTML = '<option value="">—</option>';
+}
+
+function updateNotaGrupo() {
+  const gid = document.getElementById('nc-nota-grupo').value;
+  const sel = document.getElementById('nc-nota-disciplina');
+  sel.innerHTML = '<option value="">—</option>';
+  if (!gid || !state.currentProyecto) return;
+  const activasSet = new Set(
+    state.disciplinasProyecto
+      .filter(d => d.proyecto_id === state.currentProyecto.proyecto_id)
+      .map(d => d.disciplina_id)
+  );
+  const discs = [...new Set(
+    state.eventosCatalogo
+      .filter(e => e.grupo_id === gid && activasSet.has(`${gid}::${e.disciplina_nombre}`))
+      .map(e => e.disciplina_nombre)
+  )];
+  discs.forEach(d => sel.innerHTML += `<option value="${d}">${d}</option>`);
 }
 
 function buildCambioDiscSelector(preselected = []) {
@@ -1315,14 +1411,34 @@ function updateEventos() {
 async function guardarNotaCambio() {
   const texto = document.getElementById('nc-texto').value.trim();
   const fecha = document.getElementById('nc-fecha').value;
-  if (!texto || !fecha) { showToast('Fecha y texto son requeridos', 'error'); return; }
+  const esNota = state.entryTipo === 'nota';
+  const titulo = esNota ? document.getElementById('nc-titulo').value.trim() : '';
+  const tipoNota = esNota ? document.getElementById('nc-tipo-nota').value : '';
+
+  if (!fecha) { showToast('La fecha es requerida', 'error'); return; }
+  if (esNota && !titulo) { showToast('El título es requerido', 'error'); return; }
+  if (esNota && !tipoNota) { showToast('La clasificación es requerida', 'error'); return; }
+  if (!esNota && !texto) { showToast('El texto es requerido', 'error'); return; }
   if (!state.currentProyecto) { showToast('Selecciona un proyecto primero', 'error'); return; }
+
   const estadoPaneles = capturarEstadoPaneles();
   const btn = document.getElementById('btn-guardar-nc');
   btn.disabled = true; btn.textContent = 'Guardando…';
 
+  // Referencia a disciplina (F3)
+  const notaGrupo = esNota ? document.getElementById('nc-nota-grupo').value : '';
+  const notaDisc = esNota ? document.getElementById('nc-nota-disciplina').value : '';
+  const notaDiscKey = (notaGrupo && notaDisc) ? `${notaGrupo}::${notaDisc}` : '';
+
+  // Generar nota_id para notas (N001, N002...)
+  async function generarClaveNota() {
+    const notas = state.logEventos.filter(e => e.proyecto_id === state.currentProyecto.proyecto_id && e.tipo_entry === 'nota' && e.hito_id && e.hito_id.startsWith('N'));
+    const nums = notas.map(e => parseInt((e.hito_id || '').replace('N',''),10)).filter(n => !isNaN(n));
+    const siguiente = nums.length > 0 ? Math.max(...nums) + 1 : 1;
+    return 'N' + String(siguiente).padStart(3, '0');
+  }
+
   try {
-    // Modo edición — llamar editarCambioDetalle
     if (state.editandoCambioId) {
       const discs = [...(state.cambioDiscsSeleccionadas || [])];
       const hitos = getHitosAfectados(discs);
@@ -1337,13 +1453,47 @@ async function guardarNotaCambio() {
       closeModal('modal-nota-cambio');
       showToast('Cambio actualizado', 'success');
     } else {
-      // Modo creación
-      const res = await api('appendLogEvento', {
-        proyecto_id: state.currentProyecto.proyecto_id,
-        fecha_real: fecha, disciplina_id: '', hito_id: '',
-        tipo_entry: state.entryTipo, nota: texto, version_timeline_activa: '1'
-      });
-      if (state.entryTipo === 'cambio_registrado') {
+      if (esNota) {
+        const claveNota = await generarClaveNota();
+        // Entry principal de la nota
+        await api('appendLogEvento', {
+          proyecto_id: state.currentProyecto.proyecto_id,
+          fecha_real: fecha,
+          disciplina_id: '',
+          hito_id: claveNota,
+          tipo_entry: 'nota',
+          nota: JSON.stringify({ titulo, tipo: tipoNota, contenido: texto, disc_ref: notaDiscKey }),
+          version_timeline_activa: '1'
+        });
+        // Si tiene referencia a disciplina — entry en log de esa disciplina
+        if (notaDiscKey) {
+          await api('appendLogEvento', {
+            proyecto_id: state.currentProyecto.proyecto_id,
+            fecha_real: fecha,
+            disciplina_id: notaDiscKey,
+            hito_id: claveNota,
+            tipo_entry: 'nota_ref',
+            nota: JSON.stringify({ titulo, tipo: tipoNota }),
+            version_timeline_activa: '1'
+          });
+        }
+        closeModal('modal-nota-cambio');
+        showToast('Nota guardada', 'success');
+      } else {
+        // Generar clave de cambio F1
+        const cambiosProyecto = state.logEventos.filter(e => e.proyecto_id === state.currentProyecto.proyecto_id && e.tipo_entry === 'cambio_registrado');
+        const nums = cambiosProyecto.map(e => {
+          const cd = (state.cambiosDetalle || []).find(c => c.entry_id === e.entry_id);
+          return parseInt((cd?.clave_cambio || '').replace('C',''), 10);
+        }).filter(n => !isNaN(n));
+        const siguiente = nums.length > 0 ? Math.max(...nums) + 1 : 1;
+        const claveCambio = 'C' + String(siguiente).padStart(3, '0');
+
+        const res = await api('appendLogEvento', {
+          proyecto_id: state.currentProyecto.proyecto_id,
+          fecha_real: fecha, disciplina_id: '', hito_id: claveCambio,
+          tipo_entry: 'cambio_registrado', nota: texto, version_timeline_activa: '1'
+        });
         const discs = [...(state.cambioDiscsSeleccionadas || [])];
         const hitos = getHitosAfectados(discs);
         if (discs.length > 0 && hitos.length === 0) {
@@ -1351,14 +1501,48 @@ async function guardarNotaCambio() {
         }
         await api('appendCambioDetalle', {
           entry_id: res.entry_id,
+          clave_cambio: claveCambio,
           origen_cambio: document.getElementById('e-origen').value,
           disciplinas_afectadas: discs.join(','),
           hitos_afectados: hitos.join(','),
           impacto_tipo: document.getElementById('e-impacto-tipo').value
         });
+
+        // Entry 1 + Entry 2 por cada disciplina afectada
+        for (const discKey of discs) {
+          const grupoId = discKey.split('::')[0];
+          const eventoAfectado = state.eventosCatalogo.find(e =>
+            e.grupo_id === grupoId &&
+            e.evento_nombre === 'Afectado por Cambio' &&
+            (e.es_cierre === 'FALSE' || e.es_cierre === 'false' || e.es_cierre === false)
+          );
+          if (eventoAfectado) {
+            // Entry 1 — destraba estado de la disciplina
+            await api('appendLogEvento', {
+              proyecto_id: state.currentProyecto.proyecto_id,
+              fecha_real: fecha,
+              disciplina_id: discKey,
+              hito_id: `Afectado por Cambio ${claveCambio}`,
+              tipo_entry: 'evento',
+              nota: '',
+              version_timeline_activa: '1'
+            });
+          }
+          // Entry 2 — trazabilidad (siempre, con o sin evento en catálogo)
+          await api('appendLogEvento', {
+            proyecto_id: state.currentProyecto.proyecto_id,
+            fecha_real: fecha,
+            disciplina_id: discKey,
+            hito_id: res.entry_id,
+            tipo_entry: 'cambio_aplicado',
+            nota: '',
+            version_timeline_activa: '1'
+          });
+        }
+
+        closeModal('modal-nota-cambio');
+        showToast(`Cambio ${claveCambio} registrado`, 'success');
       }
-      closeModal('modal-nota-cambio');
-      showToast(state.entryTipo === 'nota' ? 'Nota guardada' : 'Cambio registrado', 'success');
     }
 
     await loadAllData();
@@ -1576,8 +1760,14 @@ function renderNotas(proyecto) {
     : notas.sort((a,b) => new Date(b.fecha_real) - new Date(a.fecha_real)).map(n => {
         const esCambio = n.tipo_entry === 'cambio_registrado';
         const esPM = state.rol === 'PM';
+        // Parsear nota estructurada F3
+        let notaData = null;
+        if (n.tipo_entry === 'nota') {
+          try { notaData = JSON.parse(n.nota || '{}'); } catch(e) { notaData = null; }
+        }
         // Buscar detalle del cambio si existe
         const cd = esCambio ? (state.cambiosDetalle || []).find(c => c.entry_id === n.entry_id) : null;
+        const claveCambio = cd?.clave_cambio || '';
         const discs = cd?.disciplinas_afectadas ? cd.disciplinas_afectadas.split(',').map(s => s.trim()).filter(Boolean) : [];
         const hitos = cd?.hitos_afectados ? cd.hitos_afectados.split(',').map(s => s.trim()).filter(Boolean) : [];
         const historial = (() => { try { return JSON.parse(cd?.historial_ediciones || '[]'); } catch(e) { return []; } })();
@@ -1621,17 +1811,28 @@ function renderNotas(proyecto) {
             <div class="cambio-detail-alcance">${n.nota || '—'}</div>
             <div class="cambio-detail-chips">${chipsHTML}</div>
             ${hitosHTML}
-            ${esPM ? `<div style="margin-top:10px"><button class="btn-secondary" style="font-size:12px;padding:5px 12px" onclick="editarImpactoCambio('${n.entry_id}')">✏️ Editar impacto</button></div>` : ''}
+            ${esPM ? `<div style="margin-top:10px;display:flex;gap:8px">
+              <button class="btn-secondary" style="font-size:12px;padding:5px 12px" onclick="editarImpactoCambio('${n.entry_id}')">✏️ Editar impacto</button>
+              <button class="btn-danger" style="font-size:12px;padding:5px 12px" onclick="borrarCambio('${n.entry_id}')">Eliminar cambio…</button>
+            </div>` : ''}
             <div class="cambio-detail-hist" style="margin-top:10px">
               <div class="cambio-hist-title">Historial de ediciones</div>
               ${histHTML}
             </div>
           </div>` : '';
 
+        const notaTipoAbrev = { 'Riesgo': 'RSG', 'Lección aprendida': 'LA', 'Decisión': 'DEC', 'Pendiente externo': 'PE', 'General': 'GEN' };
+        const tipoTag = notaData?.tipo ? `<span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${notaTipoAbrev[notaData.tipo] || notaData.tipo}</span>` : '';
+        const claveTag = esCambio && claveCambio ? `<span style="font-family:var(--mono);font-size:10px;color:var(--yellow)">⚡ ${claveCambio}</span>` : esCambio ? `<span style="color:var(--yellow);font-family:var(--mono);font-size:10px">⚡ cambio</span>` : '';
+        const tituloNota = notaData?.titulo ? `<div class="nota-titulo" style="font-weight:500;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%" title="${notaData.titulo}">${notaData.titulo}</div>` : '';
+        const textoNota = esCambio ? (cd?.alcance || n.nota || '') : (notaData?.contenido || n.nota || n.hito_id || '');
+        const claveNota = !esCambio && n.hito_id ? `<span style="font-family:var(--mono);font-size:10px;color:var(--text3);cursor:pointer" title="Ver nota">${n.hito_id}</span>` : '';
+
         return `
         <div class="nota-entry">
-          <div class="nota-meta">${formatDate(n.fecha_real)} · ${n.registrado_por || state.user?.name || '—'}${esCambio ? ' · <span style="color:var(--yellow);font-family:var(--mono);font-size:10px">⚡ cambio</span>' : ''}${cd?.impacto_tipo ? ` · <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${cd.impacto_tipo}</span>` : ''}</div>
-          <div class="nota-texto">${esCambio ? (cd?.alcance || n.nota || '') : (n.nota || n.hito_id || '')}</div>
+          <div class="nota-meta" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${formatDate(n.fecha_real)} · ${n.registrado_por || state.user?.name || '—'}${claveTag ? ' · ' + claveTag : ''}${tipoTag ? ' · ' + tipoTag : ''}${cd?.impacto_tipo ? ` · <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${cd.impacto_tipo}</span>` : ''}</div>
+          ${tituloNota}
+          <div class="nota-texto">${textoNota}</div>
           ${expandHTML}
         </div>`;
       }).join('');
@@ -1659,12 +1860,47 @@ function renderNotas(proyecto) {
   </div>`;
 }
 
+function scrollToNota(claveNota) {
+  // Buscar la nota en el panel de notas y expandirlo si está cerrado
+  const notasBody = document.getElementById('notas-body');
+  if (notasBody && !notasBody.classList.contains('open')) {
+    document.getElementById('notas-toggle')?.click();
+  }
+  setTimeout(() => {
+    const entries = document.querySelectorAll('.nota-entry');
+    for (const el of entries) {
+      if (el.textContent.includes(claveNota)) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.style.outline = '1px solid var(--accent)';
+        setTimeout(() => { el.style.outline = ''; }, 1500);
+        break;
+      }
+    }
+  }, 200);
+}
+
 function toggleCambioPanel(panelId) {
   const panel = document.getElementById(panelId);
   const chevron = document.getElementById(`chevron-${panelId}`);
   if (!panel) return;
   panel.classList.toggle('open');
   if (chevron) chevron.style.transform = panel.classList.contains('open') ? 'rotate(90deg)' : '';
+}
+
+async function borrarCambio(entryId) {
+  const motivo = prompt('Motivo para eliminar este cambio (requerido):');
+  if (!motivo || !motivo.trim()) { showToast('Se requiere un motivo para eliminar el cambio', 'error'); return; }
+  const estadoPaneles = capturarEstadoPaneles();
+  try {
+    await api('borrarCambio', { entry_id: entryId, motivo: motivo.trim(), usuario: state.user?.email || '' });
+    state.logEventos = state.logEventos.filter(e => e.entry_id !== entryId);
+    state.cambiosDetalle = (state.cambiosDetalle || []).filter(c => c.entry_id !== entryId);
+    showToast('Cambio eliminado', 'success');
+    if (state.currentProyecto) {
+      await openProyecto(state.currentProyecto.proyecto_id);
+      restaurarEstadoPaneles(estadoPaneles);
+    }
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
 }
 
 function editarImpactoCambio(entryId) {
@@ -1896,7 +2132,16 @@ function isDisciplinaCompleta(disciplina, grupoId, log) {
   const cierre = state.eventosCatalogo.find(e => e.grupo_id === grupoId && e.disciplina_nombre === disciplina && (e.es_cierre === 'TRUE' || e.es_cierre === 'true' || e.es_cierre === true));
   if (!cierre) return false;
   const discKey = `${grupoId}::${disciplina}`;
-  return log.some(e => e.disciplina_id === discKey && e.hito_id === cierre.evento_nombre && e.tipo_entry === 'evento');
+  const eventos = log
+    .filter(e => e.disciplina_id === discKey && e.tipo_entry === 'evento')
+    .sort((a, b) => {
+      const ta = a.timestamp ? new Date(a.timestamp) : new Date(a.fecha_real + 'T12:00:00Z');
+      const tb = b.timestamp ? new Date(b.timestamp) : new Date(b.fecha_real + 'T12:00:00Z');
+      return ta - tb;
+    });
+  if (eventos.length === 0) return false;
+  const ultimo = eventos[eventos.length - 1];
+  return ultimo.hito_id === cierre.evento_nombre;
 }
 
 // ── ESTADO DE PANELES ──
