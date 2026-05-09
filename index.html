@@ -44,7 +44,8 @@
   ::-webkit-scrollbar-thumb { background:var(--border2); border-radius:2px; }
 
   /* LOGIN */
-  #login-screen { min-height:100vh; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:32px; }
+  #login-screen { min-height:100vh; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:32px; transition:opacity 0.2s; }
+  #login-screen.restoring { opacity:0; pointer-events:none; }
   .login-badge { font-family:var(--mono); font-size:11px; color:var(--accent); letter-spacing:3px; text-transform:uppercase; }
   .login-title { font-size:28px; font-weight:300; letter-spacing:-0.5px; }
   .login-title span { color:var(--accent); font-weight:600; }
@@ -581,14 +582,14 @@ function initGoogleAPI() {
   if (savedToken && savedUser) {
     state.accessToken = savedToken;
     state.user = JSON.parse(savedUser);
-    // Intentar restaurar directamente — si el token expiró, Apps Script lo rechazará
-    // y el usuario verá el error en el toast en lugar de ser expulsado silenciosamente
+    // Ocultar login screen mientras restauramos — evita flash visible
+    document.getElementById('login-screen').classList.add('restoring');
     completeSignIn().catch(() => {
-      // Token inválido — limpiar y mostrar login
       sessionStorage.removeItem('is4_token');
       sessionStorage.removeItem('is4_user');
       state.accessToken = null;
       state.user = null;
+      document.getElementById('login-screen').classList.remove('restoring');
     });
   }
 }
