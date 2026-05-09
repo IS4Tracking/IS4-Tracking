@@ -174,6 +174,10 @@
   .log-nota { color:var(--text3); font-style:italic; }
   .log-tipo { font-family:var(--mono); font-size:10px; color:var(--text3); background:var(--surface2); padding:1px 5px; border-radius:2px; text-align:right; }
   .log-empty { color:var(--text3); font-size:12px; font-family:var(--mono); padding:8px 0; }
+  .log-entry-wrap { position:relative; }
+  .log-entry-wrap:hover .btn-borrar-entry { opacity:1; }
+  .btn-borrar-entry { opacity:0; position:absolute; right:0; top:50%; transform:translateY(-50%); background:none; border:none; color:var(--text3); font-size:11px; cursor:pointer; padding:2px 6px; transition:all 0.15s; font-family:var(--mono); }
+  .btn-borrar-entry:hover { color:var(--red); }
 
   /* TIMELINE EN DETALLE */
   .timeline-section { margin-top:28px; margin-bottom:4px; }
@@ -853,14 +857,33 @@ function renderDisciplina(proyecto, grupo, disciplina, log) {
     <div class="log-panel" id="log_${safeId}">
       ${eventos.length === 0 ? '<div class="log-empty">Sin eventos registrados</div>'
         : eventos.sort((a,b) => new Date(a.fecha_real)-new Date(b.fecha_real)).map(e => `
-          <div class="log-entry">
-            <div class="log-fecha">${formatDate(e.fecha_real)}</div>
-            <div class="log-evento">${e.hito_id || '—'}</div>
-            <div class="log-nota">${e.nota || ''}</div>
-            <div class="log-tipo">${e.tipo_entry}</div>
+          <div class="log-entry-wrap">
+            <div class="log-entry">
+              <div class="log-fecha">${formatDate(e.fecha_real)}</div>
+              <div class="log-evento">${e.hito_id || '—'}</div>
+              <div class="log-nota">${e.nota || ''}</div>
+              <div class="log-tipo">${e.tipo_entry}</div>
+            </div>
+            ${state.rol === 'PM' ? `<button class="btn-borrar-entry" onclick="borrarEntry('${e.entry_id}')" title="Borrar entrada">✕</button>` : ''}
           </div>`).join('')}
     </div>
   </div>`;
+}
+
+async function borrarEntry(entryId) {
+  if (!confirm('¿Borrar esta entrada del log?\nEsta acción no se puede deshacer.')) return;
+  const estadoPaneles = capturarEstadoPaneles();
+  try {
+    await api('borrarLogEvento', { entry_id: entryId });
+    showToast('Entrada borrada', 'success');
+    const logFresco = await api('getLogEventos', { proyecto_id: state.currentProyecto.proyecto_id });
+    state.logEventos = [...state.logEventos.filter(e => e.proyecto_id !== state.currentProyecto.proyecto_id), ...(logFresco || [])];
+    await loadAllData();
+    if (state.currentProyecto) {
+      await openProyecto(state.currentProyecto.proyecto_id);
+      restaurarEstadoPaneles(estadoPaneles);
+    }
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
 }
 
 function toggleGroup(id) { document.getElementById(`group-${id}`)?.classList.toggle('open'); }
@@ -1350,13 +1373,30 @@ async function guardarEntry() {
 // ── EVALUACIÓN DE HITOS ──
 async function evaluarHitos(proyectoId, logOverride) {
   const log = (logOverride || state.logEventos).filter(e => e.proyecto_id === proyectoId);
-  const hitsAlcanzados = new Set(log.filter(e => e.tipo_entry === 'hito_alcanzado').map(e => e.hito_id));
-  console.log('evaluarHitos — proyectoId:', proyectoId);
-  console.log('log entries:', log.length);
-  console.log('muestra disciplina_id:', log.map(e => e.disciplina_id));
-  console.log('G5 Zonificación cierre:', log.some(e => e.disciplina_id === 'G5::Zonificación' && e.hito_id === 'Visto Bueno'));
-  console.log('G5 Mueble de Gorras cierre:', log.some(e => e.disciplina_id === 'G5::Mueble de Gorras' && e.hito_id === 'Visto Bueno'));
-  console.log('es_cierre G5 Zonificación:', state.eventosCatalogo.find(e => e.grupo_id === 'G5' && e.disciplina_nombre === 'Zonificación' && e.es_cierre === 'TRUE'));
+
+  // Construir set de hitos vigentes — un hito es vigente si fue alcanzado Y no hay
+  // ningún cambio registrado DESPUÉS de su último alcance con ese hito en hitos_afectados
+  function hitoEsVigente(hitoId) {
+    const alcances = log
+      .filter(e => e.hito_id === hitoId && e.tipo_entry === 'hito_alcanzado')
+      .sort((a, b) => new Date(a.fecha_real) - new Date(b.fecha_real));
+    if (alcances.length === 0) return false;
+    const ultimoAlcance = new Date(alcances[alcances.length - 1].fecha_real);
+    // Buscar cambios posteriores al último alcance que afecten este hito
+    const cambiosPosteriores = (state.cambiosDetalle || []).filter(cd => {
+      const hitos = cd.hitos_afectados ? cd.hitos_afectados.split(',').map(s => s.trim()) : [];
+      if (!hitos.includes(hitoId)) return false;
+      // Buscar la fecha del entry en el log
+      const entry = log.find(e => e.entry_id === cd.entry_id);
+      if (!entry) return false;
+      return new Date(entry.fecha_real) > ultimoAlcance;
+    });
+    return cambiosPosteriores.length === 0;
+  }
+
+  const hitsAlcanzados = new Set(
+    log.filter(e => e.tipo_entry === 'hito_alcanzado').map(e => e.hito_id)
+  );
   const nuevosHitos = [];
 
   function tieneEvento(grupoId, disciplina, eventoNombre) {
@@ -1397,7 +1437,8 @@ async function evaluarHitos(proyectoId, logOverride) {
   };
 
   for (const [hitoId, condicion] of Object.entries(TRIGGERS)) {
-    if (!hitsAlcanzados.has(hitoId) && condicion()) {
+    // Registrar si: nunca alcanzado, O alcanzado pero reabierto por cambio posterior
+    if (!hitoEsVigente(hitoId) && condicion()) {
       nuevosHitos.push(hitoId);
     }
   }
@@ -1637,7 +1678,9 @@ function renderCriteriosList() {
         ${c.estado === 'pendiente_vobo' ? ' · <span style="color:var(--yellow)">Pendiente VoBo PM</span>' : ''}
       </div>
       <div class="criterio-actions">
-        ${c.estado === 'pendiente_vobo' && esPM ? `<button class="btn-primary" style="font-size:12px" onclick="aprobarCriterio('${c.criterio_id}')">Aprobar</button>` : ''}
+        ${c.estado === 'pendiente_vobo' && esPM ? `
+        <button class="btn-primary" style="font-size:12px" onclick="aprobarCriterio('${c.criterio_id}')">Aprobar</button>
+        <button class="btn-secondary" style="font-size:12px;border-color:var(--red);color:var(--red)" onclick="rechazarCriterio('${c.criterio_id}')">Rechazar</button>` : ''}
         ${c.estado === 'vigente' && !confirmado ? `<button class="btn-secondary" style="font-size:12px" onclick="confirmarLectura('${c.criterio_id}')">Confirmar lectura</button>` : ''}
         ${c.estado === 'vigente' && esPM ? `<button class="btn-ghost" style="color:var(--text3);font-size:12px" onclick="obsoletarCriterio('${c.criterio_id}')">Obsoletizar</button>` : ''}
       </div>
@@ -1676,6 +1719,16 @@ async function confirmarLectura(id) {
   try { await api('confirmarLecturaCriterio', { criterio_id: id }); showToast('Lectura confirmada', 'success'); await loadAllData(); renderCriteriosList(); renderCriteriosBanner(); }
   catch(e) { showToast('Error: ' + e.message, 'error'); }
 }
+async function rechazarCriterio(id) {
+  if (!confirm('¿Rechazar este criterio? Se marcará como obsoleto.')) return;
+  try {
+    await api('obsoletarCriterio', { criterio_id: id });
+    showToast('Criterio rechazado', 'success');
+    await loadAllData();
+    renderCriteriosList();
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+}
+
 async function obsoletarCriterio(id) {
   if (!confirm('¿Marcar este criterio como obsoleto?')) return;
   try { await api('obsoletarCriterio', { criterio_id: id }); showToast('Criterio obsoletado', 'success'); await loadAllData(); renderCriteriosList(); }
