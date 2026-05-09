@@ -595,13 +595,14 @@ function initGoogleAPI() {
     }
   });
 
-  // Auto-restore: intentar renovar token silenciosamente al cargar
+  // Auto-restore: usar token guardado directamente
+  const savedToken = sessionStorage.getItem('is4_token');
   const savedUser = sessionStorage.getItem('is4_user');
-  if (savedUser) {
+  if (savedToken && savedUser) {
+    state.accessToken = savedToken;
     state.user = JSON.parse(savedUser);
     document.getElementById('login-screen').classList.add('restoring');
-    // Renovar token silenciosamente — sin popup, sin interacción
-    tokenClient.requestAccessToken({ prompt: '' });
+    completeSignIn().catch(() => showLoginScreen());
   }
 }
 
