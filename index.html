@@ -167,7 +167,7 @@
   /* LOG PANEL */
   .log-panel { display:none; background:var(--bg); border-top:1px solid var(--border); padding:16px 16px 16px 52px; }
   .log-panel.open { display:block; }
-  .log-entry { display:grid; grid-template-columns:100px 180px 1fr 100px; gap:12px; align-items:start; padding:8px 0; border-bottom:1px solid var(--border); font-size:12px; }
+  .log-entry { display:grid; grid-template-columns:100px 180px 1fr; gap:12px; align-items:start; padding:8px 0; border-bottom:1px solid var(--border); font-size:12px; }
   .log-entry:last-child { border-bottom:none; }
   .log-fecha { font-family:var(--mono); color:var(--text3); }
   .log-evento { color:var(--text); font-weight:500; }
@@ -894,7 +894,6 @@ function renderDisciplina(proyecto, grupo, disciplina, log) {
               <div class="log-fecha">${formatDate(e.fecha_real)}</div>
               <div class="log-evento">${e.hito_id || '—'}</div>
               <div class="log-nota">${e.nota || ''}</div>
-              <div class="log-tipo">${e.tipo_entry}</div>
             </div>
             ${state.rol === 'PM' ? `<button class="btn-borrar-entry" onclick="borrarEntry('${e.entry_id}')" title="Borrar entrada">✕</button>` : ''}
           </div>`).join('')}
@@ -1410,18 +1409,22 @@ async function evaluarHitos(proyectoId, logOverride) {
   function hitoEsVigente(hitoId) {
     const alcances = log
       .filter(e => e.hito_id === hitoId && e.tipo_entry === 'hito_alcanzado')
-      .sort((a, b) => new Date(a.fecha_real) - new Date(b.fecha_real));
+      .sort((a, b) => {
+        const ta = a.timestamp ? new Date(a.timestamp) : new Date(a.fecha_real + 'T12:00:00Z');
+        const tb = b.timestamp ? new Date(b.timestamp) : new Date(b.fecha_real + 'T12:00:00Z');
+        return ta - tb;
+      });
     if (alcances.length === 0) return false;
-    const ultimoAlcance = new Date(alcances[alcances.length - 1].fecha_real);
-    // Buscar cambios posteriores al último alcance que afecten este hito
-    // Usar state.logEventos completo (no filtrado por proyecto) para encontrar el entry del cambio
+    const ultimo = alcances[alcances.length - 1];
+    const ultimoTs = ultimo.timestamp ? new Date(ultimo.timestamp) : new Date(ultimo.fecha_real + 'T12:00:00Z');
     const logCompleto = state.logEventos;
     const cambiosPosteriores = (state.cambiosDetalle || []).filter(cd => {
       const hitos = cd.hitos_afectados ? cd.hitos_afectados.split(',').map(s => s.trim()) : [];
       if (!hitos.includes(hitoId)) return false;
       const entry = logCompleto.find(e => e.entry_id === cd.entry_id && e.proyecto_id === proyectoId);
       if (!entry) return false;
-      return new Date(entry.fecha_real) > ultimoAlcance;
+      const entryTs = entry.timestamp ? new Date(entry.timestamp) : new Date(entry.fecha_real + 'T12:00:00Z');
+      return entryTs > ultimoTs;
     });
     return cambiosPosteriores.length === 0;
   }
