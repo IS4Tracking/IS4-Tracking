@@ -593,7 +593,9 @@ function initGoogleAPI() {
       sessionStorage.removeItem('is4_user');
       state.accessToken = null;
       state.user = null;
-      document.getElementById('login-screen').classList.remove('restoring');
+      const ls = document.getElementById('login-screen');
+      ls.classList.remove('restoring');
+      ls.style.display = 'flex';
     });
   }
 }
