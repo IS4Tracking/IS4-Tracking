@@ -276,6 +276,38 @@
   .empty-state { text-align:center; padding:48px; color:var(--text3); font-family:var(--mono); font-size:12px; }
   .empty-state-icon { font-size:32px; margin-bottom:12px; }
 
+  /* SELECTOR DISCIPLINAS EN CAMBIO */
+  .cambio-disc-section { margin-top:4px; }
+  .cambio-disc-label { font-size:11px; font-family:var(--mono); color:var(--text3); letter-spacing:0.5px; margin-bottom:8px; display:flex; align-items:center; justify-content:space-between; }
+  .cambio-disc-label span { color:var(--text3); font-size:10px; }
+  .cambio-group { margin-bottom:10px; }
+  .cambio-group-row { display:flex; align-items:center; gap:8px; margin-bottom:5px; }
+  .cambio-group-name { font-size:11px; color:var(--text2); font-family:var(--mono); }
+  .cambio-chips-wrap { display:flex; flex-wrap:wrap; gap:5px; padding-left:2px; }
+  .chip-master { display:inline-flex; align-items:center; gap:5px; border-radius:5px; padding:4px 9px; font-size:11px; font-family:var(--mono); cursor:pointer; border:1px solid var(--border2); background:var(--surface2); color:var(--text3); transition:all 0.12s; user-select:none; }
+  .chip-master.on { background:rgba(88,166,255,0.18); border-color:var(--accent); color:var(--accent); }
+  .chip-master .chip-dot { width:5px; height:5px; border-radius:50%; background:var(--border2); flex-shrink:0; }
+  .chip-master.on .chip-dot { background:var(--accent); }
+  .chip-disc { display:inline-flex; align-items:center; gap:5px; border-radius:5px; padding:4px 9px; font-size:12px; cursor:pointer; border:1px solid var(--border); background:var(--bg); color:var(--text2); transition:all 0.12s; user-select:none; }
+  .chip-disc.on { background:rgba(88,166,255,0.10); border-color:var(--accent); color:var(--accent); }
+  .chip-disc .chip-dot { width:5px; height:5px; border-radius:50%; background:var(--border2); flex-shrink:0; }
+  .chip-disc.on .chip-dot { background:var(--accent); }
+  .chip-disc.readonly { cursor:default; pointer-events:none; opacity:0.8; }
+
+  /* PANEL EXPANDIBLE DE CAMBIO EN NOTAS */
+  .cambio-expand-btn { background:none; border:none; color:var(--text3); font-size:11px; font-family:var(--mono); cursor:pointer; padding:2px 0; transition:color 0.15s; display:flex; align-items:center; gap:5px; }
+  .cambio-expand-btn:hover { color:var(--accent); }
+  .cambio-detail-panel { display:none; margin-top:8px; padding:10px 12px; background:var(--bg); border:1px solid var(--border); border-radius:var(--radius); }
+  .cambio-detail-panel.open { display:block; }
+  .cambio-detail-alcance { font-size:13px; color:var(--text); margin-bottom:8px; line-height:1.5; }
+  .cambio-detail-chips { display:flex; flex-wrap:wrap; gap:5px; margin-bottom:10px; }
+  .cambio-detail-hist { border-top:1px solid var(--border); padding-top:8px; }
+  .cambio-hist-title { font-size:10px; font-family:var(--mono); color:var(--text3); letter-spacing:1px; text-transform:uppercase; margin-bottom:6px; }
+  .cambio-hist-row { display:grid; grid-template-columns:90px 1fr; gap:8px; font-size:11px; padding:4px 0; border-bottom:1px solid var(--border); }
+  .cambio-hist-row:last-child { border-bottom:none; }
+  .cambio-hist-fecha { font-family:var(--mono); color:var(--text3); }
+  .cambio-hist-diff { color:var(--text2); }
+
   /* TOAST */
   #toast { position:fixed; bottom:24px; right:24px; background:var(--surface); border:1px solid var(--border2); border-radius:var(--radius); padding:12px 16px; font-size:13px; z-index:999; transform:translateY(80px); opacity:0; transition:all 0.3s; max-width:320px; }
   #toast.show { transform:translateY(0); opacity:1; }
@@ -434,6 +466,10 @@
           <div class="form-group"><label class="form-label">Origen del cambio</label>
             <select class="form-select" id="e-origen"><option value="">Seleccionar…</option><option>Comercial</option><option>Operaciones</option><option>Dirección</option><option>Marketing</option><option>Marca</option><option>Interno SP</option></select>
           </div>
+        </div>
+        <div class="form-group cambio-disc-section">
+          <div class="cambio-disc-label">Disciplinas impactadas <span>opcional — se puede editar después</span></div>
+          <div id="cambio-disc-container"></div>
         </div>
       </div>
       <div class="form-group"><label class="form-label">Fecha</label><input class="form-input" id="nc-fecha" type="date"></div>
@@ -612,16 +648,17 @@ async function api(action, body = {}) {
 // ── DATA ──
 async function loadAllData() {
   try {
-    const [proyectos, eventos, log, criterios, disciplinas] = await Promise.all([
+    const [proyectos, eventos, log, criterios, disciplinas, cambiosDetalle] = await Promise.all([
       api('getProyectos'), api('getEventosCatalogo'),
       api('getLogEventos'), api('getCriteriosPrograma'),
-      api('getDisciplinasProyecto')
+      api('getDisciplinasProyecto'), api('getCambiosDetalle')
     ]);
     state.proyectos = proyectos || [];
     state.eventosCatalogo = eventos || [];
     state.logEventos = log || [];
     state.criterios = criterios || [];
     state.disciplinasProyecto = disciplinas || [];
+    state.cambiosDetalle = cambiosDetalle || [];
     renderDashboard();
     renderCriteriosBanner();
   } catch(e) { showToast('Error cargando datos: ' + e.message, 'error'); console.error(e); }
@@ -841,6 +878,7 @@ function openEntryForDisciplina(grupoId, disciplina) {
   }, 60);
 }
 
+// Mapa hito → disciplinas bloqueantes (para navegación desde dashboard)
 const HITO_DISCIPLINAS = {
   'H02': [{ g:'G3', d:'Requerimientos Comercial' }, { g:'G3', d:'Requerimientos Operaciones' }],
   'H08': [{ g:'G3', d:'Validación Módulos de Cobro' }, { g:'G3', d:'Validación Servicios en Tienda' }, { g:'G3', d:'Validación Caja Rotor' }, { g:'G3', d:'Validación C&R' }, { g:'G3', d:'Validación SFS' }],
@@ -854,6 +892,66 @@ const HITO_DISCIPLINAS = {
   'H29': [{ g:'G12', d:'Insumos' }],
   'H36': [{ g:'G15', d:'Proyecto Ejecutivo' }],
 };
+
+// Mapa disciplina → hitos que se "abren" si esa disciplina recibe un cambio
+// Formato: 'GRUPO_ID::DISCIPLINA_NOMBRE' → [hitoIds]
+const DISCIPLINA_HITOS = {
+  'G2::Plano de Conjunto':           ['H04','H09','H11'],
+  'G2::Huella del Local':            ['H04','H09','H11'],
+  'G2::Fachada':                     ['H04','H09','H11'],
+  'G2::Manual de Adaptaciones':      ['H04','H09','H11'],
+  'G2::Levantamiento':               ['H04','H09','H11'],
+  'G2::Reporte de Levantamiento':    ['H05','H09','H11'],
+  'G3::Requerimientos Comercial':    ['H07','H09','H11'],
+  'G3::Requerimientos Operaciones':  ['H07','H09','H11'],
+  'G3::Validación Módulos de Cobro': ['H08','H09','H11'],
+  'G3::Validación Servicios en Tienda':['H08','H09','H11'],
+  'G3::Validación Caja Rotor':       ['H08','H09','H11'],
+  'G3::Validación C&R':              ['H08','H09','H11'],
+  'G3::Validación SFS':              ['H08','H09','H11'],
+  'G4::Validación de Dirección':     ['H09'],
+  'G4::Proyecto Arquitectónico':     ['H13'],
+  'G4::Layout - Validación de Dirección': ['H09'],
+  'G5::Zonificación':                ['H22'],
+  'G5::Mueble de Gorras':            ['H22'],
+  'G6::HVAC':                        ['H23','H30','H34'],
+  'G6::Proyecto Eléctrico':          ['H23','H30','H34'],
+  'G7::Pantallas':                   ['H24','H31','H34'],
+  'G7::Antenas WiFi':                ['H24','H31','H34'],
+  'G7::Bocinas':                     ['H24','H31','H34'],
+  'G7::Contador de Personas':        ['H24','H31','H34'],
+  'G7::Validación Contactos':        ['H24','H31','H34'],
+  'G7::Validación Voz y Datos':      ['H24','H31','H34'],
+  'G7::Validación Site':             ['H24','H31','H34'],
+  'G7::Validación Cámaras':          ['H24','H31','H34'],
+  'G8::Cámaras de Seguridad':        ['H25','H32','H34'],
+  'G8::Antenas de Seguridad':        ['H25','H32','H34'],
+  'G8::Detección de Humos':          ['H25','H32','H34'],
+  'G8::Alarmas':                     ['H25','H32','H34'],
+  'G8::Protección Contra Incendios': ['H25','H32','H34'],
+  'G8::Lámparas de Emergencia':      ['H25','H32','H34'],
+  'G8::Señalética de Emergencia + Extintores': ['H25','H32','H34'],
+  'G8::Alarma Sísmica':              ['H25','H32','H34'],
+  'G9::Aromas':                      ['H26','H33','H34'],
+  'G9::Validación Pantallas':        ['H26','H33','H34'],
+  'G9::Validación Bocinas':          ['H26','H33','H34'],
+  'G10::Caminadora':                 ['H27'],
+  'G10::Mueble de Servicios':        ['H27'],
+  'G11::Iluminación':                ['H28'],
+  'G11::Estantería':                 ['H28'],
+  'G11::Mezzanine':                  ['H28'],
+  'G12::Insumos':                    ['H29'],
+  'G15::Proyecto Ejecutivo':         ['H15','H36'],
+};
+
+// Dado un array de disciplina_keys seleccionadas, devuelve hitos afectados únicos
+function getHitosAfectados(disciplinaKeys) {
+  const hitos = new Set();
+  disciplinaKeys.forEach(key => {
+    (DISCIPLINA_HITOS[key] || []).forEach(h => hitos.add(h));
+  });
+  return [...hitos];
+}
 
 async function openProyectoEnHito(proyectoId, hitoId) {
   await openProyecto(proyectoId);
@@ -1033,12 +1131,30 @@ function openNuevoEntry() {
   openModal('modal-entry');
 }
 
-function openNotaCambio() {
-  document.getElementById('nc-fecha').value = new Date().toISOString().split('T')[0];
-  document.getElementById('nc-texto').value = '';
-  document.getElementById('e-impacto-tipo').value = '';
-  document.getElementById('e-origen').value = '';
-  selectNotaCambioTipo('nota');
+function openNotaCambio(modoEdicion = false, cambioData = null) {
+  document.getElementById('nc-fecha').value = cambioData?.fecha || new Date().toISOString().split('T')[0];
+  document.getElementById('nc-texto').value = cambioData?.texto || '';
+  document.getElementById('e-impacto-tipo').value = cambioData?.impacto_tipo || '';
+  document.getElementById('e-origen').value = cambioData?.origen || '';
+  state.cambioDiscsSeleccionadas = new Set();
+  state.editandoCambioId = modoEdicion ? cambioData?.entry_id : null;
+
+  const title = document.getElementById('nota-cambio-title');
+  const btnGuardar = document.getElementById('btn-guardar-nc');
+  if (modoEdicion) {
+    title.textContent = 'Editar impacto del cambio';
+    btnGuardar.textContent = 'Guardar cambios';
+  } else {
+    title.textContent = 'Agregar nota o cambio';
+    btnGuardar.textContent = 'Guardar';
+  }
+
+  const preselected = cambioData?.disciplinas_afectadas
+    ? cambioData.disciplinas_afectadas.split(',').map(s => s.trim()).filter(Boolean)
+    : [];
+
+  selectNotaCambioTipo(modoEdicion ? 'cambio_registrado' : 'nota');
+  if (modoEdicion) buildCambioDiscSelector(preselected);
   openModal('modal-nota-cambio');
 }
 
@@ -1047,6 +1163,86 @@ function selectNotaCambioTipo(tipo) {
   document.getElementById('tipo-nota-btn').classList.toggle('selected', tipo === 'nota');
   document.getElementById('tipo-cambio-btn').classList.toggle('selected', tipo === 'cambio_registrado');
   document.getElementById('cambio-fields').style.display = tipo === 'cambio_registrado' ? 'block' : 'none';
+  if (tipo === 'cambio_registrado') buildCambioDiscSelector();
+}
+
+function buildCambioDiscSelector(preselected = []) {
+  if (!state.currentProyecto) return;
+  const activasSet = new Set(
+    state.disciplinasProyecto
+      .filter(d => d.proyecto_id === state.currentProyecto.proyecto_id)
+      .map(d => d.disciplina_id)
+  );
+  // Agrupar disciplinas activas por grupo
+  const grupos = {};
+  state.eventosCatalogo.forEach(e => {
+    if (!e.grupo_id || e.grupo_id === 'G0') return;
+    const key = `${e.grupo_id}::${e.disciplina_nombre}`;
+    if (!activasSet.has(key)) return;
+    if (!grupos[e.grupo_id]) grupos[e.grupo_id] = { nombre: e.grupo_nombre, disciplinas: new Set() };
+    if (e.disciplina_nombre) grupos[e.grupo_id].disciplinas.add(e.disciplina_nombre);
+  });
+
+  state.cambioDiscsSeleccionadas = new Set(preselected);
+
+  document.getElementById('cambio-disc-container').innerHTML = Object.entries(grupos).map(([gid, g]) => {
+    const discs = [...g.disciplinas];
+    return `
+    <div class="cambio-group" id="cambio-group-${gid}">
+      <div class="cambio-group-row">
+        <div class="chip-master" id="cambio-master-${gid}" onclick="toggleCambioMaster('${gid}')">
+          <div class="chip-dot"></div>${gid}
+        </div>
+        <span class="cambio-group-name">${g.nombre}</span>
+      </div>
+      <div class="cambio-chips-wrap" id="cambio-chips-${gid}">
+        ${discs.map(d => {
+          const key = `${gid}::${d}`;
+          const on = preselected.includes(key);
+          return `<div class="chip-disc${on?' on':''}" id="cambio-chip-${gid}_${d.replace(/\W+/g,'_')}" onclick="toggleCambioChip(this,'${gid}','${key}')"><div class="chip-dot"></div>${d}</div>`;
+        }).join('')}
+      </div>
+    </div>`;
+  }).join('');
+
+  // Sincronizar masters con estado inicial
+  Object.keys(grupos).forEach(gid => syncCambioMaster(gid));
+}
+
+function toggleCambioChip(el, gid, key) {
+  const on = el.classList.toggle('on');
+  el.querySelector('.chip-dot').style.background = on ? 'var(--accent)' : 'var(--border2)';
+  if (on) state.cambioDiscsSeleccionadas.add(key);
+  else state.cambioDiscsSeleccionadas.delete(key);
+  syncCambioMaster(gid);
+}
+
+function toggleCambioMaster(gid) {
+  const chips = document.querySelectorAll(`#cambio-chips-${gid} .chip-disc`);
+  const allOn = [...chips].every(c => c.classList.contains('on'));
+  chips.forEach(c => {
+    const key = c.id.replace(`cambio-chip-${gid}_`, '').replace(/_/g, ' ');
+    // Reconstruir key desde el texto del chip
+    const disc = c.textContent.trim();
+    const fullKey = `${gid}::${disc}`;
+    const turnOn = !allOn;
+    c.classList.toggle('on', turnOn);
+    c.querySelector('.chip-dot').style.background = turnOn ? 'var(--accent)' : 'var(--border2)';
+    if (turnOn) state.cambioDiscsSeleccionadas.add(fullKey);
+    else state.cambioDiscsSeleccionadas.delete(fullKey);
+  });
+  syncCambioMaster(gid);
+}
+
+function syncCambioMaster(gid) {
+  const master = document.getElementById(`cambio-master-${gid}`);
+  if (!master) return;
+  const chips = document.querySelectorAll(`#cambio-chips-${gid} .chip-disc`);
+  const allOn = [...chips].every(c => c.classList.contains('on'));
+  const anyOn = [...chips].some(c => c.classList.contains('on'));
+  master.classList.toggle('on', anyOn);
+  master.querySelector('.chip-dot').style.background = anyOn ? 'var(--accent)' : 'var(--border2)';
+  master.style.opacity = anyOn && !allOn ? '0.55' : '1';
 }
 
 function updateDisciplinas() {
@@ -1074,23 +1270,47 @@ async function guardarNotaCambio() {
   if (!state.currentProyecto) { showToast('Selecciona un proyecto primero', 'error'); return; }
   const btn = document.getElementById('btn-guardar-nc');
   btn.disabled = true; btn.textContent = 'Guardando…';
+
   try {
-    const res = await api('appendLogEvento', {
-      proyecto_id: state.currentProyecto.proyecto_id,
-      fecha_real: fecha, disciplina_id: '', hito_id: '',
-      tipo_entry: state.entryTipo, nota: texto, version_timeline_activa: '1'
-    });
-    if (state.entryTipo === 'cambio_registrado') {
-      await api('appendCambioDetalle', {
-        entry_id: res.entry_id,
+    // Modo edición — llamar editarCambioDetalle
+    if (state.editandoCambioId) {
+      const discs = [...(state.cambioDiscsSeleccionadas || [])];
+      const hitos = getHitosAfectados(discs);
+      await api('editarCambioDetalle', {
+        entry_id: state.editandoCambioId,
+        disciplinas_afectadas: discs.join(','),
+        hitos_afectados: hitos.join(','),
+        impacto_tipo: document.getElementById('e-impacto-tipo').value,
         origen_cambio: document.getElementById('e-origen').value,
-        disciplinas_afectadas: '',
-        hitos_afectados: '',
-        impacto_tipo: document.getElementById('e-impacto-tipo').value
+        alcance: texto
       });
+      closeModal('modal-nota-cambio');
+      showToast('Cambio actualizado', 'success');
+    } else {
+      // Modo creación
+      const res = await api('appendLogEvento', {
+        proyecto_id: state.currentProyecto.proyecto_id,
+        fecha_real: fecha, disciplina_id: '', hito_id: '',
+        tipo_entry: state.entryTipo, nota: texto, version_timeline_activa: '1'
+      });
+      if (state.entryTipo === 'cambio_registrado') {
+        const discs = [...(state.cambioDiscsSeleccionadas || [])];
+        const hitos = getHitosAfectados(discs);
+        if (discs.length > 0 && hitos.length === 0) {
+          showToast('Sin hitos vinculados a las disciplinas — puedes editarlo después', 'success');
+        }
+        await api('appendCambioDetalle', {
+          entry_id: res.entry_id,
+          origen_cambio: document.getElementById('e-origen').value,
+          disciplinas_afectadas: discs.join(','),
+          hitos_afectados: hitos.join(','),
+          impacto_tipo: document.getElementById('e-impacto-tipo').value
+        });
+      }
+      closeModal('modal-nota-cambio');
+      showToast(state.entryTipo === 'nota' ? 'Nota guardada' : 'Cambio registrado', 'success');
     }
-    closeModal('modal-nota-cambio');
-    showToast(state.entryTipo === 'nota' ? 'Nota guardada' : 'Cambio registrado', 'success');
+
     await loadAllData();
     if (state.currentProyecto) openProyecto(state.currentProyecto.proyecto_id);
   } catch(e) { showToast('Error: ' + e.message, 'error'); }
@@ -1195,6 +1415,13 @@ async function evaluarHitos(proyectoId, logOverride) {
 
 function calcVersionHito(log, hitoId) {
   const anteriores = log.filter(e => e.hito_id === hitoId && e.tipo_entry === 'hito_alcanzado');
+  if (anteriores.length === 0) return 1; // Primera vez — siempre versión 1
+  // Versiones subsecuentes solo si hay un cambio registrado con este hito en hitos_afectados
+  const cambiosConHito = (state.cambiosDetalle || []).filter(cd => {
+    const hitos = cd.hitos_afectados ? cd.hitos_afectados.split(',').map(s => s.trim()) : [];
+    return hitos.includes(hitoId);
+  });
+  if (cambiosConHito.length === 0) return anteriores.length + 1; // fallback — no bloquea
   return anteriores.length + 1;
 }
 
@@ -1266,11 +1493,54 @@ function renderNotas(proyecto) {
   const notas = state.logEventos.filter(e => e.proyecto_id === proyecto.proyecto_id && (e.tipo_entry === 'nota' || e.tipo_entry === 'cambio_registrado'));
   const notasHTML = notas.length === 0
     ? '<div style="color:var(--text3);font-family:var(--mono);font-size:12px;padding:4px 0">Sin notas registradas.</div>'
-    : notas.sort((a,b) => new Date(b.fecha_real) - new Date(a.fecha_real)).map(n => `
+    : notas.sort((a,b) => new Date(b.fecha_real) - new Date(a.fecha_real)).map(n => {
+        const esCambio = n.tipo_entry === 'cambio_registrado';
+        const esPM = state.rol === 'PM';
+        // Buscar detalle del cambio si existe
+        const cd = esCambio ? (state.cambiosDetalle || []).find(c => c.entry_id === n.entry_id) : null;
+        const discs = cd?.disciplinas_afectadas ? cd.disciplinas_afectadas.split(',').map(s => s.trim()).filter(Boolean) : [];
+        const hitos = cd?.hitos_afectados ? cd.hitos_afectados.split(',').map(s => s.trim()).filter(Boolean) : [];
+        const historial = (() => { try { return JSON.parse(cd?.historial_ediciones || '[]'); } catch(e) { return []; } })();
+        const panelId = `cambio-panel-${n.entry_id}`;
+
+        const chipsHTML = discs.length === 0
+          ? '<span style="color:var(--text3);font-family:var(--mono);font-size:11px">Sin disciplinas registradas</span>'
+          : discs.map(d => `<div class="chip-disc on readonly"><div class="chip-dot" style="background:var(--accent)"></div>${d.split('::')[1] || d}</div>`).join('');
+
+        const hitosHTML = hitos.length > 0
+          ? `<div style="margin-top:6px;font-size:11px;font-family:var(--mono);color:var(--text3)">Hitos afectados: <span style="color:var(--yellow)">${hitos.join(' · ')}</span></div>`
+          : '';
+
+        const histHTML = historial.length === 0
+          ? '<div style="color:var(--text3);font-family:var(--mono);font-size:11px">Sin ediciones previas</div>'
+          : historial.map(h => `
+              <div class="cambio-hist-row">
+                <div class="cambio-hist-fecha">${formatDate(h.fecha_edicion)}</div>
+                <div class="cambio-hist-diff">${h.diff || h.alcance || '—'}</div>
+              </div>`).join('');
+
+        const expandHTML = esCambio ? `
+          <button class="cambio-expand-btn" onclick="toggleCambioPanel('${panelId}')">
+            <span id="chevron-${panelId}" style="transition:transform 0.15s;display:inline-block">▶</span> ver detalle
+          </button>
+          <div class="cambio-detail-panel" id="${panelId}">
+            <div class="cambio-detail-alcance">${n.nota || '—'}</div>
+            <div class="cambio-detail-chips">${chipsHTML}</div>
+            ${hitosHTML}
+            ${esPM ? `<div style="margin-top:10px"><button class="btn-ghost" style="font-size:11px" onclick="editarImpactoCambio('${n.entry_id}')">Editar impacto</button></div>` : ''}
+            <div class="cambio-detail-hist" style="margin-top:10px">
+              <div class="cambio-hist-title">Historial de ediciones</div>
+              ${histHTML}
+            </div>
+          </div>` : '';
+
+        return `
         <div class="nota-entry">
-          <div class="nota-meta">${formatDate(n.fecha_real)} · ${n.registrado_por || state.user?.name || '—'}${n.tipo_entry === 'cambio_registrado' ? ' · <span style="color:var(--yellow);font-family:var(--mono);font-size:10px">⚡ cambio</span>' : ''}</div>
-          <div class="nota-texto">${n.nota || n.hito_id || ''}</div>
-        </div>`).join('');
+          <div class="nota-meta">${formatDate(n.fecha_real)} · ${n.registrado_por || state.user?.name || '—'}${esCambio ? ' · <span style="color:var(--yellow);font-family:var(--mono);font-size:10px">⚡ cambio</span>' : ''}${cd?.impacto_tipo ? ` · <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${cd.impacto_tipo}</span>` : ''}</div>
+          <div class="nota-texto">${esCambio ? (cd?.alcance || n.nota || '') : (n.nota || n.hito_id || '')}</div>
+          ${expandHTML}
+        </div>`;
+      }).join('');
 
   return `
   <div class="notas-section">
@@ -1293,6 +1563,28 @@ function renderNotas(proyecto) {
       </div>
     </div>
   </div>`;
+}
+
+function toggleCambioPanel(panelId) {
+  const panel = document.getElementById(panelId);
+  const chevron = document.getElementById(`chevron-${panelId}`);
+  if (!panel) return;
+  panel.classList.toggle('open');
+  if (chevron) chevron.style.transform = panel.classList.contains('open') ? 'rotate(90deg)' : '';
+}
+
+function editarImpactoCambio(entryId) {
+  const n = state.logEventos.find(e => e.entry_id === entryId);
+  const cd = (state.cambiosDetalle || []).find(c => c.entry_id === entryId);
+  if (!n) return;
+  openNotaCambio(true, {
+    entry_id: entryId,
+    fecha: n.fecha_real,
+    texto: cd?.alcance || n.nota || '',
+    impacto_tipo: cd?.impacto_tipo || '',
+    origen: cd?.origen_cambio || '',
+    disciplinas_afectadas: cd?.disciplinas_afectadas || ''
+  });
 }
 
 function toggleTimeline() {
@@ -1382,7 +1674,7 @@ const HITOS_TIMELINE = [
   { id:'H04',  nombre:'Recepción info preliminar',                       offset:8  },
   { id:'H05',  nombre:'Envío Reporte de Levantamiento',                  offset:10 },
   { id:'H06',  nombre:'Día 1 de Diseño',                                 offset:10 },
-  { id:'H07',  nombre:'Requerimientos Comercial + Operaciones cerrados', offset:null },
+  { id:'H07',  nombre:'Requerimientos Comercial + Operaciones cerrados', offset:5   },
   { id:'H08',  nombre:'Validaciones cerradas',                           offset:3  },
   { id:'H09',  nombre:'VoBo Layout — Dirección',                         offset:14 },
   { id:'H10',  nombre:'VoBo Fachada',                                    offset:14 },
