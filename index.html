@@ -875,10 +875,9 @@ async function borrarEntry(entryId) {
   const estadoPaneles = capturarEstadoPaneles();
   try {
     await api('borrarLogEvento', { entry_id: entryId });
+    // Remover localmente antes de re-renderizar — evita brinco visual
+    state.logEventos = state.logEventos.filter(e => e.entry_id !== entryId);
     showToast('Entrada borrada', 'success');
-    const logFresco = await api('getLogEventos', { proyecto_id: state.currentProyecto.proyecto_id });
-    state.logEventos = [...state.logEventos.filter(e => e.proyecto_id !== state.currentProyecto.proyecto_id), ...(logFresco || [])];
-    await loadAllData();
     if (state.currentProyecto) {
       await openProyecto(state.currentProyecto.proyecto_id);
       restaurarEstadoPaneles(estadoPaneles);
@@ -1383,11 +1382,12 @@ async function evaluarHitos(proyectoId, logOverride) {
     if (alcances.length === 0) return false;
     const ultimoAlcance = new Date(alcances[alcances.length - 1].fecha_real);
     // Buscar cambios posteriores al último alcance que afecten este hito
+    // Usar state.logEventos completo (no filtrado por proyecto) para encontrar el entry del cambio
+    const logCompleto = state.logEventos;
     const cambiosPosteriores = (state.cambiosDetalle || []).filter(cd => {
       const hitos = cd.hitos_afectados ? cd.hitos_afectados.split(',').map(s => s.trim()) : [];
       if (!hitos.includes(hitoId)) return false;
-      // Buscar la fecha del entry en el log
-      const entry = log.find(e => e.entry_id === cd.entry_id);
+      const entry = logCompleto.find(e => e.entry_id === cd.entry_id && e.proyecto_id === proyectoId);
       if (!entry) return false;
       return new Date(entry.fecha_real) > ultimoAlcance;
     });
