@@ -1268,6 +1268,7 @@ async function guardarNotaCambio() {
   const fecha = document.getElementById('nc-fecha').value;
   if (!texto || !fecha) { showToast('Fecha y texto son requeridos', 'error'); return; }
   if (!state.currentProyecto) { showToast('Selecciona un proyecto primero', 'error'); return; }
+  const estadoPaneles = capturarEstadoPaneles();
   const btn = document.getElementById('btn-guardar-nc');
   btn.disabled = true; btn.textContent = 'Guardando…';
 
@@ -1312,7 +1313,10 @@ async function guardarNotaCambio() {
     }
 
     await loadAllData();
-    if (state.currentProyecto) openProyecto(state.currentProyecto.proyecto_id);
+    if (state.currentProyecto) {
+      await openProyecto(state.currentProyecto.proyecto_id);
+      restaurarEstadoPaneles(estadoPaneles);
+    }
   } catch(e) { showToast('Error: ' + e.message, 'error'); }
   finally { btn.disabled = false; btn.textContent = 'Guardar'; }
 }
@@ -1324,6 +1328,7 @@ async function guardarEntry() {
   const evento = document.getElementById('e-evento').value;
   if (!fecha || !grupo || !disciplina || !evento) { showToast('Todos los campos son requeridos', 'error'); return; }
   if (!state.currentProyecto) { showToast('Selecciona un proyecto primero', 'error'); return; }
+  const estadoPaneles = capturarEstadoPaneles();
   const btn = document.getElementById('btn-guardar-entry');
   btn.disabled = true; btn.textContent = 'Guardando…';
   try {
@@ -1338,7 +1343,10 @@ async function guardarEntry() {
     state.logEventos = [...state.logEventos.filter(e => e.proyecto_id !== state.currentProyecto.proyecto_id), ...(logFresco || [])];
     await evaluarHitos(state.currentProyecto.proyecto_id, state.logEventos);
     await loadAllData();
-    if (state.currentProyecto) openProyecto(state.currentProyecto.proyecto_id);
+    if (state.currentProyecto) {
+      await openProyecto(state.currentProyecto.proyecto_id);
+      restaurarEstadoPaneles(estadoPaneles);
+    }
   } catch(e) { showToast('Error: ' + e.message, 'error'); }
   finally { btn.disabled = false; btn.textContent = 'Guardar Evento'; }
 }
@@ -1513,11 +1521,25 @@ function renderNotas(proyecto) {
 
         const histHTML = historial.length === 0
           ? '<div style="color:var(--text3);font-family:var(--mono);font-size:11px">Sin ediciones previas</div>'
-          : historial.map(h => `
+          : historial.map((h, i) => {
+              // Construir descripción del diff comparando con snapshot anterior
+              const partes = [];
+              if (h.alcance && h.alcance !== (cd?.alcance || n.nota || '')) partes.push(`Alcance editado`);
+              if (h.disciplinas_afectadas !== undefined) {
+                const discAntes = h.disciplinas_afectadas ? h.disciplinas_afectadas.split(',').filter(Boolean).map(d => d.split('::')[1] || d).join(', ') : 'ninguna';
+                partes.push(`Disciplinas: ${discAntes || 'ninguna'}`);
+              }
+              if (h.hitos_afectados !== undefined) {
+                const hitosAntes = h.hitos_afectados || 'ninguno';
+                partes.push(`Hitos: ${hitosAntes || 'ninguno'}`);
+              }
+              const desc = partes.length > 0 ? partes.join(' · ') : 'Edición registrada';
+              return `
               <div class="cambio-hist-row">
                 <div class="cambio-hist-fecha">${formatDate(h.fecha_edicion)}</div>
-                <div class="cambio-hist-diff">${h.diff || h.alcance || '—'}</div>
-              </div>`).join('');
+                <div class="cambio-hist-diff">${desc} <span style="color:var(--text3);font-size:10px">· ${h.editado_por || '—'}</span></div>
+              </div>`;
+            }).join('');
 
         const expandHTML = esCambio ? `
           <button class="cambio-expand-btn" onclick="toggleCambioPanel('${panelId}')">
@@ -1527,7 +1549,7 @@ function renderNotas(proyecto) {
             <div class="cambio-detail-alcance">${n.nota || '—'}</div>
             <div class="cambio-detail-chips">${chipsHTML}</div>
             ${hitosHTML}
-            ${esPM ? `<div style="margin-top:10px"><button class="btn-ghost" style="font-size:11px" onclick="editarImpactoCambio('${n.entry_id}')">Editar impacto</button></div>` : ''}
+            ${esPM ? `<div style="margin-top:10px"><button class="btn-secondary" style="font-size:12px;padding:5px 12px" onclick="editarImpactoCambio('${n.entry_id}')">✏️ Editar impacto</button></div>` : ''}
             <div class="cambio-detail-hist" style="margin-top:10px">
               <div class="cambio-hist-title">Historial de ediciones</div>
               ${histHTML}
@@ -1791,6 +1813,51 @@ function isDisciplinaCompleta(disciplina, grupoId, log) {
   if (!cierre) return false;
   const discKey = `${grupoId}::${disciplina}`;
   return log.some(e => e.disciplina_id === discKey && e.hito_id === cierre.evento_nombre && e.tipo_entry === 'evento');
+}
+
+// ── ESTADO DE PANELES ──
+function capturarEstadoPaneles() {
+  return {
+    timelineOpen: document.getElementById('timeline-body')?.classList.contains('open') || false,
+    notasOpen: document.getElementById('notas-body')?.classList.contains('open') || false,
+    gruposOpen: [...document.querySelectorAll('.group-row.open')].map(el => el.id),
+    logPanelsOpen: [...document.querySelectorAll('.log-panel.open')].map(el => el.id),
+    cambioPanelsOpen: [...document.querySelectorAll('.cambio-detail-panel.open')].map(el => el.id),
+    scrollY: window.scrollY
+  };
+}
+
+function restaurarEstadoPaneles(estado) {
+  if (!estado) return;
+  setTimeout(() => {
+    if (estado.timelineOpen) {
+      document.getElementById('timeline-toggle')?.classList.add('open');
+      document.getElementById('timeline-body')?.classList.add('open');
+      const ch = document.getElementById('timeline-chevron');
+      if (ch) ch.style.transform = 'rotate(90deg)';
+    }
+    if (estado.notasOpen) {
+      document.getElementById('notas-toggle')?.classList.add('open');
+      document.getElementById('notas-body')?.classList.add('open');
+      const ch = document.getElementById('notas-chevron');
+      if (ch) ch.style.transform = 'rotate(90deg)';
+    }
+    estado.gruposOpen.forEach(id => {
+      document.getElementById(id)?.classList.add('open');
+    });
+    estado.logPanelsOpen.forEach(id => {
+      document.getElementById(id)?.classList.add('open');
+    });
+    estado.cambioPanelsOpen.forEach(id => {
+      const panel = document.getElementById(id);
+      if (panel) {
+        panel.classList.add('open');
+        const chevron = document.getElementById(`chevron-${id}`);
+        if (chevron) chevron.style.transform = 'rotate(90deg)';
+      }
+    });
+    window.scrollTo({ top: estado.scrollY, behavior: 'instant' });
+  }, 80);
 }
 
 // ── UI ──
