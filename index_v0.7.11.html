@@ -1,0 +1,2317 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IS4 · Store Planning Tracking</title>
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0b0e14;
+  --surface: #161b22;
+  --surface2: #21262d;
+  
+  --border: #30363d;
+  --border2: #3d444d;
+  
+  --text: #e6edf3;   /* Off-white azulado */
+  --text2: #8b949e;  /* Gris medio */
+  --text3: #6e7681;  /* Gris oscuro para deshabilitados */
+  
+  --accent: #58a6ff;  /* Azul brillante */
+  --accent2: #1f6feb; /* Azul profundo */
+  
+/* Semánticos para Dashboard (High Contrast / Eye-Friendly) */
+  --red: #ff6b6b;    /* Crítico / Retrasado */
+  --yellow: #e3b341; /* Riesgo / En Pausa */
+  --green: #44cc88;  /* Completado / A tiempo */
+  --blue: #58a6ff;   /* Informativo / En Proceso */
+
+  /* Variantes para backgrounds de etiquetas (Transparentes) */
+  --red-bg: rgba(255, 107, 107, 0.15);
+  --green-bg: rgba(78, 205, 196, 0.15);
+  --yellow-bg: rgba(227, 179, 65, 0.15);
+  
+  --radius: 8px;
+  --sans: 'DM Sans', system-ui, sans-serif;
+  --mono: 'DM Mono', monospace;
+}
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--text); font-family:var(--sans); font-size:15px; line-height:1.6; min-height:100vh; }
+  ::-webkit-scrollbar { width:4px; height:4px; }
+  ::-webkit-scrollbar-track { background:var(--bg); }
+  ::-webkit-scrollbar-thumb { background:var(--border2); border-radius:2px; }
+
+  /* LOGIN */
+  #login-screen { min-height:100vh; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:32px; transition:opacity 0.2s; }
+  #login-screen.restoring { opacity:0; pointer-events:none; }
+  .login-badge { font-family:var(--mono); font-size:11px; color:var(--accent); letter-spacing:3px; text-transform:uppercase; }
+  .login-title { font-size:28px; font-weight:300; letter-spacing:-0.5px; }
+  .login-title span { color:var(--accent); font-weight:600; }
+  .login-sub { font-size:13px; color:var(--text2); font-family:var(--mono); }
+  .btn-google { display:flex; align-items:center; gap:10px; background:#e6edf3; color:#0f0f0f; border:none; padding:12px 24px; border-radius:var(--radius); font-family:var(--sans); font-size:14px; font-weight:600; cursor:pointer; transition:background 0.15s; }
+  .btn-google:hover { background:#c9d1d9; }
+  .login-note { font-size:12px; color:var(--text2); font-family:var(--mono); text-align:center; }
+
+  /* APP */
+  #app { display:none; flex-direction:column; min-height:100vh; }
+  .topbar { height:48px; background:var(--surface); border-bottom:1px solid var(--border); display:flex; align-items:center; padding:0 20px; gap:16px; position:sticky; top:0; z-index:100; }
+  .topbar-brand { font-family:var(--mono); font-size:12px; color:var(--accent); letter-spacing:2px; font-weight:500; }
+  .topbar-sep { width:1px; height:20px; background:var(--border); }
+  .topbar-nav { display:flex; gap:4px; flex:1; }
+  .nav-btn { background:none; border:none; color:var(--text2); font-family:var(--sans); font-size:13px; padding:6px 12px; border-radius:var(--radius); cursor:pointer; transition:all 0.15s; }
+  .nav-btn:hover { background:var(--surface2); color:var(--text); }
+  .nav-btn.active { background:var(--surface2); color:var(--accent); }
+  .topbar-user { display:flex; align-items:center; gap:8px; margin-left:auto; }
+  .user-name { font-size:12px; color:var(--text2); }
+  .user-role { font-family:var(--mono); font-size:10px; color:var(--text3); background:var(--surface2); padding:2px 6px; border-radius:3px; border:1px solid var(--border); }
+  .btn-logout { background:none; border:1px solid var(--border); color:var(--text3); font-size:11px; padding:4px 8px; border-radius:var(--radius); cursor:pointer; transition:all 0.15s; }
+  .btn-logout:hover { border-color:var(--red); color:var(--red); }
+
+  .main { flex:1; padding:24px; max-width:1200px; margin:0 auto; width:100%; }
+  .view { display:none; }
+  .view.active { display:block; }
+  .page-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:24px; }
+  .page-title { font-size:20px; font-weight:500; letter-spacing:-0.3px; }
+  .page-sub { font-size:12px; color:var(--text2); font-family:var(--mono); margin-top:2px; }
+
+  /* BUTTONS */
+  .btn-primary { background:var(--accent); color:#0f0f0f; border:none; padding:8px 16px; border-radius:var(--radius); font-family:var(--sans); font-size:13px; font-weight:600; cursor:pointer; transition:background 0.15s; }
+  .btn-primary:hover { background:var(--accent2); }
+  .btn-primary:disabled { opacity:0.5; cursor:not-allowed; }
+  .btn-secondary { background:none; border:1px solid var(--border); color:var(--text2); padding:8px 16px; border-radius:var(--radius); font-family:var(--sans); font-size:13px; cursor:pointer; transition:all 0.15s; }
+  .btn-secondary:hover { border-color:var(--border2); color:var(--text); }
+  .btn-ghost { background:none; border:1px solid var(--accent2); color:var(--accent); font-size:11px; cursor:pointer; padding:3px 10px; border-radius:var(--radius); transition:all 0.15s; font-family:var(--sans); }
+  .btn-ghost:hover { background:rgba(31,111,235,0.15); color:var(--text); border-color:var(--accent); }
+
+  /* PROJECT CARDS */
+  .project-grid { display:flex; flex-direction:column; gap:8px; }
+  .project-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px 20px; cursor:pointer; transition:border-color 0.15s; display:grid; grid-template-columns:1fr auto; gap:12px; align-items:center; }
+  .project-card:hover { border-color:var(--border2); }
+  .project-card.risk-red { border-left:3px solid var(--red); }
+  .project-card.risk-yellow { border-left:3px solid var(--yellow); }
+  .project-card.risk-green { border-left:3px solid var(--green); }
+  .project-name { font-size:15px; font-weight:500; margin-bottom:4px; }
+  .project-meta { display:flex; gap:16px; flex-wrap:wrap; }
+  .meta-item { font-size:11px; color:var(--text2); font-family:var(--mono); display:flex; align-items:center; gap:4px; }
+  .meta-item .label { color:var(--text2); }
+  .project-right { display:flex; flex-direction:column; align-items:flex-end; gap:6px; }
+  .semaforo { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+  .semaforo.red { background:var(--red); box-shadow:0 0 6px var(--red); }
+  .semaforo.yellow { background:var(--yellow); box-shadow:0 0 6px var(--yellow); }
+  .semaforo.green { background:var(--green); box-shadow:0 0 6px var(--green); }
+  .semaforo.gray { background:var(--text3); }
+  .desvio-badge { font-family:var(--mono); font-size:11px; padding:2px 6px; border-radius:3px; }
+  .desvio-badge.red { background:rgba(255,68,68,0.15); color:var(--red); }
+  .desvio-badge.yellow { background:rgba(255,170,0,0.15); color:var(--yellow); }
+  .desvio-badge.green { background:rgba(68,204,136,0.15); color:var(--green); }
+  .desvio-badge.gray { background:var(--surface2); color:var(--text3); }
+
+  /* HITOS */
+  .hitos-section { margin-top:32px; }
+  .section-title { font-size:11px; font-family:var(--mono); color:var(--text3); letter-spacing:2px; text-transform:uppercase; margin-bottom:12px; }
+  .hito-row { display:grid; grid-template-columns:120px 1fr 200px 80px; gap:12px; align-items:center; padding:10px 16px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); margin-bottom:4px; font-size:13px; cursor:pointer; transition:border-color 0.15s; }
+  .hito-row:hover { border-color:var(--border2); }
+  .hito-fecha { font-family:var(--mono); font-size:12px; color:var(--text2); }
+  .hito-row.retrasado { border-left:2px solid #ff5050; cursor:default; }
+  .hito-link { font-weight:500; cursor:pointer; color:var(--text); transition:color 0.15s; }
+  .hito-link:hover { color:var(--accent); }
+  .hito-link.secondary { font-size:12px; font-weight:400; color:var(--text2); }
+  .hito-link.secondary:hover { color:var(--accent); }
+
+  /* SCOREBOARD */
+  .progress-bar-wrap { margin-top:10px; }
+  .progress-bar-track { height:3px; background:var(--border); border-radius:2px; overflow:hidden; }
+  .progress-bar-fill { height:100%; border-radius:2px; background:var(--accent); transition:width 0.4s ease; }
+  .progress-label { display:flex; justify-content:space-between; align-items:center; margin-top:5px; }
+  .progress-text { font-family:var(--mono); font-size:10px; color:var(--text2); }
+  .progress-pct { font-family:var(--mono); font-size:10px; color:var(--accent); font-weight:500; }
+
+  /* SCOREBOARD EN DETALLE */
+  .detail-scoreboard { margin-top:8px; max-width:340px; }
+
+  /* CRITERIOS BANNER */
+  .criterios-banner { background:rgba(200,240,60,0.06); border:1px solid rgba(200,240,60,0.2); border-radius:var(--radius); padding:12px 16px; margin-bottom:20px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  .criterios-banner-text { font-size:13px; color:var(--accent); }
+  .criterios-banner-sub { font-size:11px; color:var(--text2); font-family:var(--mono); margin-top:2px; }
+
+  /* DETAIL */
+  .back-btn { display:flex; align-items:center; gap:6px; color:var(--text2); font-size:12px; cursor:pointer; margin-bottom:20px; background:none; border:none; font-family:var(--sans); transition:color 0.15s; }
+  .back-btn:hover { color:var(--text); }
+  .project-detail-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:24px; }
+  .project-detail-title { font-size:22px; font-weight:500; }
+  .project-detail-meta { font-size:12px; color:var(--text2); font-family:var(--mono); margin-top:4px; }
+
+  /* GROUPS */
+  .groups-container { display:flex; flex-direction:column; gap:4px; }
+  .group-row { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; }
+  .group-header { display:grid; grid-template-columns:24px 60px 1fr auto auto; gap:12px; align-items:center; padding:12px 16px; cursor:pointer; transition:background 0.15s; user-select:none; }
+  .group-header:hover { background:var(--surface2); }
+  .group-chevron { font-size:10px; color:var(--text3); transition:transform 0.15s; }
+  .group-row.open .group-chevron { transform:rotate(90deg); }
+  .group-id { font-family:var(--mono); font-size:10px; color:var(--text3); background:var(--surface2); padding:2px 6px; border-radius:3px; }
+  .group-name { font-size:13px; font-weight:500; }
+  .group-progress { font-family:var(--mono); font-size:11px; color:var(--text3); }
+  .group-body { display:none; border-top:1px solid var(--border); }
+  .group-row.open .group-body { display:block; }
+
+  .disciplina-row { display:grid; grid-template-columns:1fr auto auto auto auto; gap:12px; align-items:center; padding:10px 16px 10px 52px; border-bottom:1px solid var(--border); cursor:pointer; transition:background 0.15s; }
+  .disciplina-row:last-child { border-bottom:none; }
+  .disciplina-row:hover { background:var(--surface2); }
+  .disciplina-estado { font-family:var(--mono); font-size:10px; padding:2px 6px; border-radius:3px; }
+  .disciplina-estado.pendiente { background:var(--surface2); color:var(--text3); }
+  .disciplina-estado.en-proceso { background:rgba(68,136,255,0.15); color:var(--blue); }
+  .disciplina-estado.completado { background:rgba(68,204,136,0.15); color:var(--green); }
+  .disciplina-estado.afectado { background:rgba(255,170,0,0.15); color:var(--yellow); }
+  .vobo-badge { font-family:var(--mono); font-size:10px; padding:2px 6px; border-radius:3px; white-space:nowrap; }
+  .vobo-badge.v1 { background:var(--surface2); color:var(--text3); }
+  .vobo-badge.v2 { background:rgba(120,120,120,0.2); color:#aaa; }
+  .vobo-badge.v3 { background:rgba(234,179,8,0.15); color:var(--yellow); }
+  .vobo-badge.v4 { background:rgba(249,115,22,0.15); color:#f97316; }
+  .vobo-badge.v5plus { background:rgba(239,68,68,0.15); color:#ef4444; }
+
+  /* LOG PANEL */
+  .log-panel { display:none; background:var(--bg); border-top:1px solid var(--border); padding:16px 16px 16px 52px; }
+  .log-panel.open { display:block; }
+  .log-entry { display:grid; grid-template-columns:100px 180px 1fr; gap:12px; align-items:start; padding:8px 0; border-bottom:1px solid var(--border); font-size:12px; }
+  .log-entry:last-child { border-bottom:none; }
+  .log-fecha { font-family:var(--mono); color:var(--text3); }
+  .log-evento { color:var(--text); font-weight:500; }
+  .log-nota { color:var(--text3); font-style:italic; }
+  .log-tipo { font-family:var(--mono); font-size:10px; color:var(--text3); background:var(--surface2); padding:1px 5px; border-radius:2px; text-align:right; }
+  .log-empty { color:var(--text3); font-size:12px; font-family:var(--mono); padding:8px 0; }
+  .log-entry-wrap { position:relative; }
+  .log-entry-wrap:hover .btn-borrar-entry { opacity:1; }
+  .btn-borrar-entry { opacity:0; position:absolute; right:0; top:50%; transform:translateY(-50%); background:none; border:none; color:var(--text3); font-size:11px; cursor:pointer; padding:2px 6px; transition:all 0.15s; font-family:var(--mono); }
+  .btn-borrar-entry:hover { color:var(--red); }
+
+  /* TIMELINE EN DETALLE */
+  .timeline-section { margin-top:28px; margin-bottom:4px; }
+  .timeline-header { display:flex; align-items:center; justify-content:space-between; cursor:pointer; padding:10px 16px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); transition:background 0.15s; user-select:none; }
+  .timeline-header:hover { background:var(--surface2); }
+  .timeline-header.open { border-radius:var(--radius) var(--radius) 0 0; border-bottom-color:transparent; }
+  .timeline-body { display:none; }
+  .timeline-body.open { display:block; }
+  .timeline-table { width:100%; border-collapse:collapse; }
+  .timeline-row { display:grid; grid-template-columns:80px 1fr 130px 90px; gap:12px; align-items:center; padding:9px 16px; border-bottom:1px solid var(--border); font-size:13px; }
+  .timeline-row:last-child { border-bottom:none; }
+  .timeline-row.header { background:var(--surface2); border-radius:var(--radius) var(--radius) 0 0; border:1px solid var(--border); border-bottom:1px solid var(--border); }
+  .timeline-row:not(.header) { background:var(--surface); border-left:1px solid var(--border); border-right:1px solid var(--border); }
+  .timeline-row:not(.header):last-child { border-bottom:1px solid var(--border); border-radius:0 0 var(--radius) var(--radius); }
+  .timeline-hito-id { font-family:var(--mono); font-size:10px; color:var(--text3); }
+  .timeline-hito-nombre { font-size:13px; }
+  .timeline-fecha { font-family:var(--mono); font-size:12px; color:var(--text2); }
+  .timeline-estado { font-family:var(--mono); font-size:10px; padding:2px 7px; border-radius:3px; text-align:center; }
+  .timeline-estado.completado { background:rgba(68,204,136,0.15); color:var(--green); }
+  .timeline-estado.en-riesgo { background:rgba(255,200,0,0.15); color:var(--yellow); border-color:var(--yellow); }
+  .timeline-estado.retrasado { background:rgba(255,80,80,0.15); color:#ff5050; border-color:#ff5050; }
+  .timeline-estado.pendiente { background:var(--surface2); color:var(--text3); }
+  .col-header { font-family:var(--mono); font-size:10px; color:var(--text3); letter-spacing:0.5px; }
+
+  /* NOTAS DEL PROYECTO */
+  .notas-section { margin-top:28px; margin-bottom:28px; }
+  .notas-header { display:flex; align-items:center; justify-content:space-between; cursor:pointer; padding:10px 16px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); transition:background 0.15s; user-select:none; }
+  .notas-header:hover { background:var(--surface2); }
+  .notas-header.open { border-radius:var(--radius) var(--radius) 0 0; border-bottom-color:transparent; }
+  .notas-body { display:none; background:var(--surface); border:1px solid var(--border); border-top:none; border-radius:0 0 var(--radius) var(--radius); padding:16px; }
+  .notas-body.open { display:block; }
+  .nota-entry { padding:10px 0; border-bottom:1px solid var(--border); }
+  .nota-entry:last-of-type { border-bottom:none; }
+  .nota-meta { font-family:var(--mono); font-size:10px; color:var(--text3); margin-bottom:4px; }
+  .nota-texto { font-size:13px; line-height:1.6; color:var(--text); }
+  .nota-form { margin-top:16px; padding-top:16px; border-top:1px solid var(--border); display:none; }
+  .nota-form.open { display:block; }
+
+  /* SETTINGS MODAL — DANGER ZONE */
+  .danger-zone { margin-top:24px; padding-top:16px; border-top:1px solid var(--border); }
+  .danger-zone-title { font-size:11px; font-family:var(--mono); color:var(--red); letter-spacing:1px; text-transform:uppercase; margin-bottom:10px; }
+  .btn-danger { background:none; border:1px solid var(--red); color:var(--red); padding:8px 16px; border-radius:var(--radius); font-family:var(--sans); font-size:13px; cursor:pointer; transition:all 0.15s; }
+  .btn-danger:hover { background:rgba(255,107,107,0.1); }
+
+  /* CRITERIOS */
+  .criterio-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px; margin-bottom:8px; }
+  .criterio-card.pendiente_vobo { border-left:3px solid var(--yellow); }
+  .criterio-card.vigente { border-left:3px solid var(--green); }
+  .criterio-concepto { font-family:var(--mono); font-size:10px; color:var(--text3); margin-bottom:6px; text-transform:uppercase; letter-spacing:1px; }
+  .criterio-desc { font-size:13px; margin-bottom:8px; line-height:1.6; }
+  .criterio-meta { font-size:11px; color:var(--text3); font-family:var(--mono); }
+  .criterio-actions { display:flex; gap:8px; margin-top:10px; }
+
+  /* MODAL */
+  .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:200; align-items:center; justify-content:center; padding:20px; }
+  .modal-overlay.open { display:flex; }
+  .modal { background:var(--surface); border:1px solid var(--border2); border-radius:8px; width:100%; max-width:800px; max-height:90vh; overflow-y:auto; }
+  .modal-header { padding:20px 24px 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+  .modal-title { font-size:16px; font-weight:500; }
+  .modal-close { background:none; border:none; color:var(--text3); font-size:18px; cursor:pointer; line-height:1; transition:color 0.15s; }
+  .modal-close:hover { color:var(--text); }
+  .modal-body { padding:20px 24px; }
+  .modal-footer { padding:16px 24px; border-top:1px solid var(--border); display:flex; gap:8px; justify-content:flex-end; }
+
+  /* FORM */
+  .form-group { margin-bottom:16px; }
+  .form-row { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .form-label { display:block; font-size:12px; font-family:var(--mono); color:var(--text2); margin-bottom:6px; letter-spacing:0.5px; }
+  .form-input, .form-select, .form-textarea { width:100%; background:var(--bg); border:1px solid var(--border); color:var(--text); padding:8px 12px; border-radius:var(--radius); font-family:var(--sans); font-size:13px; transition:border-color 0.15s; outline:none; }
+  .form-input:focus, .form-select:focus, .form-textarea:focus { border-color:var(--accent); }
+  .form-textarea { resize:vertical; min-height:80px; }
+  .form-select option { background:var(--surface); }
+  .form-toggle { display:flex; align-items:center; gap:10px; cursor:pointer; }
+  .toggle-switch { width:36px; height:20px; background:var(--border2); border-radius:10px; position:relative; transition:background 0.2s; }
+  .toggle-switch.on { background:var(--accent); }
+  .toggle-switch::after { content:''; position:absolute; width:14px; height:14px; background:white; border-radius:50%; top:3px; left:3px; transition:left 0.2s; }
+  .toggle-switch.on::after { left:19px; }
+  .toggle-label { font-size:13px; color:var(--text2); }
+
+  /* CHIPS */
+  .disc-group { margin-bottom:12px; }
+  .disc-group-title { font-size:10px; font-family:var(--mono); color:var(--text3); letter-spacing:1px; text-transform:uppercase; margin-bottom:6px; }
+  .disc-items { display:flex; flex-wrap:wrap; gap:6px; }
+  .disc-chip { display:flex; align-items:center; gap:6px; background:var(--surface2); border:1px solid var(--border); border-radius:4px; padding:4px 8px; font-size:13px; cursor:pointer; transition:all 0.15s; user-select:none; }
+  .disc-chip.selected { background:rgba(200,240,60,0.1); border-color:var(--accent); color:var(--accent); }
+  .disc-chip-dot { width:6px; height:6px; border-radius:50%; background:var(--border2); }
+  .disc-chip.selected .disc-chip-dot { background:var(--accent); }
+
+  /* ENTRY TYPE */
+  .entry-tipo-selector { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:16px; }
+  .tipo-btn { background:var(--bg); border:1px solid var(--border); border-radius:var(--radius); padding:10px; text-align:center; cursor:pointer; transition:all 0.15s; }
+  .tipo-btn.selected { border-color:var(--accent); background:rgba(200,240,60,0.08); }
+  .tipo-btn-icon { font-size:16px; margin-bottom:4px; }
+  .tipo-btn-label { font-size:11px; font-family:var(--mono); color:var(--text2); }
+  .tipo-btn.selected .tipo-btn-label { color:var(--accent); }
+
+  /* LOADING / EMPTY */
+  .loading { display:flex; align-items:center; justify-content:center; padding:48px; color:var(--text3); font-family:var(--mono); font-size:12px; gap:10px; }
+  .spinner { width:16px; height:16px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.8s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .empty-state { text-align:center; padding:48px; color:var(--text3); font-family:var(--mono); font-size:12px; }
+  .empty-state-icon { font-size:32px; margin-bottom:12px; }
+
+  /* SELECTOR DISCIPLINAS EN CAMBIO */
+  .cambio-disc-section { margin-top:4px; }
+  .cambio-disc-label { font-size:11px; font-family:var(--mono); color:var(--text3); letter-spacing:0.5px; margin-bottom:8px; display:flex; align-items:center; justify-content:space-between; }
+  .cambio-disc-label span { color:var(--text3); font-size:10px; }
+  .cambio-group { margin-bottom:10px; }
+  .cambio-group-row { display:flex; align-items:center; gap:8px; margin-bottom:5px; }
+  .cambio-group-name { font-size:11px; color:var(--text2); font-family:var(--mono); }
+  .cambio-chips-wrap { display:flex; flex-wrap:wrap; gap:5px; padding-left:2px; }
+  .chip-master { display:inline-flex; align-items:center; gap:5px; border-radius:5px; padding:4px 9px; font-size:11px; font-family:var(--mono); cursor:pointer; border:1px solid var(--border2); background:var(--surface2); color:var(--text3); transition:all 0.12s; user-select:none; }
+  .chip-master.on { background:rgba(88,166,255,0.18); border-color:var(--accent); color:var(--accent); }
+  .chip-master .chip-dot { width:5px; height:5px; border-radius:50%; background:var(--border2); flex-shrink:0; }
+  .chip-master.on .chip-dot { background:var(--accent); }
+  .chip-disc { display:inline-flex; align-items:center; gap:5px; border-radius:5px; padding:4px 9px; font-size:12px; cursor:pointer; border:1px solid var(--border); background:var(--bg); color:var(--text2); transition:all 0.12s; user-select:none; }
+  .chip-disc.on { background:rgba(88,166,255,0.10); border-color:var(--accent); color:var(--accent); }
+  .chip-disc .chip-dot { width:5px; height:5px; border-radius:50%; background:var(--border2); flex-shrink:0; }
+  .chip-disc.on .chip-dot { background:var(--accent); }
+  .chip-disc.readonly { cursor:default; pointer-events:none; opacity:0.8; }
+
+  /* PANEL EXPANDIBLE DE CAMBIO EN NOTAS */
+  .cambio-expand-btn { background:none; border:none; color:var(--text3); font-size:11px; font-family:var(--mono); cursor:pointer; padding:2px 0; transition:color 0.15s; display:flex; align-items:center; gap:5px; }
+  .cambio-expand-btn:hover { color:var(--accent); }
+  .cambio-detail-panel { display:none; margin-top:8px; padding:10px 12px; background:var(--bg); border:1px solid var(--border); border-radius:var(--radius); }
+  .cambio-detail-panel.open { display:block; }
+  .cambio-detail-alcance { font-size:13px; color:var(--text); margin-bottom:8px; line-height:1.5; }
+  .cambio-detail-chips { display:flex; flex-wrap:wrap; gap:5px; margin-bottom:10px; }
+  .cambio-detail-hist { border-top:1px solid var(--border); padding-top:8px; }
+  .cambio-hist-title { font-size:10px; font-family:var(--mono); color:var(--text3); letter-spacing:1px; text-transform:uppercase; margin-bottom:6px; }
+  .cambio-hist-row { display:grid; grid-template-columns:90px 1fr; gap:8px; font-size:11px; padding:4px 0; border-bottom:1px solid var(--border); }
+  .cambio-hist-row:last-child { border-bottom:none; }
+  .cambio-hist-fecha { font-family:var(--mono); color:var(--text3); }
+  .cambio-hist-diff { color:var(--text2); }
+
+  /* TOAST */
+  #toast { position:fixed; bottom:24px; right:24px; background:var(--surface); border:1px solid var(--border2); border-radius:var(--radius); padding:12px 16px; font-size:13px; z-index:999; transform:translateY(80px); opacity:0; transition:all 0.3s; max-width:320px; }
+  #toast.show { transform:translateY(0); opacity:1; }
+  #toast.success { border-left:3px solid var(--green); }
+  #toast.error { border-left:3px solid var(--red); }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div style="display:flex;flex-direction:column;align-items:center;gap:8px">
+    <div class="login-badge">JLL · Innovasport</div>
+    <div class="login-title">IS4 <span>Tracking</span></div>
+    <div class="login-sub">Store Planning · Project Management</div>
+  </div>
+  <button class="btn-google" onclick="handleLogin()">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+    </svg>
+    Continuar con Google
+  </button>
+  <div class="login-note">Acceso restringido · Solo usuarios autorizados</div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="topbar">
+    <div class="topbar-brand">IS4</div>
+    <div class="topbar-sep"></div>
+    <div class="topbar-nav">
+      <button class="nav-btn active" onclick="showView('dashboard')" id="nav-dashboard">Dashboard</button>
+      <button class="nav-btn" onclick="showView('criterios')" id="nav-criterios">Criterios</button>
+    </div>
+    <div class="topbar-user">
+      <span class="user-name" id="user-name-display"></span>
+      <span class="user-role" id="user-role-display"></span>
+      <button class="btn-logout" onclick="handleLogout()">Salir</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <!-- DASHBOARD -->
+    <div class="view active" id="view-dashboard">
+      <div id="criterios-banner-container"></div>
+      <div class="page-header">
+        <div>
+          <div class="page-title">Dashboard</div>
+          <div class="page-sub" id="dashboard-date"></div>
+        </div>
+        <button class="btn-primary" onclick="openNuevoProyecto()" id="btn-nuevo-proyecto">+ Nuevo Proyecto</button>
+      </div>
+      <div id="proyectos-list"><div class="loading"><div class="spinner"></div>Cargando proyectos…</div></div>
+      <div class="hitos-section">
+        <div id="hitos-proximos"><div class="loading"><div class="spinner"></div>Calculando…</div></div>
+      </div>
+    </div>
+
+    <!-- PROYECTO DETAIL -->
+    <div class="view" id="view-proyecto-detail">
+      <button class="back-btn" onclick="showView('dashboard')">← Volver al dashboard</button>
+      <div class="project-detail-header">
+        <div>
+          <div class="project-detail-title" id="detail-title"></div>
+          <div class="project-detail-meta" id="detail-meta"></div>
+          <div id="detail-scoreboard"></div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn-secondary" onclick="openSettings()" style="font-size:13px">⚙️ Settings</button>
+          <button class="btn-primary" onclick="openNuevoEntry()">+ Registrar evento</button>
+        </div>
+      </div>
+      <div id="detail-timeline"></div>
+      <div id="detail-notas"></div>
+      <div class="groups-container" id="groups-container"></div>
+    </div>
+
+    <!-- CRITERIOS -->
+    <div class="view" id="view-criterios">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Criterios del Programa</div>
+          <div class="page-sub">IS 4.0 · Innovasport · Definiciones de diseño vigentes</div>
+        </div>
+        <button class="btn-primary" onclick="openNuevoCriterio()">+ Nuevo Criterio</button>
+      </div>
+      <div id="criterios-list"><div class="loading"><div class="spinner"></div>Cargando…</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: NUEVO PROYECTO -->
+<div class="modal-overlay" id="modal-proyecto">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title">Nuevo Proyecto</div><button class="modal-close" onclick="closeModal('modal-proyecto')">×</button></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Nombre del proyecto</label><input class="form-input" id="p-nombre" placeholder="IS Nombre Sucursal"></div>
+        <div class="form-group"><label class="form-label">Clave Innovasport</label><input class="form-input" id="p-clave" placeholder="IS-XXX"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Tipo de proyecto</label>
+          <select class="form-select" id="p-tipo"><option value="">Seleccionar…</option><option>Apertura nueva</option><option>Reubicación</option><option>Remodelación</option></select>
+        </div>
+        <div class="form-group"><label class="form-label">Fecha de aprobación</label><input class="form-input" id="p-fecha" type="date" placeholder="DD/MM/AAAA"></div>
+      </div>
+      <div class="form-group"><label class="form-label">Arquitecto asignado</label><select class="form-select" id="p-arquitecto"><option value="">Sin asignar</option></select></div>
+      <div class="form-group"><div class="form-toggle" onclick="toggleBubblePlan()"><div class="toggle-switch" id="toggle-bubble"></div><div class="toggle-label">Bubble Plan aplica</div></div></div>
+      <div class="form-group"><label class="form-label">Disciplinas que aplican</label><div id="disciplinas-checklist"></div></div>
+      <div class="form-group"><label class="form-label">Notas</label><textarea class="form-textarea" id="p-notas" placeholder="Contexto del proyecto…"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('modal-proyecto')">Cancelar</button>
+      <button class="btn-primary" id="btn-guardar-proyecto" onclick="guardarProyecto()">Crear Proyecto</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: EVENTO DEL LOG (tarea) -->
+<div class="modal-overlay" id="modal-entry">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title">Registrar Evento</div><button class="modal-close" onclick="closeModal('modal-entry')">×</button></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Grupo</label><select class="form-select" id="e-grupo" onchange="updateDisciplinas()"><option value="">Seleccionar grupo…</option></select></div>
+        <div class="form-group"><label class="form-label">Tarea</label><select class="form-select" id="e-disciplina" onchange="updateEventos()"><option value="">Seleccionar tarea…</option></select></div>
+      </div>
+      <div class="form-group"><label class="form-label">Evento</label><select class="form-select" id="e-evento"><option value="">Seleccionar evento…</option></select></div>
+      <div class="form-group"><label class="form-label">Fecha real</label><input class="form-input" id="e-fecha" type="date" placeholder="DD/MM/AAAA"></div>
+      <div class="form-group"><label class="form-label">Nota <span style="color:var(--text3)">(opcional)</span></label><textarea class="form-textarea" id="e-nota" placeholder="Contexto, observaciones, riesgos…" style="min-height:60px"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('modal-entry')">Cancelar</button>
+      <button class="btn-primary" id="btn-guardar-entry" onclick="guardarEntry()">Guardar Evento</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: NOTA / CAMBIO DEL PROYECTO -->
+<div class="modal-overlay" id="modal-nota-cambio">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title" id="nota-cambio-title">Agregar nota o cambio</div><button class="modal-close" onclick="closeModal('modal-nota-cambio')">×</button></div>
+    <div class="modal-body">
+      <div class="entry-tipo-selector">
+        <div class="tipo-btn selected" id="tipo-nota-btn" onclick="selectNotaCambioTipo('nota')"><div class="tipo-btn-icon">📝</div><div class="tipo-btn-label">Nota</div></div>
+        <div class="tipo-btn" id="tipo-cambio-btn" onclick="selectNotaCambioTipo('cambio_registrado')"><div class="tipo-btn-icon">⚡</div><div class="tipo-btn-label">Cambio</div></div>
+      </div>
+      <!-- Campos solo para NOTA -->
+      <div id="nota-fields" style="display:none">
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Clasificación <span style="color:var(--accent)">*</span></label>
+            <select class="form-select" id="nc-tipo-nota"><option value="">Seleccionar…</option><option value="Riesgo">Riesgo</option><option value="Lección aprendida">Lección aprendida</option><option value="Decisión">Decisión</option><option value="Pendiente externo">Pendiente externo</option><option value="General">General</option></select>
+          </div>
+        </div>
+        <div class="form-group"><label class="form-label">Título <span style="color:var(--accent)">*</span></label><input class="form-input" id="nc-titulo" placeholder="Título corto de la nota…" maxlength="80"></div>
+        <div class="form-group cambio-disc-section">
+          <div class="cambio-disc-label">Disciplina relacionada <span>opcional</span></div>
+          <div class="form-row" style="gap:8px">
+            <select class="form-select" id="nc-nota-grupo" onchange="updateNotaGrupo()" style="flex:1"><option value="">Sin referencia</option></select>
+            <select class="form-select" id="nc-nota-disciplina" style="flex:1"><option value="">—</option></select>
+          </div>
+        </div>
+      </div>
+      <!-- Campos solo para CAMBIO -->
+      <div id="cambio-fields" style="display:none">
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Tipo de cambio</label>
+            <select class="form-select" id="e-impacto-tipo"><option value="">Seleccionar…</option><option>Cambio Menor</option><option>Cambio Arquitectónico</option><option>Cambio de Ingenierías</option><option>Cambio Mayor</option></select>
+          </div>
+          <div class="form-group"><label class="form-label">Origen del cambio</label>
+            <select class="form-select" id="e-origen"><option value="">Seleccionar…</option><option>Comercial</option><option>Operaciones</option><option>Dirección</option><option>Marketing</option><option>Marca</option><option>Interno SP</option></select>
+          </div>
+        </div>
+        <div class="form-group cambio-disc-section">
+          <div class="cambio-disc-label">Disciplinas impactadas <span>opcional — se puede editar después</span></div>
+          <div id="cambio-disc-container"></div>
+        </div>
+      </div>
+      <!-- Campos comunes -->
+      <div class="form-group"><label class="form-label">Fecha</label><input class="form-input" id="nc-fecha" type="date"></div>
+      <div class="form-group"><label class="form-label" id="nc-texto-label">Texto</label><textarea class="form-textarea" id="nc-texto" placeholder="Escribe la nota o descripción del cambio…" style="min-height:80px"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('modal-nota-cambio')">Cancelar</button>
+      <button class="btn-primary" id="btn-guardar-nc" onclick="guardarNotaCambio()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: NUEVO CRITERIO -->
+<div class="modal-overlay" id="modal-criterio">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title">Nuevo Criterio de Programa</div><button class="modal-close" onclick="closeModal('modal-criterio')">×</button></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Concepto</label>
+          <select class="form-select" id="c-concepto"><option value="">Seleccionar…</option><option>Acabados</option><option>Estructura</option><option>MEP</option><option>Mobiliario</option><option>Iluminación</option><option>Señalética</option><option>Fachada</option><option>Costos</option><option>Proceso</option><option>General</option></select>
+        </div>
+        <div class="form-group"><label class="form-label">Proyecto detonador</label><select class="form-select" id="c-proyecto"><option value="">Ninguno / General</option></select></div>
+      </div>
+      <div class="form-group"><label class="form-label">Descripción del criterio</label><textarea class="form-textarea" id="c-descripcion" placeholder="Describe el criterio de diseño, decisión o ajuste…" style="min-height:100px"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('modal-criterio')">Cancelar</button>
+      <button class="btn-primary" id="btn-guardar-criterio" onclick="guardarCriterio()">Proponer Criterio</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: SETTINGS DEL PROYECTO -->
+<div class="modal-overlay" id="modal-settings">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title">Settings del Proyecto</div><button class="modal-close" onclick="closeModal('modal-settings')">×</button></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Nombre del proyecto</label><input class="form-input" id="s-nombre" placeholder="IS Nombre Sucursal"></div>
+        <div class="form-group"><label class="form-label">Clave Innovasport</label><input class="form-input" id="s-clave" placeholder="IS-XXX"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Tipo de proyecto</label>
+          <select class="form-select" id="s-tipo"><option value="">Seleccionar…</option><option>Apertura nueva</option><option>Reubicación</option><option>Remodelación</option></select>
+        </div>
+        <div class="form-group"><label class="form-label">Fecha de aprobación</label><input class="form-input" id="s-fecha" type="date"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Arquitecto asignado</label><select class="form-select" id="s-arquitecto"><option value="">Sin asignar</option></select></div>
+        <div class="form-group"><label class="form-label">Estado</label>
+          <select class="form-select" id="s-estado"><option value="Activo">Activo</option><option value="En pausa">En pausa</option><option value="Cerrado">Cerrado</option></select>
+        </div>
+      </div>
+      <div class="form-group"><div class="form-toggle" onclick="toggleSettingsBubble()"><div class="toggle-switch" id="toggle-settings-bubble"></div><div class="toggle-label">Bubble Plan aplica</div></div></div>
+      <div class="form-group"><label class="form-label">Notas</label><textarea class="form-textarea" id="s-notas" placeholder="Contexto del proyecto…"></textarea></div>
+      <div class="danger-zone">
+        <div class="danger-zone-title">Zona de peligro</div>
+        <button class="btn-danger" onclick="borrarProyecto()">Borrar proyecto…</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('modal-settings')">Cancelar</button>
+      <button class="btn-primary" id="btn-guardar-settings" onclick="guardarSettings()">Guardar cambios</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: BORRAR CAMBIO -->
+<div class="modal-overlay" id="modal-borrar-cambio">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header"><div class="modal-title">Eliminar cambio</div><button class="modal-close" onclick="closeModal('modal-borrar-cambio')">×</button></div>
+    <div class="modal-body">
+      <div style="font-size:13px;color:var(--text2);margin-bottom:16px">Esta acción no se puede deshacer. El cambio quedará registrado en el historial de eliminados.</div>
+      <div class="form-group"><label class="form-label">Motivo <span style="color:var(--accent)">*</span></label><textarea class="form-textarea" id="borrar-cambio-motivo" placeholder="Describe el motivo para eliminar este cambio…" style="min-height:80px"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('modal-borrar-cambio')">Cancelar</button>
+      <button class="btn-danger" id="btn-confirmar-borrar-cambio" onclick="confirmarBorrarCambio()">Eliminar cambio</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const CONFIG = {
+  CLIENT_ID: '917190875425-0ccso9k1pthi9imfsrjd39dc4jvg9run.apps.googleusercontent.com',
+  WEBAPP_URL: 'https://script.google.com/macros/s/AKfycbwN8LLJ3FXEb4M4qVINDQLmx60D4mXP57QMvsSTelwe71lXzu5Dvuae94TJgWignmFh/exec',
+  SCOPES: 'https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile openid'
+};
+
+let state = {
+  user: null, rol: null, accessToken: null,
+  proyectos: [], eventosCatalogo: [], logEventos: [], criterios: [], usuarios: [],
+  disciplinasProyecto: [],
+  currentProyecto: null, entryTipo: 'nota',
+  bubblePlan: false, disciplinasSeleccionadas: new Set(),
+  cambioDiscsSeleccionadas: new Set(), editandoCambioId: null,
+  cambiosEliminados: [], borrandoCambioId: null
+};
+
+// ── AUTH — Google Identity Services ──
+let tokenClient;
+let tokenRenewalTimer = null;
+
+function initGoogleAPI() {
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: CONFIG.CLIENT_ID,
+    scope: CONFIG.SCOPES,
+    callback: async (tokenResponse) => {
+      if (tokenResponse.error) {
+        // Si falla renovación silenciosa, pedir login explícito
+        if (tokenResponse.error === 'user_logged_out' || tokenResponse.error === 'interaction_required') {
+          showLoginScreen();
+        } else {
+          showToast('Error al iniciar sesión', 'error');
+        }
+        return;
+      }
+      state.accessToken = tokenResponse.access_token;
+      sessionStorage.setItem('is4_token', tokenResponse.access_token);
+      // Programar renovación automática antes de que expire (55 min)
+      scheduleTokenRenewal();
+      // Si ya estamos en la app, no re-inicializar — solo actualizar el token
+      if (document.getElementById('app').style.display === 'flex') return;
+      // Primera vez — obtener perfil y entrar
+      try {
+        const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+          headers: { Authorization: 'Bearer ' + state.accessToken }
+        });
+        const profile = await res.json();
+        state.user = { email: profile.email, name: profile.name };
+        await completeSignIn();
+      } catch(e) { showToast('Error obteniendo perfil', 'error'); }
+    }
+  });
+
+  // Auto-restore: usar token guardado directamente
+  const savedToken = sessionStorage.getItem('is4_token');
+  const savedUser = sessionStorage.getItem('is4_user');
+  if (savedToken && savedUser) {
+    state.accessToken = savedToken;
+    state.user = JSON.parse(savedUser);
+    document.getElementById('login-screen').classList.add('restoring');
+    completeSignIn().catch(() => showLoginScreen());
+  }
+}
+
+function scheduleTokenRenewal() {
+  if (tokenRenewalTimer) clearTimeout(tokenRenewalTimer);
+  // Renovar a los 55 minutos (token dura 60)
+  tokenRenewalTimer = setTimeout(() => {
+    tokenClient.requestAccessToken({ prompt: '' });
+  }, 55 * 60 * 1000);
+}
+
+function showLoginScreen() {
+  sessionStorage.removeItem('is4_token');
+  sessionStorage.removeItem('is4_user');
+  state.accessToken = null; state.user = null; state.rol = null;
+  if (tokenRenewalTimer) clearTimeout(tokenRenewalTimer);
+  const ls = document.getElementById('login-screen');
+  ls.classList.remove('restoring');
+  ls.style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+}
+
+function handleLogin() {
+  tokenClient.requestAccessToken({ prompt: 'select_account' });
+}
+
+async function completeSignIn() {
+  try {
+    const usuarios = await api('getUsuarios');
+    const u = usuarios.find(x => x.email.toLowerCase() === state.user.email.toLowerCase());
+    if (!u) {
+      showToast('Acceso no autorizado. Contacta al PM.', 'error');
+      showLoginScreen();
+      return;
+    }
+    state.rol = u.rol;
+    state.usuarios = usuarios;
+  } catch(e) {
+    showToast('Error verificando acceso: ' + e.message, 'error');
+    showLoginScreen();
+    return;
+  }
+
+  document.getElementById('user-name-display').textContent = state.user.name.split(' ')[0];
+  document.getElementById('user-role-display').textContent = state.rol;
+  if (state.rol !== 'PM') document.getElementById('btn-nuevo-proyecto').style.display = 'none';
+  const loginEl = document.getElementById('login-screen');
+  loginEl.classList.remove('restoring');
+  loginEl.style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  document.getElementById('dashboard-date').textContent = new Date().toLocaleDateString('es-MX', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+  sessionStorage.setItem('is4_user', JSON.stringify(state.user));
+  await loadAllData();
+}
+
+function handleLogout() {
+  if (tokenRenewalTimer) clearTimeout(tokenRenewalTimer);
+  google.accounts.oauth2.revoke(state.accessToken, () => {});
+  showLoginScreen();
+}
+
+// ── API ──
+async function api(action, body = {}) {
+  const payload = { action, token: state.accessToken, ...body };
+  const res = await fetch(CONFIG.WEBAPP_URL, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    headers: { 'Content-Type': 'text/plain' }
+  });
+  const data = await res.json();
+  if (data && data.error) throw new Error(data.error);
+  return data;
+}
+
+// ── DATA ──
+async function loadAllData() {
+  try {
+    const [proyectos, eventos, log, criterios, disciplinas, cambiosDetalle] = await Promise.all([
+      api('getProyectos'), api('getEventosCatalogo'),
+      api('getLogEventos'), api('getCriteriosPrograma'),
+      api('getDisciplinasProyecto'), api('getCambiosDetalle')
+    ]);
+    state.proyectos = proyectos || [];
+    state.eventosCatalogo = eventos || [];
+    state.logEventos = log || [];
+    state.criterios = criterios || [];
+    state.disciplinasProyecto = disciplinas || [];
+    state.cambiosDetalle = cambiosDetalle || [];
+    renderDashboard();
+    renderCriteriosBanner();
+  } catch(e) { showToast('Error cargando datos: ' + e.message, 'error'); console.error(e); }
+}
+
+// ── DASHBOARD ──
+function renderDashboard() {
+  const activos = state.proyectos.filter(p => !p.estado || p.estado === 'Activo');
+  const container = document.getElementById('proyectos-list');
+
+  if (activos.length === 0) {
+    container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📋</div>No hay proyectos activos.<br>Crea el primero con el botón de arriba.</div>`;
+  } else {
+    container.innerHTML = `<div class="project-grid">${activos.map(p => {
+      const { nivel, label } = calcRiesgo(p);
+      return `<div class="project-card risk-${nivel}" onclick="openProyecto('${p.proyecto_id}')">
+        <div>
+          <div class="project-name">${p.nombre || '—'}</div>
+          ${renderScoreboard(p.proyecto_id)}
+          <div class="project-meta">
+            ${p.clave_innovasport ? `<div class="meta-item"><span class="label">Clave&nbsp;</span>${p.clave_innovasport}</div>` : ''}
+            <div class="meta-item"><span class="label">Tipo&nbsp;</span>${p.tipo_proyecto || '—'}</div>
+            <div class="meta-item"><span class="label">Aprobación&nbsp;</span>${formatDate(p.fecha_aprobacion)}</div>
+            <div class="meta-item"><span class="label">Entrega est.&nbsp;</span>${calcFechaEntrega(p.fecha_aprobacion)}</div>
+            ${p.arquitecto_id ? `<div class="meta-item"><span class="label">Arq.&nbsp;</span>${(state.usuarios.find(u => u.email === p.arquitecto_id)?.nombre) || p.arquitecto_id}</div>` : ''}
+          </div>
+        </div>
+        <div class="project-right">
+          <div class="semaforo ${nivel}"></div>
+          <div class="desvio-badge ${nivel}">${label}</div>
+        </div>
+      </div>`;
+    }).join('')}</div>`;
+  }
+
+  // Hitos próximos y vencidos
+  const hoy = new Date();
+  const limite = new Date(); limite.setDate(limite.getDate() + 7);
+  const proximos = [];
+  const vencidos = [];
+
+  activos.forEach(p => {
+    if (!p.fecha_aprobacion) return;
+    const logP = state.logEventos.filter(e => e.proyecto_id === p.proyecto_id);
+    HITOS_TIMELINE.filter(h => h.offset !== null).forEach(h => {
+      const completado = logP.some(e => e.hito_id === h.id && e.tipo_entry === 'hito_alcanzado');
+      if (completado) return;
+      const fecha = addBusinessDays(parseISODate(p.fecha_aprobacion), h.offset);
+      if (fecha < hoy) {
+        vencidos.push({ proyecto: p.nombre, hito: h.nombre, hitoId: h.id, fecha: fecha.toISOString().split('T')[0], proyectoId: p.proyecto_id });
+      } else if (fecha <= limite) {
+        proximos.push({ proyecto: p.nombre, hito: h.nombre, hitoId: h.id, fecha: fecha.toISOString().split('T')[0], proyectoId: p.proyecto_id });
+      }
+    });
+  });
+
+  proximos.sort((a,b) => new Date(a.fecha) - new Date(b.fecha));
+  vencidos.sort((a,b) => new Date(a.fecha) - new Date(b.fecha));
+
+  const hitosContainer = document.getElementById('hitos-proximos');
+  const vencidosHTML = vencidos.length === 0 ? '' : `
+    <div style="font-family:var(--mono);font-size:10px;color:#ff5050;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;margin-top:4px">⚠ Hitos vencidos — ${vencidos.length}</div>
+    ${vencidos.map(h => `<div class="hito-row retrasado">
+      <div class="hito-fecha" style="color:#ff5050">${formatDate(h.fecha)}</div>
+      <div class="hito-link" onclick="openProyectoEnHito('${h.proyectoId}','${h.hitoId}')">${h.hitoId} — ${h.hito}</div>
+      <div class="hito-link secondary" onclick="openProyecto('${h.proyectoId}')">${h.proyecto}</div>
+      <div></div>
+    </div>`).join('')}`;
+
+  const proximosHTML = proximos.length === 0
+    ? `<div style="color:var(--text3);font-family:var(--mono);font-size:12px;padding:8px 0">Sin hitos en los próximos 7 días</div>`
+    : `<div style="font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;margin-top:${vencidos.length > 0 ? '16px' : '4px'}">Próximos 7 días</div>
+    ${proximos.map(h => `<div class="hito-row">
+      <div class="hito-fecha">${formatDate(h.fecha)}</div>
+      <div class="hito-link" onclick="openProyectoEnHito('${h.proyectoId}','${h.hitoId}')">${h.hitoId} — ${h.hito}</div>
+      <div class="hito-link secondary" onclick="openProyecto('${h.proyectoId}')">${h.proyecto}</div>
+      <div></div>
+    </div>`).join('')}`;
+
+  hitosContainer.innerHTML = vencidosHTML + proximosHTML;
+}
+
+function renderCriteriosBanner() {
+  const container = document.getElementById('criterios-banner-container');
+  if (!state.user) return;
+  const pendientes = state.criterios.filter(c => {
+    if (c.estado !== 'vigente') return false;
+    try { return !JSON.parse(c.confirmaciones || '{}')[state.user.email]; } catch(e) { return true; }
+  });
+  container.innerHTML = pendientes.length === 0 ? '' : `
+    <div class="criterios-banner">
+      <div>
+        <div class="criterios-banner-text">📌 ${pendientes.length} criterio${pendientes.length > 1 ? 's' : ''} pendiente${pendientes.length > 1 ? 's' : ''} de confirmar</div>
+        <div class="criterios-banner-sub">Nuevas definiciones de diseño que aplican a todos los proyectos activos</div>
+      </div>
+      <button class="btn-primary" onclick="showView('criterios')" style="white-space:nowrap;font-size:12px">Ver criterios</button>
+    </div>`;
+}
+
+// ── SCOREBOARD ──
+function calcScoreboard(proyectoId) {
+  const log = state.logEventos.filter(e => e.proyecto_id === proyectoId);
+  const hitosAlcanzados = new Set(
+    log.filter(e => e.tipo_entry === 'hito_alcanzado').map(e => e.hito_id)
+  ).size;
+  const total = 38;
+  const pct = Math.round((hitosAlcanzados / total) * 100);
+  return { hitosAlcanzados, total, pct };
+}
+
+function renderScoreboard(proyectoId, inline = false) {
+  const { hitosAlcanzados, total, pct } = calcScoreboard(proyectoId);
+  const fillColor = pct >= 80 ? 'var(--green)' : pct >= 40 ? 'var(--accent)' : 'var(--accent)';
+  if (inline) {
+    return `
+      <div class="detail-scoreboard">
+        <div class="progress-label">
+          <span class="progress-text">${hitosAlcanzados} / ${total} hitos completados</span>
+          <span class="progress-pct">${pct}%</span>
+        </div>
+        <div class="progress-bar-track" style="margin-top:5px">
+          <div class="progress-bar-fill" style="width:${pct}%;background:${fillColor}"></div>
+        </div>
+      </div>`;
+  }
+  return `
+    <div class="progress-bar-wrap">
+      <div class="progress-bar-track">
+        <div class="progress-bar-fill" style="width:${pct}%;background:${fillColor}"></div>
+      </div>
+      <div class="progress-label">
+        <span class="progress-text">${hitosAlcanzados}/${total} hitos</span>
+        <span class="progress-pct">${pct}%</span>
+      </div>
+    </div>`;
+}
+
+// ── PROYECTO DETAIL ──
+async function openProyecto(proyectoId) {
+  const p = state.proyectos.find(x => x.proyecto_id === proyectoId);
+  if (!p) return;
+  state.currentProyecto = p;
+  document.getElementById('detail-title').textContent = p.nombre;
+  document.getElementById('detail-meta').textContent = `${p.clave_innovasport ? p.clave_innovasport + ' · ' : ''}${p.tipo_proyecto || '—'} · Aprobación: ${formatDate(p.fecha_aprobacion)} · Entrega estimada: ${calcFechaEntrega(p.fecha_aprobacion)}`;
+  document.getElementById('detail-scoreboard').innerHTML = renderScoreboard(proyectoId, true);
+  renderGroups(p);
+  document.getElementById('detail-timeline').innerHTML = renderTimeline(p);
+  document.getElementById('detail-notas').innerHTML = renderNotas(p);
+  showView('proyecto-detail');
+  await evaluarHitos(proyectoId);
+}
+
+function renderGroups(proyecto) {
+  const log = state.logEventos.filter(e => e.proyecto_id === proyecto.proyecto_id);
+  const activasSet = new Set(
+    state.disciplinasProyecto
+      .filter(d => d.proyecto_id === proyecto.proyecto_id)
+      .map(d => d.disciplina_id)
+  );
+  const grupos = getGruposUnicos().filter(g =>
+    state.eventosCatalogo.some(e => e.grupo_id === g.grupo_id && activasSet.has(`${e.grupo_id}::${e.disciplina_nombre}`))
+  );
+  document.getElementById('groups-container').innerHTML = grupos.map(g => {
+    const disciplinas = getDisciplinasGrupo(g.grupo_id).filter(d => activasSet.has(`${g.grupo_id}::${d}`));
+    const completadas = disciplinas.filter(d => isDisciplinaCompleta(d, g.grupo_id, log)).length;
+    const enProceso = disciplinas.filter(d => !isDisciplinaCompleta(d, g.grupo_id, log) && log.some(e => e.disciplina_id === `${g.grupo_id}::${d}`)).length;
+    const nivel = completadas === disciplinas.length && disciplinas.length > 0 ? 'green' : enProceso > 0 ? 'yellow' : 'gray';
+    return `
+    <div class="group-row" id="group-${g.grupo_id}">
+      <div class="group-header" onclick="toggleGroup('${g.grupo_id}')">
+        <span class="group-chevron">▶</span>
+        <span class="group-id">${g.grupo_id}</span>
+        <span class="group-name">${g.grupo_nombre}</span>
+        <span class="group-progress">${completadas}/${disciplinas.length}</span>
+        <div class="semaforo ${nivel}"></div>
+      </div>
+      <div class="group-body">${disciplinas.map(d => renderDisciplina(proyecto, g, d, log)).join('')}</div>
+    </div>`;
+  }).join('');
+}
+
+function contarVoBos(disciplina, grupoId, log) {
+  const cierre = state.eventosCatalogo.find(e => e.grupo_id === grupoId && e.disciplina_nombre === disciplina && (e.es_cierre === 'TRUE' || e.es_cierre === 'true' || e.es_cierre === true));
+  if (!cierre) return 0;
+  const discKey = `${grupoId}::${disciplina}`;
+  return log.filter(e => e.disciplina_id === discKey && e.tipo_entry === 'evento' && e.hito_id === cierre.evento_nombre).length;
+}
+
+function renderDisciplina(proyecto, grupo, disciplina, log) {
+  const discKey = `${grupo.grupo_id}::${disciplina}`;
+  const safeId = `${proyecto.proyecto_id}_${grupo.grupo_id}_${disciplina}`.replace(/[^a-zA-Z0-9_]/g, '_');
+  const eventos = log.filter(e => e.disciplina_id === discKey && e.tipo_entry !== 'cambio_aplicado');
+  const completa = isDisciplinaCompleta(disciplina, grupo.grupo_id, log);
+  const ultimoEvento = (() => {
+    const evs = log.filter(e => e.disciplina_id === discKey && e.tipo_entry === 'evento')
+      .sort((a,b) => {
+        const ta = a.timestamp ? new Date(a.timestamp) : new Date(a.fecha_real + 'T12:00:00Z');
+        const tb = b.timestamp ? new Date(b.timestamp) : new Date(b.fecha_real + 'T12:00:00Z');
+        return ta - tb;
+      });
+    return evs.length > 0 ? evs[evs.length - 1] : null;
+  })();
+  const afectado = !completa && ultimoEvento && ultimoEvento.hito_id && ultimoEvento.hito_id.startsWith('Afectado por Cambio');
+  const estado = completa ? 'completado' : afectado ? 'afectado' : eventos.length > 0 ? 'en-proceso' : 'pendiente';
+  const estadoLabel = completa ? 'completado' : afectado ? 'afectado' : eventos.length > 0 ? 'en proceso' : 'pendiente';
+  const vobos = contarVoBos(disciplina, grupo.grupo_id, log);
+  const voboBadgeClass = vobos === 0 ? '' : vobos === 1 ? 'v1' : vobos === 2 ? 'v2' : vobos === 3 ? 'v3' : vobos === 4 ? 'v4' : 'v5plus';
+  const voboLabel = vobos === 1 ? '1 Vo.Bo.' : vobos > 1 ? `${vobos} Vo.Bo.` : '';
+  const voboHTML = vobos > 0 ? `<div class="vobo-badge ${voboBadgeClass}" title="${vobos === 1 ? 'Sin retrabajo' : vobos - 1 + ' retrabajo(s)'}">${voboLabel}</div>` : `<div></div>`;
+  return `
+  <div>
+    <div class="disciplina-row" onclick="toggleLogPanel('log_${safeId}')">
+      <div>${disciplina}</div>
+      <div class="disciplina-estado ${estado}">${estadoLabel}</div>
+      ${voboHTML}
+      <div style="font-size:11px;color:var(--text3);font-family:var(--mono)">${eventos.length} eventos</div>
+      <button class="btn-ghost" onclick="event.stopPropagation();openEntryForDisciplina('${grupo.grupo_id}','${disciplina}')">+ Evento</button>
+    </div>
+    <div class="log-panel" id="log_${safeId}">
+      ${eventos.length === 0 ? '<div class="log-empty">Sin eventos registrados</div>'
+        : eventos.sort((a,b) => {
+            const ta = a.timestamp ? new Date(a.timestamp) : new Date(a.fecha_real + 'T12:00:00Z');
+            const tb = b.timestamp ? new Date(b.timestamp) : new Date(b.fecha_real + 'T12:00:00Z');
+            return ta - tb;
+          }).map(e => {
+            const esNotaRef = e.tipo_entry === 'nota_ref';
+            let notaRef = null;
+            if (esNotaRef) { try { notaRef = JSON.parse(e.nota || '{}'); } catch(x) {} }
+            const notaTipoAbrev = { 'Riesgo': 'RSG', 'Lección aprendida': 'LA', 'Decisión': 'DEC', 'Pendiente externo': 'PE', 'General': 'GEN' };
+            const tituloDisplay = notaRef?.titulo || '';
+            return `
+            <div class="log-entry-wrap">
+              <div class="log-entry${esNotaRef ? ' log-entry-nota-ref' : ''}">
+                <div class="log-fecha">${formatDate(e.fecha_real)}${e.timestamp ? '<span style="color:var(--text3);font-size:9px;margin-left:3px">' + new Date(e.timestamp).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}) + '</span>' : ''}</div>
+                ${esNotaRef
+                  ? `<div class="log-evento" style="display:flex;align-items:center;gap:6px;min-width:0;overflow:hidden">
+                      <span style="font-family:var(--mono);font-size:10px;color:var(--accent);cursor:pointer;flex-shrink:0" onclick="scrollToNota('${e.hito_id}')" title="Ver nota completa">${e.hito_id}</span>
+                      <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0" title="${notaRef?.titulo || ''}">${tituloDisplay}</span>
+                      ${notaRef?.tipo ? `<span style="font-family:var(--mono);font-size:9px;color:var(--text3);flex-shrink:0">${notaTipoAbrev[notaRef.tipo] || ''}</span>` : ''}
+                    </div>`
+                  : (() => {
+                      const esAfectado = e.hito_id && e.hito_id.startsWith('Afectado por Cambio ');
+                      if (esAfectado) {
+                        const clave = e.hito_id.replace('Afectado por Cambio ', '');
+                        const entryIdCambio = (state.cambiosDetalle || []).find(cd => cd.clave_cambio === clave)?.entry_id;
+                        const link = entryIdCambio
+                          ? `<span style="font-family:var(--mono);font-size:10px;color:var(--yellow);cursor:pointer;flex-shrink:0" onclick="scrollToCambio('${entryIdCambio}')" title="Ver detalle del cambio">${clave}</span>`
+                          : `<span style="font-family:var(--mono);font-size:10px;color:var(--yellow);flex-shrink:0">${clave}</span>`;
+                        return `<div class="log-evento" style="display:flex;align-items:center;gap:6px">${link}<span>Afectado por Cambio</span></div>`;
+                      }
+                      return `<div class="log-evento">${e.hito_id || '—'}</div>`;
+                    })()
+                }
+                <div class="log-nota">${esNotaRef ? '' : (e.nota || '')}</div>
+              </div>
+              ${state.rol === 'PM' ? `<button class="btn-borrar-entry" onclick="borrarEntry('${e.entry_id}')" title="Borrar entrada">✕</button>` : ''}
+            </div>`;
+          }).join('')}
+    </div>
+  </div>`;
+}
+
+async function borrarEntry(entryId) {
+  if (!confirm('¿Borrar esta entrada del log?\nEsta acción no se puede deshacer.')) return;
+  const estadoPaneles = capturarEstadoPaneles();
+  try {
+    await api('borrarLogEvento', { entry_id: entryId });
+    // Remover localmente antes de re-renderizar — evita brinco visual
+    state.logEventos = state.logEventos.filter(e => e.entry_id !== entryId);
+    showToast('Entrada borrada', 'success');
+    if (state.currentProyecto) {
+      await openProyecto(state.currentProyecto.proyecto_id);
+      restaurarEstadoPaneles(estadoPaneles);
+    }
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+}
+
+function toggleGroup(id) { document.getElementById(`group-${id}`)?.classList.toggle('open'); }
+function toggleLogPanel(id) { document.getElementById(id)?.classList.toggle('open'); }
+function openEntryForDisciplina(grupoId, disciplina) {
+  openNuevoEntry();
+  setTimeout(() => {
+    document.getElementById('e-grupo').value = grupoId;
+    updateDisciplinas();
+    setTimeout(() => { document.getElementById('e-disciplina').value = disciplina; updateEventos(); }, 60);
+  }, 60);
+}
+
+// Mapa hito → disciplinas bloqueantes (para navegación desde dashboard)
+const HITO_DISCIPLINAS = {
+  'H02': [{ g:'G3', d:'Requerimientos Comercial' }, { g:'G3', d:'Requerimientos Operaciones' }],
+  'H08': [{ g:'G3', d:'Validación Módulos de Cobro' }, { g:'G3', d:'Validación Servicios en Tienda' }, { g:'G3', d:'Validación Caja Rotor' }, { g:'G3', d:'Validación C&R' }, { g:'G3', d:'Validación SFS' }],
+  'H22': [{ g:'G5', d:'Zonificación' }, { g:'G5', d:'Mueble de Gorras' }],
+  'H23': [{ g:'G6', d:'HVAC' }, { g:'G6', d:'Proyecto Eléctrico' }],
+  'H24': [{ g:'G7', d:'Pantallas' }, { g:'G7', d:'Antenas WiFi' }, { g:'G7', d:'Bocinas' }, { g:'G7', d:'Contador de Personas' }, { g:'G7', d:'Validación Contactos' }, { g:'G7', d:'Validación Voz y Datos' }, { g:'G7', d:'Validación Site' }, { g:'G7', d:'Validación Cámaras' }],
+  'H25': [{ g:'G8', d:'Cámaras de Seguridad' }, { g:'G8', d:'Antenas de Seguridad' }, { g:'G8', d:'Detección de Humos' }, { g:'G8', d:'Alarmas' }, { g:'G8', d:'Protección Contra Incendios' }, { g:'G8', d:'Lámparas de Emergencia' }, { g:'G8', d:'Señalética de Emergencia + Extintores' }, { g:'G8', d:'Alarma Sísmica' }],
+  'H26': [{ g:'G9', d:'Aromas' }, { g:'G9', d:'Validación Pantallas' }, { g:'G9', d:'Validación Bocinas' }],
+  'H27': [{ g:'G10', d:'Caminadora' }, { g:'G10', d:'Mueble de Servicios' }],
+  'H28': [{ g:'G11', d:'Iluminación' }, { g:'G11', d:'Estantería' }, { g:'G11', d:'Mezzanine' }],
+  'H29': [{ g:'G12', d:'Insumos' }],
+  'H36': [{ g:'G15', d:'Proyecto Ejecutivo' }],
+};
+
+// Mapa disciplina → hitos que se "abren" si esa disciplina recibe un cambio
+// Formato: 'GRUPO_ID::DISCIPLINA_NOMBRE' → [hitoIds]
+const DISCIPLINA_HITOS = {
+  'G2::Plano de Conjunto':           ['H04','H09','H11'],
+  'G2::Huella del Local':            ['H04','H09','H11'],
+  'G2::Fachada':                     ['H04','H09','H11'],
+  'G2::Manual de Adaptaciones':      ['H04','H09','H11'],
+  'G2::Levantamiento':               ['H04','H09','H11'],
+  'G2::Reporte de Levantamiento':    ['H05','H09','H11'],
+  'G3::Requerimientos Comercial':    ['H07','H09','H11'],
+  'G3::Requerimientos Operaciones':  ['H07','H09','H11'],
+  'G3::Validación Módulos de Cobro': ['H08','H09','H11'],
+  'G3::Validación Servicios en Tienda':['H08','H09','H11'],
+  'G3::Validación Caja Rotor':       ['H08','H09','H11'],
+  'G3::Validación C&R':              ['H08','H09','H11'],
+  'G3::Validación SFS':              ['H08','H09','H11'],
+  'G4::Validación de Dirección':     ['H09'],
+  'G4::Proyecto Arquitectónico':     ['H13'],
+  'G4::Layout - Validación de Dirección': ['H09'],
+  'G5::Zonificación':                ['H22'],
+  'G5::Mueble de Gorras':            ['H22'],
+  'G6::HVAC':                        ['H23','H30','H34'],
+  'G6::Proyecto Eléctrico':          ['H23','H30','H34'],
+  'G7::Pantallas':                   ['H24','H31','H34'],
+  'G7::Antenas WiFi':                ['H24','H31','H34'],
+  'G7::Bocinas':                     ['H24','H31','H34'],
+  'G7::Contador de Personas':        ['H24','H31','H34'],
+  'G7::Validación Contactos':        ['H24','H31','H34'],
+  'G7::Validación Voz y Datos':      ['H24','H31','H34'],
+  'G7::Validación Site':             ['H24','H31','H34'],
+  'G7::Validación Cámaras':          ['H24','H31','H34'],
+  'G8::Cámaras de Seguridad':        ['H25','H32','H34'],
+  'G8::Antenas de Seguridad':        ['H25','H32','H34'],
+  'G8::Detección de Humos':          ['H25','H32','H34'],
+  'G8::Alarmas':                     ['H25','H32','H34'],
+  'G8::Protección Contra Incendios': ['H25','H32','H34'],
+  'G8::Lámparas de Emergencia':      ['H25','H32','H34'],
+  'G8::Señalética de Emergencia + Extintores': ['H25','H32','H34'],
+  'G8::Alarma Sísmica':              ['H25','H32','H34'],
+  'G9::Aromas':                      ['H26','H33','H34'],
+  'G9::Validación Pantallas':        ['H26','H33','H34'],
+  'G9::Validación Bocinas':          ['H26','H33','H34'],
+  'G10::Caminadora':                 ['H27'],
+  'G10::Mueble de Servicios':        ['H27'],
+  'G11::Iluminación':                ['H28'],
+  'G11::Estantería':                 ['H28'],
+  'G11::Mezzanine':                  ['H28'],
+  'G12::Insumos':                    ['H29'],
+  'G15::Proyecto Ejecutivo':         ['H15','H36'],
+};
+
+// Dado un array de disciplina_keys seleccionadas, devuelve hitos afectados únicos
+function getHitosAfectados(disciplinaKeys) {
+  const hitos = new Set();
+  disciplinaKeys.forEach(key => {
+    (DISCIPLINA_HITOS[key] || []).forEach(h => hitos.add(h));
+  });
+  return [...hitos];
+}
+
+async function openProyectoEnHito(proyectoId, hitoId) {
+  await openProyecto(proyectoId);
+  const disciplinas = HITO_DISCIPLINAS[hitoId];
+  if (!disciplinas || disciplinas.length === 0) return;
+  setTimeout(() => {
+    console.log('openProyectoEnHito — hitoId:', hitoId, 'disciplinas:', disciplinas);
+    // Expandir grupos relevantes
+    const gruposVistos = new Set();
+    disciplinas.forEach(({ g }) => {
+      console.log('expandiendo grupo:', g, '— elemento:', document.getElementById(`group-${g}`));
+      if (!gruposVistos.has(g)) {
+        gruposVistos.add(g);
+        const groupEl = document.getElementById(`group-${g}`);
+        if (groupEl && !groupEl.classList.contains('open')) {
+          groupEl.classList.add('open');
+        }
+      }
+    });
+    // Expandir log panels de disciplinas bloqueantes
+    disciplinas.forEach(({ g, d }) => {
+      const safeId = `${proyectoId}_${g}_${d}`.replace(/[^a-zA-Z0-9_]/g, '_');
+      const logPanel = document.getElementById(`log_${safeId}`);
+      if (logPanel && !logPanel.classList.contains('open')) {
+        logPanel.classList.add('open');
+      }
+    });
+    // Scroll a la primera disciplina bloqueante
+    const { g, d } = disciplinas[0];
+    const safeId = `${proyectoId}_${g}_${d}`.replace(/[^a-zA-Z0-9_]/g, '_');
+    const discEl = document.getElementById(`log_${safeId}`)?.closest('[onclick]') ||
+                   document.getElementById(`log_${safeId}`);
+    if (discEl) {
+      discEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      discEl.style.background = 'rgba(255,80,80,0.08)';
+      setTimeout(() => discEl.style.background = '', 2000);
+    }
+  }, 800);
+}
+
+// ── NUEVO PROYECTO ──
+function openNuevoProyecto() {
+  document.getElementById('p-fecha').value = new Date().toISOString().split('T')[0];
+  ['p-nombre','p-clave','p-notas'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('p-tipo').value = '';
+  state.bubblePlan = true;
+  state.disciplinasSeleccionadas = new Set();
+  document.getElementById('toggle-bubble').classList.add('on');
+  const sel = document.getElementById('p-arquitecto');
+  sel.innerHTML = '<option value="">Sin asignar</option>';
+  state.usuarios.filter(u => u.rol === 'Arquitecto').forEach(u => sel.innerHTML += `<option value="${u.email}">${u.nombre}</option>`);
+  buildDisciplinasChecklist();
+  openModal('modal-proyecto');
+}
+
+function buildDisciplinasChecklist() {
+  const grupos = {};
+  state.eventosCatalogo.forEach(e => {
+    if (!e.grupo_id || e.grupo_id === 'G0') return;
+    if (!grupos[e.grupo_id]) grupos[e.grupo_id] = { nombre: e.grupo_nombre, disciplinas: new Set() };
+    if (e.disciplina_nombre) grupos[e.grupo_id].disciplinas.add(e.disciplina_nombre);
+  });
+
+  state.disciplinasSeleccionadas = new Set();
+  Object.entries(grupos).forEach(([gid, g]) => {
+    [...g.disciplinas].forEach(d => {
+      if (gid === 'G1') return; // G1 lo controla el toggle — no se auto-selecciona
+      state.disciplinasSeleccionadas.add(`${gid}::${d}`);
+    });
+  });
+  if (state.bubblePlan) state.disciplinasSeleccionadas.add('G1::Bubble Plan');
+
+  document.getElementById('disciplinas-checklist').innerHTML = `
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <button type="button" class="btn-ghost" style="font-size:11px;border:1px solid var(--border);padding:3px 10px" onclick="selectAllDisciplinas()">Seleccionar todo</button>
+      <button type="button" class="btn-ghost" style="font-size:11px;border:1px solid var(--border);padding:3px 10px" onclick="deselectAllDisciplinas()">Deseleccionar todo</button>
+    </div>
+  ` + Object.entries(grupos).map(([gid, g]) => `
+    <div class="disc-group">
+      <div class="disc-group-title">${gid} — ${g.nombre}</div>
+      <div class="disc-items">${[...g.disciplinas].map(d => {
+        const cid = `chip_${gid}_${d.replace(/\W+/g,'_')}`;
+        const selected = state.disciplinasSeleccionadas.has(`${gid}::${d}`);
+        return `<div class="disc-chip${selected ? ' selected' : ''}" id="${cid}" onclick="toggleDisciplina('${gid}','${d}','${cid}')"><div class="disc-chip-dot"></div>${d}</div>`;
+      }).join('')}</div>
+    </div>`).join('');
+}
+
+function selectAllDisciplinas() {
+  const grupos = {};
+  state.eventosCatalogo.forEach(e => {
+    if (!e.grupo_id || e.grupo_id === 'G0') return;
+    if (!grupos[e.grupo_id]) grupos[e.grupo_id] = new Set();
+    if (e.disciplina_nombre) grupos[e.grupo_id].add(e.disciplina_nombre);
+  });
+  Object.entries(grupos).forEach(([gid, discs]) => {
+    [...discs].forEach(d => {
+      state.disciplinasSeleccionadas.add(`${gid}::${d}`);
+      document.getElementById(`chip_${gid}_${d.replace(/\W+/g,'_')}`)?.classList.add('selected');
+    });
+  });
+  state.bubblePlan = true;
+  document.getElementById('toggle-bubble').classList.add('on');
+  state.disciplinasSeleccionadas.add('G1::Bubble Plan');
+  document.getElementById('chip_G1_Bubble_Plan')?.classList.add('selected');
+}
+
+function deselectAllDisciplinas() {
+  state.disciplinasSeleccionadas.clear();
+  document.querySelectorAll('.disc-chip').forEach(c => c.classList.remove('selected'));
+}
+
+function toggleDisciplina(gid, d, cid) {
+  const key = `${gid}::${d}`;
+  const chip = document.getElementById(cid);
+  if (state.disciplinasSeleccionadas.has(key)) {
+    state.disciplinasSeleccionadas.delete(key);
+    chip.classList.remove('selected');
+    if (gid === 'G1' && d === 'Bubble Plan') {
+      state.bubblePlan = false;
+      document.getElementById('toggle-bubble').classList.remove('on');
+    }
+  } else {
+    state.disciplinasSeleccionadas.add(key);
+    chip.classList.add('selected');
+    if (gid === 'G1' && d === 'Bubble Plan') {
+      state.bubblePlan = true;
+      document.getElementById('toggle-bubble').classList.add('on');
+    }
+  }
+}
+
+function toggleBubblePlan() {
+  state.bubblePlan = !state.bubblePlan;
+  document.getElementById('toggle-bubble').classList.toggle('on', state.bubblePlan);
+  const cid = 'chip_G1_Bubble_Plan';
+  const chip = document.getElementById(cid);
+  if (chip) {
+    if (state.bubblePlan) { chip.classList.add('selected'); state.disciplinasSeleccionadas.add('G1::Bubble Plan'); }
+    else { chip.classList.remove('selected'); state.disciplinasSeleccionadas.delete('G1::Bubble Plan'); }
+  }
+}
+
+async function guardarProyecto() {
+  const nombre = document.getElementById('p-nombre').value.trim();
+  const fecha = document.getElementById('p-fecha').value;
+  if (!nombre || !fecha) { showToast('Nombre y fecha son requeridos', 'error'); return; }
+  const btn = document.getElementById('btn-guardar-proyecto');
+  btn.disabled = true; btn.textContent = 'Guardando…';
+  try {
+    await api('crearProyecto', {
+      nombre, clave_innovasport: document.getElementById('p-clave').value,
+      arquitecto_id: document.getElementById('p-arquitecto').value,
+      fecha_aprobacion: fecha, tipo_proyecto: document.getElementById('p-tipo').value,
+      bubble_plan_aplica: state.bubblePlan, notas: document.getElementById('p-notas').value,
+      disciplinas: [...state.disciplinasSeleccionadas].map(k => { const [g,d] = k.split('::'); return { disciplina_id: k, grupo_id: g }; })
+    });
+    closeModal('modal-proyecto');
+    showToast(`Proyecto "${nombre}" creado`, 'success');
+    await loadAllData();
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+  finally { btn.disabled = false; btn.textContent = 'Crear Proyecto'; }
+}
+
+// ── NUEVO ENTRY ──
+function openNuevoEntry() {
+  document.getElementById('e-fecha').value = new Date().toISOString().split('T')[0];
+  document.getElementById('e-nota').value = '';
+  document.getElementById('e-grupo').value = '';
+  document.getElementById('e-disciplina').innerHTML = '<option value="">Seleccionar tarea…</option>';
+  document.getElementById('e-evento').innerHTML = '<option value="">Seleccionar evento…</option>';
+  const sel = document.getElementById('e-grupo');
+  sel.innerHTML = '<option value="">Seleccionar grupo…</option>';
+  const grupos = {};
+  state.eventosCatalogo.forEach(e => { if (!grupos[e.grupo_id]) grupos[e.grupo_id] = e.grupo_nombre; });
+  Object.entries(grupos).forEach(([id, n]) => sel.innerHTML += `<option value="${id}">${id} — ${n}</option>`);
+  openModal('modal-entry');
+}
+
+function openNotaCambio(modoEdicion = false, cambioData = null) {
+  document.getElementById('nc-fecha').value = cambioData?.fecha || new Date().toISOString().split('T')[0];
+  document.getElementById('nc-texto').value = cambioData?.texto || '';
+  document.getElementById('e-impacto-tipo').value = cambioData?.impacto_tipo || '';
+  document.getElementById('e-origen').value = cambioData?.origen || '';
+  document.getElementById('nc-titulo').value = cambioData?.titulo || '';
+  document.getElementById('nc-tipo-nota').value = cambioData?.tipo_nota || '';
+  document.getElementById('nc-nota-grupo').value = '';
+  document.getElementById('nc-nota-disciplina').innerHTML = '<option value="">—</option>';
+  state.cambioDiscsSeleccionadas = new Set();
+  state.editandoCambioId = modoEdicion ? cambioData?.entry_id : null;
+
+  const title = document.getElementById('nota-cambio-title');
+  const btnGuardar = document.getElementById('btn-guardar-nc');
+  if (modoEdicion) {
+    title.textContent = 'Editar impacto del cambio';
+    btnGuardar.textContent = 'Guardar cambios';
+  } else {
+    title.textContent = 'Agregar nota o cambio';
+    btnGuardar.textContent = 'Guardar';
+  }
+
+  const preselected = cambioData?.disciplinas_afectadas
+    ? cambioData.disciplinas_afectadas.split(',').map(s => s.trim()).filter(Boolean)
+    : [];
+
+  selectNotaCambioTipo(modoEdicion ? 'cambio_registrado' : 'nota');
+  if (modoEdicion) buildCambioDiscSelector(preselected);
+  openModal('modal-nota-cambio');
+}
+
+function selectNotaCambioTipo(tipo) {
+  state.entryTipo = tipo;
+  document.getElementById('tipo-nota-btn').classList.toggle('selected', tipo === 'nota');
+  document.getElementById('tipo-cambio-btn').classList.toggle('selected', tipo === 'cambio_registrado');
+  document.getElementById('nota-fields').style.display = tipo === 'nota' ? 'block' : 'none';
+  document.getElementById('cambio-fields').style.display = tipo === 'cambio_registrado' ? 'block' : 'none';
+  const label = document.getElementById('nc-texto-label');
+  if (label) label.textContent = tipo === 'nota' ? 'Detalle / contenido' : 'Texto';
+  if (tipo === 'cambio_registrado') buildCambioDiscSelector();
+  if (tipo === 'nota') buildNotaGrupoSelector();
+}
+
+function buildNotaGrupoSelector() {
+  if (!state.currentProyecto) return;
+  const activasSet = new Set(
+    state.disciplinasProyecto
+      .filter(d => d.proyecto_id === state.currentProyecto.proyecto_id)
+      .map(d => d.disciplina_id)
+  );
+  const grupos = {};
+  state.eventosCatalogo.forEach(e => {
+    if (!e.grupo_id || e.grupo_id === 'G0') return;
+    const key = `${e.grupo_id}::${e.disciplina_nombre}`;
+    if (!activasSet.has(key)) return;
+    if (!grupos[e.grupo_id]) grupos[e.grupo_id] = e.grupo_nombre;
+  });
+  const sel = document.getElementById('nc-nota-grupo');
+  sel.innerHTML = '<option value="">Sin referencia</option>' +
+    Object.entries(grupos).map(([gid, nombre]) => `<option value="${gid}">${gid} — ${nombre}</option>`).join('');
+  document.getElementById('nc-nota-disciplina').innerHTML = '<option value="">—</option>';
+}
+
+function updateNotaGrupo() {
+  const gid = document.getElementById('nc-nota-grupo').value;
+  const sel = document.getElementById('nc-nota-disciplina');
+  sel.innerHTML = '<option value="">—</option>';
+  if (!gid || !state.currentProyecto) return;
+  const activasSet = new Set(
+    state.disciplinasProyecto
+      .filter(d => d.proyecto_id === state.currentProyecto.proyecto_id)
+      .map(d => d.disciplina_id)
+  );
+  const discs = [...new Set(
+    state.eventosCatalogo
+      .filter(e => e.grupo_id === gid && activasSet.has(`${gid}::${e.disciplina_nombre}`))
+      .map(e => e.disciplina_nombre)
+  )];
+  discs.forEach(d => sel.innerHTML += `<option value="${d}">${d}</option>`);
+}
+
+function buildCambioDiscSelector(preselected = []) {
+  if (!state.currentProyecto) return;
+  const activasSet = new Set(
+    state.disciplinasProyecto
+      .filter(d => d.proyecto_id === state.currentProyecto.proyecto_id)
+      .map(d => d.disciplina_id)
+  );
+  // Agrupar disciplinas activas por grupo
+  const grupos = {};
+  state.eventosCatalogo.forEach(e => {
+    if (!e.grupo_id || e.grupo_id === 'G0') return;
+    const key = `${e.grupo_id}::${e.disciplina_nombre}`;
+    if (!activasSet.has(key)) return;
+    if (!grupos[e.grupo_id]) grupos[e.grupo_id] = { nombre: e.grupo_nombre, disciplinas: new Set() };
+    if (e.disciplina_nombre) grupos[e.grupo_id].disciplinas.add(e.disciplina_nombre);
+  });
+
+  state.cambioDiscsSeleccionadas = new Set(preselected);
+
+  document.getElementById('cambio-disc-container').innerHTML = Object.entries(grupos).map(([gid, g]) => {
+    const discs = [...g.disciplinas];
+    return `
+    <div class="cambio-group" id="cambio-group-${gid}">
+      <div class="cambio-group-row">
+        <div class="chip-master" id="cambio-master-${gid}" onclick="toggleCambioMaster('${gid}')">
+          <div class="chip-dot"></div>${gid}
+        </div>
+        <span class="cambio-group-name">${g.nombre}</span>
+      </div>
+      <div class="cambio-chips-wrap" id="cambio-chips-${gid}">
+        ${discs.map(d => {
+          const key = `${gid}::${d}`;
+          const on = preselected.includes(key);
+          return `<div class="chip-disc${on?' on':''}" id="cambio-chip-${gid}_${d.replace(/\W+/g,'_')}" onclick="toggleCambioChip(this,'${gid}','${key}')"><div class="chip-dot"></div>${d}</div>`;
+        }).join('')}
+      </div>
+    </div>`;
+  }).join('');
+
+  // Sincronizar masters con estado inicial
+  Object.keys(grupos).forEach(gid => syncCambioMaster(gid));
+}
+
+function toggleCambioChip(el, gid, key) {
+  const on = el.classList.toggle('on');
+  el.querySelector('.chip-dot').style.background = on ? 'var(--accent)' : 'var(--border2)';
+  if (on) state.cambioDiscsSeleccionadas.add(key);
+  else state.cambioDiscsSeleccionadas.delete(key);
+  syncCambioMaster(gid);
+}
+
+function toggleCambioMaster(gid) {
+  const chips = document.querySelectorAll(`#cambio-chips-${gid} .chip-disc`);
+  const allOn = [...chips].every(c => c.classList.contains('on'));
+  chips.forEach(c => {
+    const key = c.id.replace(`cambio-chip-${gid}_`, '').replace(/_/g, ' ');
+    // Reconstruir key desde el texto del chip
+    const disc = c.textContent.trim();
+    const fullKey = `${gid}::${disc}`;
+    const turnOn = !allOn;
+    c.classList.toggle('on', turnOn);
+    c.querySelector('.chip-dot').style.background = turnOn ? 'var(--accent)' : 'var(--border2)';
+    if (turnOn) state.cambioDiscsSeleccionadas.add(fullKey);
+    else state.cambioDiscsSeleccionadas.delete(fullKey);
+  });
+  syncCambioMaster(gid);
+}
+
+function syncCambioMaster(gid) {
+  const master = document.getElementById(`cambio-master-${gid}`);
+  if (!master) return;
+  const chips = document.querySelectorAll(`#cambio-chips-${gid} .chip-disc`);
+  const allOn = [...chips].every(c => c.classList.contains('on'));
+  const anyOn = [...chips].some(c => c.classList.contains('on'));
+  master.classList.toggle('on', anyOn);
+  master.querySelector('.chip-dot').style.background = anyOn ? 'var(--accent)' : 'var(--border2)';
+  master.style.opacity = anyOn && !allOn ? '0.55' : '1';
+}
+
+function updateDisciplinas() {
+  const gid = document.getElementById('e-grupo').value;
+  const sel = document.getElementById('e-disciplina');
+  sel.innerHTML = '<option value="">Seleccionar disciplina…</option>';
+  if (!gid) return;
+  [...new Set(state.eventosCatalogo.filter(e => e.grupo_id === gid).map(e => e.disciplina_nombre))].forEach(d => sel.innerHTML += `<option value="${d}">${d}</option>`);
+}
+
+const VOBO_AREA_LABEL = {
+  'G5': 'Mobiliario', 'G6': 'Instalaciones', 'G7': 'Redes / Sistemas',
+  'G8': 'Prevención', 'G9': 'Mkt Sensorial', 'G10': 'Excelencia Operativa',
+  'G11': 'Precios Unitarios', 'G14': 'SP'
+};
+
+function updateEventos() {
+  const gid = document.getElementById('e-grupo').value;
+  const disc = document.getElementById('e-disciplina').value;
+  const sel = document.getElementById('e-evento');
+  sel.innerHTML = '<option value="">Seleccionar evento…</option>';
+  if (!gid || !disc) return;
+  state.eventosCatalogo
+    .filter(e => e.grupo_id === gid && e.disciplina_nombre === disc && e.evento_nombre !== 'Afectado por Cambio')
+    .forEach(e => {
+      const areaLabel = VOBO_AREA_LABEL[gid];
+      let label = e.evento_nombre;
+      if (label === 'Visto Bueno' && areaLabel) label = `Visto Bueno ${areaLabel}`;
+      const dir = e.direccion && e.direccion !== '[Área]' ? ' · ' + e.direccion : '';
+      sel.innerHTML += `<option value="${e.evento_nombre}">${label}${dir}</option>`;
+    });
+}
+
+async function guardarNotaCambio() {
+  const texto = document.getElementById('nc-texto').value.trim();
+  const fecha = document.getElementById('nc-fecha').value;
+  const esNota = state.entryTipo === 'nota';
+  const titulo = esNota ? document.getElementById('nc-titulo').value.trim() : '';
+  const tipoNota = esNota ? document.getElementById('nc-tipo-nota').value : '';
+
+  if (!fecha) { showToast('La fecha es requerida', 'error'); return; }
+  if (esNota && !titulo) { showToast('El título es requerido', 'error'); return; }
+  if (esNota && !tipoNota) { showToast('La clasificación es requerida', 'error'); return; }
+  if (!esNota && !texto) { showToast('El texto es requerido', 'error'); return; }
+  if (!state.currentProyecto) { showToast('Selecciona un proyecto primero', 'error'); return; }
+
+  const estadoPaneles = capturarEstadoPaneles();
+  const btn = document.getElementById('btn-guardar-nc');
+  btn.disabled = true; btn.textContent = 'Guardando…';
+
+  // Referencia a disciplina (F3)
+  const notaGrupo = esNota ? document.getElementById('nc-nota-grupo').value : '';
+  const notaDisc = esNota ? document.getElementById('nc-nota-disciplina').value : '';
+  const notaDiscKey = (notaGrupo && notaDisc) ? `${notaGrupo}::${notaDisc}` : '';
+
+  // Generar nota_id para notas (N001, N002...)
+  async function generarClaveNota() {
+    const notas = state.logEventos.filter(e => e.proyecto_id === state.currentProyecto.proyecto_id && e.tipo_entry === 'nota' && e.hito_id && e.hito_id.startsWith('N'));
+    const nums = notas.map(e => parseInt((e.hito_id || '').replace('N',''),10)).filter(n => !isNaN(n));
+    const siguiente = nums.length > 0 ? Math.max(...nums) + 1 : 1;
+    return 'N' + String(siguiente).padStart(3, '0');
+  }
+
+  try {
+    if (state.editandoCambioId) {
+      const discs = [...(state.cambioDiscsSeleccionadas || [])];
+      const hitos = getHitosAfectados(discs);
+      await api('editarCambioDetalle', {
+        entry_id: state.editandoCambioId,
+        disciplinas_afectadas: discs.join(','),
+        hitos_afectados: hitos.join(','),
+        impacto_tipo: document.getElementById('e-impacto-tipo').value,
+        origen_cambio: document.getElementById('e-origen').value,
+        alcance: texto
+      });
+      closeModal('modal-nota-cambio');
+      showToast('Cambio actualizado', 'success');
+    } else {
+      if (esNota) {
+        const claveNota = await generarClaveNota();
+        // Entry principal de la nota
+        await api('appendLogEvento', {
+          proyecto_id: state.currentProyecto.proyecto_id,
+          fecha_real: fecha,
+          disciplina_id: '',
+          hito_id: claveNota,
+          tipo_entry: 'nota',
+          nota: JSON.stringify({ titulo, tipo: tipoNota, contenido: texto, disc_ref: notaDiscKey }),
+          version_timeline_activa: '1'
+        });
+        // Si tiene referencia a disciplina — entry en log de esa disciplina
+        if (notaDiscKey) {
+          await api('appendLogEvento', {
+            proyecto_id: state.currentProyecto.proyecto_id,
+            fecha_real: fecha,
+            disciplina_id: notaDiscKey,
+            hito_id: claveNota,
+            tipo_entry: 'nota_ref',
+            nota: JSON.stringify({ titulo, tipo: tipoNota }),
+            version_timeline_activa: '1'
+          });
+        }
+        closeModal('modal-nota-cambio');
+        showToast('Nota guardada', 'success');
+      } else {
+        // Generar clave de cambio F1
+        const cambiosProyecto = state.logEventos.filter(e => e.proyecto_id === state.currentProyecto.proyecto_id && e.tipo_entry === 'cambio_registrado');
+        const nums = cambiosProyecto.map(e => {
+          const cd = (state.cambiosDetalle || []).find(c => c.entry_id === e.entry_id);
+          return parseInt((cd?.clave_cambio || '').replace('C',''), 10);
+        }).filter(n => !isNaN(n));
+        const siguiente = nums.length > 0 ? Math.max(...nums) + 1 : 1;
+        const claveCambio = 'C' + String(siguiente).padStart(3, '0');
+
+        const res = await api('appendLogEvento', {
+          proyecto_id: state.currentProyecto.proyecto_id,
+          fecha_real: fecha, disciplina_id: '', hito_id: claveCambio,
+          tipo_entry: 'cambio_registrado', nota: texto, version_timeline_activa: '1'
+        });
+        const discs = [...(state.cambioDiscsSeleccionadas || [])];
+        const hitos = getHitosAfectados(discs);
+        if (discs.length > 0 && hitos.length === 0) {
+          showToast('Sin hitos vinculados a las disciplinas — puedes editarlo después', 'success');
+        }
+        await api('appendCambioDetalle', {
+          entry_id: res.entry_id,
+          clave_cambio: claveCambio,
+          origen_cambio: document.getElementById('e-origen').value,
+          disciplinas_afectadas: discs.join(','),
+          hitos_afectados: hitos.join(','),
+          impacto_tipo: document.getElementById('e-impacto-tipo').value
+        });
+
+        // Entry 1 + Entry 2 por cada disciplina afectada
+        for (const discKey of discs) {
+          const grupoId = discKey.split('::')[0];
+          const eventoAfectado = state.eventosCatalogo.find(e =>
+            e.grupo_id === grupoId &&
+            e.evento_nombre === 'Afectado por Cambio' &&
+            (e.es_cierre === 'FALSE' || e.es_cierre === 'false' || e.es_cierre === false)
+          );
+          if (eventoAfectado) {
+            // Entry 1 — destraba estado de la disciplina
+            await api('appendLogEvento', {
+              proyecto_id: state.currentProyecto.proyecto_id,
+              fecha_real: fecha,
+              disciplina_id: discKey,
+              hito_id: `Afectado por Cambio ${claveCambio}`,
+              tipo_entry: 'evento',
+              nota: '',
+              version_timeline_activa: '1'
+            });
+          }
+          // Entry 2 — trazabilidad (siempre, con o sin evento en catálogo)
+          await api('appendLogEvento', {
+            proyecto_id: state.currentProyecto.proyecto_id,
+            fecha_real: fecha,
+            disciplina_id: discKey,
+            hito_id: res.entry_id,
+            tipo_entry: 'cambio_aplicado',
+            nota: '',
+            version_timeline_activa: '1'
+          });
+        }
+
+        closeModal('modal-nota-cambio');
+        showToast(`Cambio ${claveCambio} registrado`, 'success');
+      }
+    }
+
+    await loadAllData();
+    if (state.currentProyecto) {
+      await openProyecto(state.currentProyecto.proyecto_id);
+      restaurarEstadoPaneles(estadoPaneles);
+    }
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+  finally { btn.disabled = false; btn.textContent = 'Guardar'; }
+}
+
+async function guardarEntry() {
+  const fecha = document.getElementById('e-fecha').value;
+  const grupo = document.getElementById('e-grupo').value;
+  const disciplina = document.getElementById('e-disciplina').value;
+  const evento = document.getElementById('e-evento').value;
+  if (!fecha || !grupo || !disciplina || !evento) { showToast('Todos los campos son requeridos', 'error'); return; }
+  if (!state.currentProyecto) { showToast('Selecciona un proyecto primero', 'error'); return; }
+  const estadoPaneles = capturarEstadoPaneles();
+  const btn = document.getElementById('btn-guardar-entry');
+  btn.disabled = true; btn.textContent = 'Guardando…';
+  try {
+    await api('appendLogEvento', {
+      proyecto_id: state.currentProyecto.proyecto_id, fecha_real: fecha,
+      disciplina_id: `${grupo}::${disciplina}`, hito_id: evento,
+      tipo_entry: 'evento', nota: document.getElementById('e-nota').value, version_timeline_activa: '1'
+    });
+    closeModal('modal-entry');
+    showToast('Evento registrado', 'success');
+    const logFresco = await api('getLogEventos', { proyecto_id: state.currentProyecto.proyecto_id });
+    state.logEventos = [...state.logEventos.filter(e => e.proyecto_id !== state.currentProyecto.proyecto_id), ...(logFresco || [])];
+    await evaluarHitos(state.currentProyecto.proyecto_id, state.logEventos);
+    await loadAllData();
+    if (state.currentProyecto) {
+      await openProyecto(state.currentProyecto.proyecto_id);
+      restaurarEstadoPaneles(estadoPaneles);
+    }
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+  finally { btn.disabled = false; btn.textContent = 'Guardar Evento'; }
+}
+
+// ── EVALUACIÓN DE HITOS ──
+async function evaluarHitos(proyectoId, logOverride) {
+  const log = (logOverride || state.logEventos).filter(e => e.proyecto_id === proyectoId);
+
+  // Construir set de hitos vigentes — un hito es vigente si fue alcanzado Y no hay
+  // ningún cambio registrado DESPUÉS de su último alcance con ese hito en hitos_afectados
+  function hitoEsVigente(hitoId) {
+    const alcances = log
+      .filter(e => e.hito_id === hitoId && e.tipo_entry === 'hito_alcanzado')
+      .sort((a, b) => {
+        const ta = a.timestamp ? new Date(a.timestamp) : new Date(a.fecha_real + 'T12:00:00Z');
+        const tb = b.timestamp ? new Date(b.timestamp) : new Date(b.fecha_real + 'T12:00:00Z');
+        return ta - tb;
+      });
+    if (alcances.length === 0) return false;
+    const ultimo = alcances[alcances.length - 1];
+    const ultimoTs = ultimo.timestamp ? new Date(ultimo.timestamp) : new Date(ultimo.fecha_real + 'T12:00:00Z');
+    const logCompleto = state.logEventos;
+    const cambiosPosteriores = (state.cambiosDetalle || []).filter(cd => {
+      const hitos = cd.hitos_afectados ? cd.hitos_afectados.split(',').map(s => s.trim()) : [];
+      if (!hitos.includes(hitoId)) return false;
+      const entry = logCompleto.find(e => e.entry_id === cd.entry_id && e.proyecto_id === proyectoId);
+      if (!entry) return false;
+      const entryTs = entry.timestamp ? new Date(entry.timestamp) : new Date(entry.fecha_real + 'T12:00:00Z');
+      return entryTs > ultimoTs;
+    });
+    return cambiosPosteriores.length === 0;
+  }
+
+  const hitsAlcanzados = new Set(
+    log.filter(e => e.tipo_entry === 'hito_alcanzado').map(e => e.hito_id)
+  );
+  const nuevosHitos = [];
+
+  function tieneEvento(grupoId, disciplina, eventoNombre) {
+    const discKey = `${grupoId}::${disciplina}`;
+    return log.some(e => e.disciplina_id === discKey && e.hito_id === eventoNombre);
+  }
+  function tieneCierre(grupoId, disciplina) {
+    const cierre = state.eventosCatalogo.find(e => e.grupo_id === grupoId && e.disciplina_nombre === disciplina && (e.es_cierre === 'TRUE' || e.es_cierre === 'true' || e.es_cierre === true));
+    if (!cierre) return false;
+    return tieneEvento(grupoId, disciplina, cierre.evento_nombre);
+  }
+  function todasCierran(grupoId, disciplinas) {
+    return disciplinas.every(d => tieneCierre(grupoId, d));
+  }
+  function algunaSolicitud(grupoId, disciplinas) {
+    return disciplinas.some(d => {
+      const discKey = `${grupoId}::${d}`;
+      return log.some(e => e.disciplina_id === discKey && e.hito_id && e.hito_id.toLowerCase().includes('solicitud'));
+    });
+  }
+
+  const TRIGGERS = {
+    'H01': () => true, // auto al crear — siempre alcanzado
+    'H22': () => todasCierran('G5', ['Zonificación','Mueble de Gorras']),
+    'H23': () => todasCierran('G6', ['HVAC','Proyecto Eléctrico']),
+    'H24': () => todasCierran('G7', ['Pantallas','Antenas WiFi','Bocinas','Contador de Personas','Validación Contactos','Validación Voz y Datos','Validación Site','Validación Cámaras']),
+    'H25': () => todasCierran('G8', state.eventosCatalogo.filter(e => e.grupo_id === 'G8').map(e => e.disciplina_nombre).filter((v,i,a) => a.indexOf(v) === i)),
+    'H26': () => todasCierran('G9', ['Aromas','Validación Pantallas','Validación Bocinas']),
+    'H27': () => todasCierran('G10', ['Caminadora','Mueble de Servicios']),
+    'H28': () => todasCierran('G11', state.eventosCatalogo.filter(e => e.grupo_id === 'G11').map(e => e.disciplina_nombre).filter((v,i,a) => a.indexOf(v) === i)),
+    'H29': () => tieneCierre('G12', 'Insumos'),
+    'H30': () => hitsAlcanzados.has('H23'),
+    'H31': () => hitsAlcanzados.has('H24'),
+    'H32': () => hitsAlcanzados.has('H25'),
+    'H33': () => hitsAlcanzados.has('H26'),
+    'H34': () => ['H30','H31','H32','H33'].every(h => hitsAlcanzados.has(h)),
+    'H36': () => tieneCierre('G15', 'Proyecto Ejecutivo'),
+  };
+
+  for (const [hitoId, condicion] of Object.entries(TRIGGERS)) {
+    // Registrar si: nunca alcanzado, O alcanzado pero reabierto por cambio posterior
+    if (!hitoEsVigente(hitoId) && condicion()) {
+      nuevosHitos.push(hitoId);
+    }
+  }
+
+  for (const hitoId of nuevosHitos) {
+    await api('appendLogEvento', {
+      proyecto_id: proyectoId,
+      fecha_real: new Date().toISOString().split('T')[0],
+      disciplina_id: '', hito_id: hitoId,
+      tipo_entry: 'hito_alcanzado',
+      version_hito: calcVersionHito(log, hitoId),
+      nota: 'Alcanzado automáticamente', version_timeline_activa: '1'
+    });
+    showToast(`🎯 Hito ${hitoId} alcanzado`, 'success');
+  }
+
+  return nuevosHitos;
+}
+
+function calcVersionHito(log, hitoId) {
+  const anteriores = log.filter(e => e.hito_id === hitoId && e.tipo_entry === 'hito_alcanzado');
+  if (anteriores.length === 0) return 1; // Primera vez — siempre versión 1
+  // Versiones subsecuentes solo si hay un cambio registrado con este hito en hitos_afectados
+  const cambiosConHito = (state.cambiosDetalle || []).filter(cd => {
+    const hitos = cd.hitos_afectados ? cd.hitos_afectados.split(',').map(s => s.trim()) : [];
+    return hitos.includes(hitoId);
+  });
+  if (cambiosConHito.length === 0) return anteriores.length + 1; // fallback — no bloquea
+  return anteriores.length + 1;
+}
+
+// ── SETTINGS ──
+function openSettings() {
+    const p = state.currentProyecto;
+  if (!p) return;
+  document.getElementById('s-nombre').value = p.nombre || '';
+  document.getElementById('s-clave').value = p.clave_innovasport || '';
+  document.getElementById('s-tipo').value = p.tipo_proyecto || '';
+  document.getElementById('s-fecha').value = p.fecha_aprobacion ? p.fecha_aprobacion.toString().split('T')[0].substring(0,10) : '';
+  document.getElementById('s-notas').value = p.notas || '';
+  document.getElementById('s-estado').value = p.estado || 'Activo';
+  const bubbleOn = p.bubble_plan_aplica === true || p.bubble_plan_aplica === 'TRUE';
+  document.getElementById('toggle-settings-bubble').classList.toggle('on', bubbleOn);
+  const sel = document.getElementById('s-arquitecto');
+  sel.innerHTML = '<option value="">Sin asignar</option>';
+  state.usuarios.filter(u => u.rol === 'Arquitecto').forEach(u => sel.innerHTML += `<option value="${u.email}">${u.nombre}</option>`);
+  sel.value = p.arquitecto_id || '';
+  openModal('modal-settings');
+}
+
+function toggleSettingsBubble() {
+  const toggle = document.getElementById('toggle-settings-bubble');
+  toggle.classList.toggle('on');
+}
+
+async function guardarSettings() {
+  const nombre = document.getElementById('s-nombre').value.trim();
+  if (!nombre) { showToast('El nombre es requerido', 'error'); return; }
+  const btn = document.getElementById('btn-guardar-settings');
+  btn.disabled = true; btn.textContent = 'Guardando…';
+  try {
+    await api('actualizarProyecto', {
+      proyecto_id: state.currentProyecto.proyecto_id,
+      nombre, clave_innovasport: document.getElementById('s-clave').value,
+      tipo_proyecto: document.getElementById('s-tipo').value,
+      fecha_aprobacion: document.getElementById('s-fecha').value,
+      arquitecto_id: document.getElementById('s-arquitecto').value,
+      estado: document.getElementById('s-estado').value,
+      bubble_plan_aplica: document.getElementById('toggle-settings-bubble').classList.contains('on'),
+      notas: document.getElementById('s-notas').value
+    });
+    closeModal('modal-settings');
+    showToast('Proyecto actualizado', 'success');
+    await loadAllData();
+    const updated = state.proyectos.find(p => p.proyecto_id === state.currentProyecto.proyecto_id);
+    if (updated) { state.currentProyecto = updated; openProyecto(updated.proyecto_id); }
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+  finally { btn.disabled = false; btn.textContent = 'Guardar cambios'; }
+}
+
+async function borrarProyecto() {
+  const p = state.currentProyecto;
+  if (!p) return;
+  if (!confirm(`¿Borrar "${p.nombre}"?\n\nEsta acción no se puede deshacer.`)) return;
+  try {
+    await api('borrarProyecto', { proyecto_id: p.proyecto_id });
+    closeModal('modal-settings');
+    showToast('Proyecto borrado', 'success');
+    state.currentProyecto = null;
+    await loadAllData();
+    showView('dashboard');
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+}
+
+// ── NOTAS ──
+function renderNotas(proyecto) {
+  const notas = state.logEventos.filter(e => e.proyecto_id === proyecto.proyecto_id && (e.tipo_entry === 'nota' || e.tipo_entry === 'cambio_registrado'));
+  const notasHTML = notas.length === 0
+    ? '<div style="color:var(--text3);font-family:var(--mono);font-size:12px;padding:4px 0">Sin notas registradas.</div>'
+    : notas.sort((a,b) => new Date(b.fecha_real) - new Date(a.fecha_real)).map(n => {
+        const esCambio = n.tipo_entry === 'cambio_registrado';
+        const esPM = state.rol === 'PM';
+        // Parsear nota estructurada F3
+        let notaData = null;
+        if (n.tipo_entry === 'nota') {
+          try { notaData = JSON.parse(n.nota || '{}'); } catch(e) { notaData = null; }
+        }
+        // Buscar detalle del cambio si existe
+        const cd = esCambio ? (state.cambiosDetalle || []).find(c => c.entry_id === n.entry_id) : null;
+        const claveCambio = cd?.clave_cambio || '';
+        const discs = cd?.disciplinas_afectadas ? cd.disciplinas_afectadas.split(',').map(s => s.trim()).filter(Boolean) : [];
+        const hitos = cd?.hitos_afectados ? cd.hitos_afectados.split(',').map(s => s.trim()).filter(Boolean) : [];
+        const historial = (() => { try { return JSON.parse(cd?.historial_ediciones || '[]'); } catch(e) { return []; } })();
+        const panelId = `cambio-panel-${n.entry_id}`;
+
+        const chipsHTML = discs.length === 0
+          ? '<span style="color:var(--text3);font-family:var(--mono);font-size:11px">Sin disciplinas registradas</span>'
+          : discs.map(d => `<div class="chip-disc on readonly"><div class="chip-dot" style="background:var(--accent)"></div>${d.split('::')[1] || d}</div>`).join('');
+
+        const hitosHTML = hitos.length > 0
+          ? `<div style="margin-top:6px;font-size:11px;font-family:var(--mono);color:var(--text3)">Hitos afectados: <span style="color:var(--yellow)">${hitos.join(' · ')}</span></div>`
+          : '';
+
+        const histHTML = historial.length === 0
+          ? '<div style="color:var(--text3);font-family:var(--mono);font-size:11px">Sin ediciones previas</div>'
+          : historial.map((h, i) => {
+              // Construir descripción del diff comparando con snapshot anterior
+              const partes = [];
+              if (h.alcance && h.alcance !== (cd?.alcance || n.nota || '')) partes.push(`Alcance editado`);
+              if (h.disciplinas_afectadas !== undefined) {
+                const discAntes = h.disciplinas_afectadas ? h.disciplinas_afectadas.split(',').filter(Boolean).map(d => d.split('::')[1] || d).join(', ') : 'ninguna';
+                partes.push(`Disciplinas: ${discAntes || 'ninguna'}`);
+              }
+              if (h.hitos_afectados !== undefined) {
+                const hitosAntes = h.hitos_afectados || 'ninguno';
+                partes.push(`Hitos: ${hitosAntes || 'ninguno'}`);
+              }
+              const desc = partes.length > 0 ? partes.join(' · ') : 'Edición registrada';
+              return `
+              <div class="cambio-hist-row">
+                <div class="cambio-hist-fecha">${formatDate(h.fecha_edicion)}</div>
+                <div class="cambio-hist-diff">${desc} <span style="color:var(--text3);font-size:10px">· ${h.editado_por || '—'}</span></div>
+              </div>`;
+            }).join('');
+
+        const expandHTML = esCambio ? `
+          <button class="cambio-expand-btn" onclick="toggleCambioPanel('${panelId}')">
+            <span id="chevron-${panelId}" style="transition:transform 0.15s;display:inline-block">▶</span> ver detalle
+          </button>
+          <div class="cambio-detail-panel" id="${panelId}">
+            <div class="cambio-detail-alcance">${n.nota || '—'}</div>
+            <div class="cambio-detail-chips">${chipsHTML}</div>
+            ${hitosHTML}
+            ${esPM ? `<div style="margin-top:10px;display:flex;gap:8px">
+              <button class="btn-secondary" style="font-size:12px;padding:5px 12px" onclick="editarImpactoCambio('${n.entry_id}')">✏️ Editar impacto</button>
+              <button class="btn-danger" style="font-size:12px;padding:5px 12px" onclick="borrarCambio('${n.entry_id}')">Eliminar cambio…</button>
+            </div>` : ''}
+            <div class="cambio-detail-hist" style="margin-top:10px">
+              <div class="cambio-hist-title">Historial de ediciones</div>
+              ${histHTML}
+            </div>
+          </div>` : '';
+
+        const notaTipoAbrev = { 'Riesgo': 'RSG', 'Lección aprendida': 'LA', 'Decisión': 'DEC', 'Pendiente externo': 'PE', 'General': 'GEN' };
+        const tipoTag = notaData?.tipo ? `<span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${notaTipoAbrev[notaData.tipo] || notaData.tipo}</span>` : '';
+        const claveTag = esCambio && claveCambio ? `<span style="font-family:var(--mono);font-size:10px;color:var(--yellow);cursor:pointer" onclick="scrollToCambio('${n.entry_id}')" title="Ver detalle del cambio">⚡ ${claveCambio}</span>` : esCambio ? `<span style="color:var(--yellow);font-family:var(--mono);font-size:10px">⚡ cambio</span>` : '';
+        const tituloNota = notaData?.titulo ? `<div class="nota-titulo" style="font-weight:500;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%" title="${notaData.titulo}">${notaData.titulo}</div>` : '';
+        const textoNota = esCambio ? (cd?.alcance || n.nota || '') : (notaData?.contenido || n.nota || n.hito_id || '');
+        const claveNota = !esCambio && n.hito_id ? `<span style="font-family:var(--mono);font-size:10px;color:var(--text3);cursor:pointer" title="Ver nota">${n.hito_id}</span>` : '';
+
+        return `
+        <div class="nota-entry" data-entry-id="${n.entry_id}" data-hito-id="${n.hito_id || ''}">
+          <div class="nota-meta" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${formatDate(n.fecha_real)} · ${n.registrado_por || state.user?.name || '—'}${claveTag ? ' · ' + claveTag : ''}${tipoTag ? ' · ' + tipoTag : ''}${cd?.impacto_tipo ? ` · <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${cd.impacto_tipo}</span>` : ''}</div>
+          ${tituloNota}
+          <div class="nota-texto">${textoNota}</div>
+          ${expandHTML}
+        </div>`;
+      }).join('');
+
+  return `
+  <div class="notas-section">
+    <div class="notas-header" id="notas-toggle" onclick="toggleNotas()" >
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:10px;color:var(--text3);transition:transform 0.15s" id="notas-chevron">▶</span>
+        <span class="section-title" style="margin:0">Notas del proyecto</span>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${notas.length}</span>
+      </div>
+      <button class="btn-ghost" style="font-size:11px" onclick="event.stopPropagation();openNotaCambio()">+ Nota / Cambio</button>
+    </div>
+    <div class="notas-body" id="notas-body">
+      <div id="notas-lista">${notasHTML}</div>
+      <div class="nota-form" id="nota-form">
+        <textarea class="form-textarea" id="nota-texto-input" placeholder="Escribe la nota…" style="min-height:72px;margin-bottom:10px"></textarea>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button class="btn-secondary" style="font-size:12px" onclick="cerrarFormNota()">Cancelar</button>
+          <button class="btn-primary" id="btn-guardar-nota" style="font-size:12px" onclick="guardarNota()">Guardar nota</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function scrollToCambio(entryId) {
+  const notasBody = document.getElementById('notas-body');
+  if (notasBody && !notasBody.classList.contains('open')) {
+    document.getElementById('notas-toggle')?.click();
+  }
+  setTimeout(() => {
+    const panelId = `cambio-panel-${entryId}`;
+    const panel = document.getElementById(panelId);
+    if (panel) {
+      panel.closest('.nota-entry')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      if (!panel.classList.contains('open')) {
+        panel.classList.add('open');
+        const chevron = document.getElementById(`chevron-${panelId}`);
+        if (chevron) chevron.style.transform = 'rotate(90deg)';
+      }
+      panel.closest('.nota-entry').style.outline = '1px solid var(--yellow)';
+      setTimeout(() => { panel.closest('.nota-entry').style.outline = ''; }, 1500);
+    }
+  }, 200);
+}
+
+function scrollToNota(claveNota) {
+  const notasToggle = document.getElementById('notas-toggle');
+  const notasBody = document.getElementById('notas-body');
+  if (notasBody && !notasBody.classList.contains('open')) {
+    notasToggle?.click();
+  }
+  setTimeout(() => {
+    const el = document.querySelector(`.nota-entry[data-hito-id="${claveNota}"]`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.style.outline = '1px solid var(--accent)';
+      setTimeout(() => { el.style.outline = ''; }, 1500);
+    }
+  }, 250);
+}
+
+
+function toggleCambioPanel(panelId) {
+  const panel = document.getElementById(panelId);
+  const chevron = document.getElementById(`chevron-${panelId}`);
+  if (!panel) return;
+  panel.classList.toggle('open');
+  if (chevron) chevron.style.transform = panel.classList.contains('open') ? 'rotate(90deg)' : '';
+}
+
+function borrarCambio(entryId) {
+  state.borrandoCambioId = entryId;
+  document.getElementById('borrar-cambio-motivo').value = '';
+  openModal('modal-borrar-cambio');
+}
+
+async function confirmarBorrarCambio() {
+  const motivo = document.getElementById('borrar-cambio-motivo').value.trim();
+  if (!motivo) { showToast('El motivo es requerido', 'error'); return; }
+  const entryId = state.borrandoCambioId;
+  if (!entryId) return;
+  const btn = document.getElementById('btn-confirmar-borrar-cambio');
+  btn.disabled = true; btn.textContent = 'Eliminando…';
+  const estadoPaneles = capturarEstadoPaneles();
+  try {
+    await api('borrarCambio', { entry_id: entryId, motivo, usuario: state.user?.email || '' });
+    state.logEventos = state.logEventos.filter(e => e.entry_id !== entryId);
+    state.cambiosDetalle = (state.cambiosDetalle || []).filter(c => c.entry_id !== entryId);
+    closeModal('modal-borrar-cambio');
+    showToast('Cambio eliminado', 'success');
+    if (state.currentProyecto) {
+      await openProyecto(state.currentProyecto.proyecto_id);
+      restaurarEstadoPaneles(estadoPaneles);
+    }
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+  finally { btn.disabled = false; btn.textContent = 'Eliminar cambio'; }
+}
+
+function editarImpactoCambio(entryId) {
+  const n = state.logEventos.find(e => e.entry_id === entryId);
+  const cd = (state.cambiosDetalle || []).find(c => c.entry_id === entryId);
+  if (!n) return;
+  openNotaCambio(true, {
+    entry_id: entryId,
+    fecha: n.fecha_real,
+    texto: cd?.alcance || n.nota || '',
+    impacto_tipo: cd?.impacto_tipo || '',
+    origen: cd?.origen_cambio || '',
+    disciplinas_afectadas: cd?.disciplinas_afectadas || ''
+  });
+}
+
+function toggleTimeline() {
+  document.getElementById('timeline-toggle').classList.toggle('open');
+  document.getElementById('timeline-body').classList.toggle('open');
+  const ch = document.getElementById('timeline-chevron');
+  ch.style.transform = document.getElementById('timeline-body').classList.contains('open') ? 'rotate(90deg)' : '';
+}
+function toggleNotas() {
+  document.getElementById('notas-toggle').classList.toggle('open');
+  document.getElementById('notas-body').classList.toggle('open');
+  const ch = document.getElementById('notas-chevron');
+  ch.style.transform = document.getElementById('notas-body').classList.contains('open') ? 'rotate(90deg)' : '';
+}
+
+// ── CRITERIOS ──
+function renderCriteriosList() {
+  const container = document.getElementById('criterios-list');
+  const lista = state.criterios.filter(c => c.estado !== 'obsoleto');
+  if (lista.length === 0) { container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📌</div>Sin criterios registrados.</div>`; return; }
+  container.innerHTML = lista.map(c => {
+    let confirmado = false;
+    try { confirmado = state.user && JSON.parse(c.confirmaciones || '{}')[state.user.email]; } catch(e) {}
+    const esPM = state.rol === 'PM';
+    return `
+    <div class="criterio-card ${c.estado}">
+      <div class="criterio-concepto">${c.concepto || 'General'}${c.proyecto_detonador ? ' · ' + c.proyecto_detonador : ''}</div>
+      <div class="criterio-desc">${c.descripcion}</div>
+      <div class="criterio-meta">Registrado por ${c.registrado_por} · ${formatDate(c.fecha_registro)}
+        ${c.estado === 'vigente' ? ` · Aprobado ${formatDate(c.fecha_aprobacion)}` : ''}
+        ${c.estado === 'vigente' && confirmado ? ' · <span style="color:var(--green)">✓ Leído</span>' : ''}
+        ${c.estado === 'pendiente_vobo' ? ' · <span style="color:var(--yellow)">Pendiente VoBo PM</span>' : ''}
+      </div>
+      <div class="criterio-actions">
+        ${c.estado === 'pendiente_vobo' && esPM ? `
+        <button class="btn-primary" style="font-size:12px" onclick="aprobarCriterio('${c.criterio_id}')">Aprobar</button>
+        <button class="btn-secondary" style="font-size:12px;border-color:var(--red);color:var(--red)" onclick="rechazarCriterio('${c.criterio_id}')">Rechazar</button>` : ''}
+        ${c.estado === 'vigente' && !confirmado ? `<button class="btn-secondary" style="font-size:12px" onclick="confirmarLectura('${c.criterio_id}')">Confirmar lectura</button>` : ''}
+        ${c.estado === 'vigente' && esPM ? `<button class="btn-ghost" style="color:var(--text3);font-size:12px" onclick="obsoletarCriterio('${c.criterio_id}')">Obsoletizar</button>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openNuevoCriterio() {
+  document.getElementById('c-descripcion').value = '';
+  document.getElementById('c-concepto').value = '';
+  const sel = document.getElementById('c-proyecto');
+  sel.innerHTML = '<option value="">Ninguno / General</option>';
+  state.proyectos.forEach(p => sel.innerHTML += `<option value="${p.proyecto_id}">${p.nombre}</option>`);
+  openModal('modal-criterio');
+}
+
+async function guardarCriterio() {
+  const desc = document.getElementById('c-descripcion').value.trim();
+  if (!desc) { showToast('La descripción es requerida', 'error'); return; }
+  const btn = document.getElementById('btn-guardar-criterio');
+  btn.disabled = true; btn.textContent = 'Guardando…';
+  try {
+    await api('crearCriterio', { concepto: document.getElementById('c-concepto').value, descripcion: desc, proyecto_detonador: document.getElementById('c-proyecto').value });
+    closeModal('modal-criterio');
+    showToast('Criterio propuesto — pendiente VoBo PM', 'success');
+    await loadAllData(); renderCriteriosList();
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+  finally { btn.disabled = false; btn.textContent = 'Proponer Criterio'; }
+}
+
+async function aprobarCriterio(id) {
+  try { await api('aprobarCriterio', { criterio_id: id }); showToast('Criterio aprobado', 'success'); await loadAllData(); renderCriteriosList(); renderCriteriosBanner(); }
+  catch(e) { showToast('Error: ' + e.message, 'error'); }
+}
+async function confirmarLectura(id) {
+  try { await api('confirmarLecturaCriterio', { criterio_id: id }); showToast('Lectura confirmada', 'success'); await loadAllData(); renderCriteriosList(); renderCriteriosBanner(); }
+  catch(e) { showToast('Error: ' + e.message, 'error'); }
+}
+async function rechazarCriterio(id) {
+  if (!confirm('¿Rechazar este criterio? Se marcará como obsoleto.')) return;
+  try {
+    await api('obsoletarCriterio', { criterio_id: id });
+    showToast('Criterio rechazado', 'success');
+    await loadAllData();
+    renderCriteriosList();
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+}
+
+async function obsoletarCriterio(id) {
+  if (!confirm('¿Marcar este criterio como obsoleto?')) return;
+  try { await api('obsoletarCriterio', { criterio_id: id }); showToast('Criterio obsoletado', 'success'); await loadAllData(); renderCriteriosList(); }
+  catch(e) { showToast('Error: ' + e.message, 'error'); }
+}
+
+// ── TIMELINE / FECHAS ──
+const HITOS_TIMELINE = [
+  { id:'H01',  nombre:'Aprobación de nuevo proyecto',                    offset:0  },
+  { id:'H02',  nombre:'Solicitud Requerimientos Comercial + Operaciones', offset:1  },
+  { id:'H0A',  nombre:'Recepción de info para Bubble Plan',              offset:null },
+  { id:'H0B',  nombre:'Envío de Bubble Plan a Control de Proyectos',     offset:null },
+  { id:'H03',  nombre:'Asignación de arquitecto',                        offset:5  },
+  { id:'H04',  nombre:'Recepción info preliminar',                       offset:8  },
+  { id:'H05',  nombre:'Envío Reporte de Levantamiento',                  offset:10 },
+  { id:'H06',  nombre:'Día 1 de Diseño',                                 offset:10 },
+  { id:'H07',  nombre:'Requerimientos Comercial + Operaciones cerrados', offset:5   },
+  { id:'H08',  nombre:'Validaciones cerradas',                           offset:3  },
+  { id:'H09',  nombre:'VoBo Layout — Dirección',                         offset:14 },
+  { id:'H10',  nombre:'VoBo Fachada',                                    offset:14 },
+  { id:'H11',  nombre:'Liberación de Layout',                            offset:20 },
+  { id:'H12',  nombre:'Solicitud Proyecto Arquitectónico',               offset:15 },
+  { id:'H13',  nombre:'Recepción P. Arq. (planos + catálogo)',           offset:25 },
+  { id:'H14',  nombre:'Envío comentarios post-revisión P. Arq.',         offset:27 },
+  { id:'H15',  nombre:'Entrega preliminar P. Ejecutivo',                 offset:28 },
+  { id:'H16',  nombre:'Solicitud Etapa 1 — Zonificación',               offset:15 },
+  { id:'H17',  nombre:'Solicitud Etapa 2 — HVAC + Eléctrico',           offset:18 },
+  { id:'H18',  nombre:'Solicitud Etapa 3 — Pantallas, Cámaras, Aromas', offset:19 },
+  { id:'H19',  nombre:'Solicitud Etapa 4 — Redes, Prevención',          offset:19 },
+  { id:'H20',  nombre:'Solicitud Etapa 5 — Señalética, Insumos',        offset:20 },
+  { id:'H21',  nombre:'Solicitud Etapa 6 — Validaciones dependientes',  offset:21 },
+  { id:'H22',  nombre:'Cierre Mobiliario',                               offset:20 },
+  { id:'H23',  nombre:'Cierre Instalaciones',                            offset:33 },
+  { id:'H24',  nombre:'Cierre Redes / Sistemas',                         offset:24 },
+  { id:'H25',  nombre:'Cierre Prevención',                               offset:24 },
+  { id:'H26',  nombre:'Cierre Marketing Sensorial',                      offset:26 },
+  { id:'H27',  nombre:'Cierre Excelencia Operativa',                     offset:25 },
+  { id:'H28',  nombre:'Cierre Precios Unitarios',                        offset:24 },
+  { id:'H29',  nombre:'Cierre Control de Proyectos — Insumos',          offset:25 },
+  { id:'H30',  nombre:'Cruce Instalaciones cerrado',                     offset:33 },
+  { id:'H31',  nombre:'Cruce Redes / Sistemas cerrado',                  offset:24 },
+  { id:'H32',  nombre:'Cruce Prevención cerrado',                        offset:24 },
+  { id:'H33',  nombre:'Cruce Marketing Sensorial cerrado',               offset:26 },
+  { id:'H34',  nombre:'Cruce General cerrado',                           offset:34 },
+  { id:'H35',  nombre:'Recepción P. Arq. corregido',                     offset:38 },
+  { id:'H36',  nombre:'Entrega Proyecto Ejecutivo',                      offset:43 },
+];
+
+function renderTimeline(proyecto) {
+  if (!proyecto.fecha_aprobacion) return '<div style="color:var(--text3);font-family:var(--mono);font-size:12px;padding:12px 0">Sin fecha de aprobación — no se puede calcular el timeline.</div>';
+  const base = parseISODate(proyecto.fecha_aprobacion);
+  if (!base) return '';
+  const hoy = new Date();
+  const log = state.logEventos.filter(e => e.proyecto_id === proyecto.proyecto_id);
+
+  const rows = HITOS_TIMELINE.map(h => {
+    const fechaEsperada = h.offset !== null ? addBusinessDays(base, h.offset) : null;
+    const completado = log.some(e => e.hito_id === h.id && e.tipo_entry === 'hito_alcanzado');
+    const retrasado = !completado && fechaEsperada && fechaEsperada < hoy;
+    const enRiesgo = !completado && !retrasado && fechaEsperada && (fechaEsperada - hoy) < 7 * 24 * 60 * 60 * 1000;
+    const estadoLabel = completado ? 'completado' : retrasado ? 'retrasado' : enRiesgo ? 'en riesgo' : 'pendiente';
+    const estadoClass = completado ? 'completado' : retrasado ? 'retrasado' : enRiesgo ? 'en-riesgo' : 'pendiente';
+    return `
+    <div class="timeline-row">
+      <div class="timeline-hito-id">${h.id}</div>
+      <div class="timeline-hito-nombre">${h.nombre}</div>
+      <div class="timeline-fecha">${fechaEsperada ? formatDate(fechaEsperada) : '<span style="color:var(--text3)">variable</span>'}</div>
+      <div class="timeline-estado ${estadoClass}">${estadoLabel}</div>
+    </div>`;
+  }).join('');
+
+return `
+  <div class="timeline-section">
+    <div class="timeline-header" id="timeline-toggle" onclick="toggleTimeline()">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:10px;color:var(--text3);transition:transform 0.15s" id="timeline-chevron">▶</span>
+        <span class="section-title" style="margin:0">Hitos del Proyecto</span>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${HITOS_TIMELINE.length}</span>
+      </div>
+    </div>
+    <div class="timeline-body" id="timeline-body">
+    <div>
+      <div class="timeline-row header">
+        <div class="col-header">Hito</div>
+        <div class="col-header">Descripción</div>
+        <div class="col-header">Fecha esperada</div>
+        <div class="col-header">Estado</div>
+      </div>
+      ${rows}
+    </div>
+    </div>
+  </div>`;
+}
+function calcFechaEntrega(fechaAprobacion) {
+  if (!fechaAprobacion) return '—';
+  try {
+    const dt = parseISODate(fechaAprobacion);
+    if (!dt) return '—';
+    return formatDate(addBusinessDays(dt, 43));
+  } catch(e) { return '—'; }
+}
+
+function calcRiesgo(proyecto) {
+  if (!proyecto.fecha_aprobacion) return { nivel: 'gray', label: 'Sin fecha' };
+  const dt = parseISODate(proyecto.fecha_aprobacion);
+  if (!dt) return { nivel: 'gray', label: 'Sin fecha' };
+  const hoy = new Date();
+  const fechaEntrega = addBusinessDays(dt, 43);
+  const dias = Math.round((fechaEntrega - hoy) / (1000*60*60*24));
+  if (dias < 0) return { nivel: 'red', label: Math.abs(dias) + 'd vencido' };
+  if (dias < 7) return { nivel: 'yellow', label: dias + 'd' };
+  return { nivel: 'green', label: dias + 'd' };
+}
+
+function addBusinessDays(startDate, days) {
+  const date = new Date(startDate);
+  let added = 0;
+  while (added < days) { date.setDate(date.getDate() + 1); if (date.getDay() !== 0 && date.getDay() !== 6) added++; }
+  return date;
+}
+
+// ── HELPERS ──
+function getGruposUnicos() {
+  const grupos = []; const seen = new Set();
+  state.eventosCatalogo.forEach(e => { if (!seen.has(e.grupo_id)) { seen.add(e.grupo_id); grupos.push({ grupo_id: e.grupo_id, grupo_nombre: e.grupo_nombre }); } });
+  return grupos;
+}
+function getDisciplinasGrupo(gid) { return [...new Set(state.eventosCatalogo.filter(e => e.grupo_id === gid).map(e => e.disciplina_nombre))]; }
+function isDisciplinaCompleta(disciplina, grupoId, log) {
+  const cierre = state.eventosCatalogo.find(e => e.grupo_id === grupoId && e.disciplina_nombre === disciplina && (e.es_cierre === 'TRUE' || e.es_cierre === 'true' || e.es_cierre === true));
+  if (!cierre) return false;
+  const discKey = `${grupoId}::${disciplina}`;
+  const eventos = log
+    .filter(e => e.disciplina_id === discKey && e.tipo_entry === 'evento')
+    .sort((a, b) => {
+      const ta = a.timestamp ? new Date(a.timestamp) : new Date(a.fecha_real + 'T12:00:00Z');
+      const tb = b.timestamp ? new Date(b.timestamp) : new Date(b.fecha_real + 'T12:00:00Z');
+      return ta - tb;
+    });
+  if (eventos.length === 0) return false;
+  const ultimo = eventos[eventos.length - 1];
+  return ultimo.hito_id === cierre.evento_nombre;
+}
+
+// ── ESTADO DE PANELES ──
+function capturarEstadoPaneles() {
+  return {
+    timelineOpen: document.getElementById('timeline-body')?.classList.contains('open') || false,
+    notasOpen: document.getElementById('notas-body')?.classList.contains('open') || false,
+    gruposOpen: [...document.querySelectorAll('.group-row.open')].map(el => el.id),
+    logPanelsOpen: [...document.querySelectorAll('.log-panel.open')].map(el => el.id),
+    cambioPanelsOpen: [...document.querySelectorAll('.cambio-detail-panel.open')].map(el => el.id),
+    scrollY: window.scrollY
+  };
+}
+
+function restaurarEstadoPaneles(estado) {
+  if (!estado) return;
+  setTimeout(() => {
+    if (estado.timelineOpen) {
+      document.getElementById('timeline-toggle')?.classList.add('open');
+      document.getElementById('timeline-body')?.classList.add('open');
+      const ch = document.getElementById('timeline-chevron');
+      if (ch) ch.style.transform = 'rotate(90deg)';
+    }
+    if (estado.notasOpen) {
+      document.getElementById('notas-toggle')?.classList.add('open');
+      document.getElementById('notas-body')?.classList.add('open');
+      const ch = document.getElementById('notas-chevron');
+      if (ch) ch.style.transform = 'rotate(90deg)';
+    }
+    estado.gruposOpen.forEach(id => {
+      document.getElementById(id)?.classList.add('open');
+    });
+    estado.logPanelsOpen.forEach(id => {
+      document.getElementById(id)?.classList.add('open');
+    });
+    estado.cambioPanelsOpen.forEach(id => {
+      const panel = document.getElementById(id);
+      if (panel) {
+        panel.classList.add('open');
+        const chevron = document.getElementById(`chevron-${id}`);
+        if (chevron) chevron.style.transform = 'rotate(90deg)';
+      }
+    });
+    window.scrollTo({ top: estado.scrollY, behavior: 'instant' });
+  }, 80);
+}
+
+// ── UI ──
+function showView(viewName) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(`view-${viewName}`)?.classList.add('active');
+  document.getElementById(`nav-${viewName}`)?.classList.add('active');
+  if (viewName === 'criterios') renderCriteriosList();
+}
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function parseISODate(d) {
+  // Maneja YYYY-MM-DD, Date objects, y strings largos tipo "Tue May 05 2026..."
+  if (!d) return null;
+  if (d instanceof Date) return isNaN(d) ? null : d;
+  const s = d.toString().trim();
+  // Formato YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return new Date(s + 'T12:00:00');
+  // Cualquier otro string — intentar parsear directamente
+  const dt = new Date(s);
+  return isNaN(dt) ? null : dt;
+}
+function formatDate(d) {
+  if (!d) return '—';
+  const dt = parseISODate(d);
+  if (!dt) return '—';
+  const m = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  return `${dt.getDate()} ${m[dt.getMonth()]} ${dt.getFullYear()}`;
+}
+function showToast(msg, type = 'success') {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.className = `show ${type}`;
+  setTimeout(() => el.className = '', 3500);
+}
+document.querySelectorAll('.modal-overlay').forEach(o => o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); }));
+</script>
+<script src="https://accounts.google.com/gsi/client" onload="initGoogleAPI()"></script>
+</body>
+</html>
