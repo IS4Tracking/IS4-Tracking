@@ -925,7 +925,7 @@ function renderDisciplina(proyecto, grupo, disciplina, log) {
   const estadoLabel = completa ? 'completado' : afectado ? 'afectado' : eventos.length > 0 ? 'en proceso' : 'pendiente';
   const vobos = contarVoBos(disciplina, grupo.grupo_id, log);
   const voboBadgeClass = vobos === 0 ? '' : vobos === 1 ? 'v1' : vobos === 2 ? 'v2' : vobos === 3 ? 'v3' : vobos === 4 ? 'v4' : 'v5plus';
-  const voboLabel = vobos === 1 ? '1 visto bueno' : vobos > 1 ? `${vobos} vistos buenos` : '';
+  const voboLabel = vobos === 1 ? '1 Vo.Bo.' : vobos > 1 ? `${vobos} Vo.Bo.` : '';
   const voboHTML = vobos > 0 ? `<div class="vobo-badge ${voboBadgeClass}" title="${vobos === 1 ? 'Sin retrabajo' : vobos - 1 + ' retrabajo(s)'}">${voboLabel}</div>` : `<div></div>`;
   return `
   <div>
