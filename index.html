@@ -821,10 +821,18 @@ async function openProyectoEnHito(proyectoId, hitoId) {
         }
       }
     });
+    // Expandir log panels de disciplinas bloqueantes
+    disciplinas.forEach(({ g, d }) => {
+      const safeId = `${proyectoId}_${g}_${d}`.replace(/[^a-zA-Z0-9_]/g, '_');
+      const logPanel = document.getElementById(`log_${safeId}`);
+      if (logPanel && !logPanel.classList.contains('open')) {
+        logPanel.classList.add('open');
+      }
+    });
     // Scroll a la primera disciplina bloqueante
     const { g, d } = disciplinas[0];
     const safeId = `${proyectoId}_${g}_${d}`.replace(/[^a-zA-Z0-9_]/g, '_');
-    const discEl = document.getElementById(`log_${safeId}`)?.closest('.disciplina-row') || 
+    const discEl = document.getElementById(`log_${safeId}`)?.closest('[onclick]') ||
                    document.getElementById(`log_${safeId}`);
     if (discEl) {
       discEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
