@@ -621,7 +621,9 @@ async function completeSignIn() {
   document.getElementById('user-name-display').textContent = state.user.name.split(' ')[0];
   document.getElementById('user-role-display').textContent = state.rol;
   if (state.rol !== 'PM') document.getElementById('btn-nuevo-proyecto').style.display = 'none';
-  document.getElementById('login-screen').style.display = 'none';
+  const loginEl = document.getElementById('login-screen');
+  loginEl.classList.remove('restoring');
+  loginEl.style.display = 'none';
   document.getElementById('app').style.display = 'flex';
   document.getElementById('dashboard-date').textContent = new Date().toLocaleDateString('es-MX', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
   sessionStorage.setItem('is4_user', JSON.stringify(state.user));
