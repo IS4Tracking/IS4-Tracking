@@ -174,12 +174,12 @@
   /* LOG PANEL */
   .log-panel { display:none; background:var(--bg); border-top:1px solid var(--border); padding:16px 16px 16px 52px; }
   .log-panel.open { display:block; }
-  .log-entry { display:grid; grid-template-columns:100px 180px 1fr; gap:12px; align-items:start; padding:8px 0; border-bottom:1px solid var(--border); font-size:12px; min-width:0; }
+  .log-entry { display:flex; gap:12px; align-items:start; padding:8px 0; border-bottom:1px solid var(--border); font-size:12px; min-width:0; overflow:hidden; }
   .log-entry:last-child { border-bottom:none; }
-  .log-fecha { font-family:var(--mono); color:var(--text3); }
-  .log-evento { color:var(--text); font-weight:500; }
-  .log-nota { color:var(--text3); font-style:italic; }
-  .log-tipo { font-family:var(--mono); font-size:10px; color:var(--text3); background:var(--surface2); padding:1px 5px; border-radius:2px; text-align:right; }
+  .log-fecha { font-family:var(--mono); color:var(--text3); flex-shrink:0; min-width:100px; }
+  .log-tipo { font-family:var(--mono); font-size:10px; color:var(--text3); background:var(--surface2); padding:1px 5px; border-radius:2px; flex-shrink:0; }
+  .log-evento { color:var(--text); font-weight:500; flex:1; min-width:0; overflow:hidden; }
+  .log-nota { color:var(--text3); font-style:italic; flex-shrink:0; max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .log-empty { color:var(--text3); font-size:12px; font-family:var(--mono); padding:8px 0; }
   .log-entry-wrap { position:relative; }
   .log-entry-wrap:hover .btn-borrar-entry { opacity:1; }
@@ -325,6 +325,44 @@
   #toast.show { transform:translateY(0); opacity:1; }
   #toast.success { border-left:3px solid var(--green); }
   #toast.error { border-left:3px solid var(--red); }
+
+  /* FAB — BÚSQUEDA Y COLAPSAR */
+  #fab-buscar {
+    position:fixed; bottom:28px; right:28px; z-index:150;
+    width:44px; height:44px; border-radius:50%;
+    background:var(--surface); border:1px solid var(--border2);
+    color:var(--text2); font-size:18px; cursor:pointer;
+    display:none; align-items:center; justify-content:center;
+    box-shadow:0 4px 16px rgba(0,0,0,0.4);
+    transition:all 0.15s; user-select:none;
+  }
+  #fab-buscar.visible { display:flex; }
+  #fab-buscar:hover { background:var(--surface2); color:var(--text); }
+  #fab-buscar.activo { background:var(--accent); border-color:var(--accent); color:#000; }
+
+  #panel-busqueda {
+    position:fixed; bottom:84px; right:28px; z-index:149;
+    width:340px; background:var(--surface); border:1px solid var(--border2);
+    border-radius:var(--radius); box-shadow:0 8px 32px rgba(0,0,0,0.5);
+    display:none; flex-direction:column; overflow:hidden;
+  }
+  #panel-busqueda.open { display:flex; }
+  #busqueda-input {
+    background:var(--bg); border:none; border-bottom:1px solid var(--border);
+    color:var(--text); padding:12px 16px; font-family:var(--sans); font-size:13px;
+    outline:none; width:100%; box-sizing:border-box;
+  }
+  #busqueda-resultados { max-height:320px; overflow-y:auto; }
+  .busqueda-grupo { font-family:var(--mono); font-size:10px; color:var(--text3);
+    padding:8px 16px 4px; letter-spacing:0.5px; text-transform:uppercase; }
+  .busqueda-item { padding:8px 16px; font-size:13px; cursor:pointer;
+    transition:background 0.1s; display:flex; align-items:center; gap:8px; }
+  .busqueda-item:hover { background:var(--surface2); }
+  .busqueda-item-tipo { font-family:var(--mono); font-size:10px; color:var(--text3);
+    background:var(--surface2); padding:1px 5px; border-radius:2px; flex-shrink:0; }
+  #busqueda-empty { padding:16px; font-size:12px; color:var(--text3);
+    font-family:var(--mono); text-align:center; }
+
 </style>
 </head>
 <body>
@@ -875,6 +913,7 @@ function renderScoreboard(proyectoId, inline = false) {
 
 // ── PROYECTO DETAIL ──
 async function openProyecto(proyectoId) {
+  document.getElementById('fab-buscar')?.classList.add('visible');
   const p = state.proyectos.find(x => x.proyecto_id === proyectoId);
   if (!p) return;
   state.currentProyecto = p;
@@ -886,6 +925,21 @@ async function openProyecto(proyectoId) {
   document.getElementById('detail-notas').innerHTML = renderNotas(p);
   showView('proyecto-detail');
   await evaluarHitos(proyectoId);
+}
+
+function showView(view) {
+  const fab = document.getElementById('fab-buscar');
+  if (fab) {
+    if (view === 'proyecto-detail') fab.classList.add('visible');
+    else { fab.classList.remove('visible'); cerrarBusqueda(); }
+  }
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  const el = document.getElementById('view-' + view);
+  if (el) el.classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  const navMap = { 'dashboard': 'nav-dashboard', 'criterios': 'nav-criterios' };
+  if (navMap[view]) document.getElementById(navMap[view])?.classList.add('active');
+  if (view === 'criterios') renderCriteriosList();
 }
 
 function renderGroups(proyecto) {
@@ -1898,7 +1952,7 @@ function renderNotas(proyecto) {
             <span id="chevron-${panelId}" style="transition:transform 0.15s;display:inline-block">▶</span> ver detalle
           </button>
           <div class="cambio-detail-panel" id="${panelId}">
-            <div class="cambio-detail-alcance">${n.nota || '—'}</div>
+            <div class="cambio-detail-alcance">${cd?.alcance || n.nota || '—'}</div>
             <div class="cambio-detail-chips">${chipsHTML}</div>
             ${hitosHTML}
             ${esPM ? `<div style="margin-top:10px;display:flex;gap:8px">
@@ -1909,6 +1963,14 @@ function renderNotas(proyecto) {
               <div class="cambio-hist-title">Historial de ediciones</div>
               ${histHTML}
             </div>
+          </div>`
+        : textoNota ? `
+          <button class="cambio-expand-btn" onclick="toggleCambioPanel('${panelId}')">
+            <span id="chevron-${panelId}" style="transition:transform 0.15s;display:inline-block">▶</span> ver detalle
+          </button>
+          <div class="cambio-detail-panel" id="${panelId}">
+            <div class="cambio-detail-alcance">${textoNota}</div>
+            ${notaData?.referencia_disciplina ? `<div style="margin-top:6px;font-family:var(--mono);font-size:11px;color:var(--text3)">Ref: ${notaData.referencia_disciplina}</div>` : ''}
           </div>` : '';
 
         const notaTipoAbrev = { 'Riesgo': 'RSG', 'Lección aprendida': 'LA', 'Decisión': 'DEC', 'Pendiente externo': 'PE', 'General': 'GEN' };
@@ -1926,7 +1988,6 @@ function renderNotas(proyecto) {
         <div class="nota-entry" data-entry-id="${n.entry_id}" data-hito-id="${n.hito_id || ''}">
           <div class="nota-meta" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${formatDate(n.fecha_real)} · ${n.registrado_por || state.user?.name || '—'}${claveTag ? ' · ' + claveTag : ''}${tipoTag ? ' · ' + tipoTag : ''}${cd?.impacto_tipo ? ` · <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${cd.impacto_tipo}</span>` : ''}</div>
           ${tituloNota}
-          <div class="nota-texto">${textoNota}</div>
           ${expandHTML}
         </div>`;
       }).join('');
@@ -2016,7 +2077,7 @@ async function confirmarBorrarCambio() {
   btn.disabled = true; btn.textContent = 'Eliminando…';
   const estadoPaneles = capturarEstadoPaneles();
   try {
-    await api('borrarCambio', { entry_id: entryId, motivo, usuario: state.user?.email || '' });
+    await api('borrarCambio', { entry_id: entryId, motivo, usuario: state.user?.email || '', proyecto_id: state.currentProyecto?.proyecto_id || '' });
     state.logEventos = state.logEventos.filter(e => e.entry_id !== entryId);
     state.cambiosDetalle = (state.cambiosDetalle || []).filter(c => c.entry_id !== entryId);
     closeModal('modal-borrar-cambio');
@@ -2406,13 +2467,6 @@ function restaurarEstadoPaneles(estado) {
 }
 
 // ── UI ──
-function showView(viewName) {
-  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById(`view-${viewName}`)?.classList.add('active');
-  document.getElementById(`nav-${viewName}`)?.classList.add('active');
-  if (viewName === 'criterios') renderCriteriosList();
-}
 function openModal(id) { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 function parseISODate(d) {
@@ -2441,5 +2495,18 @@ function showToast(msg, type = 'success') {
 document.querySelectorAll('.modal-overlay').forEach(o => o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); }));
 </script>
 <script src="https://accounts.google.com/gsi/client" onload="initGoogleAPI()"></script>
+
+<!-- FAB BÚSQUEDA -->
+<button id="fab-buscar" title="Buscar (1 click) · Colapsar todo (2 clicks)" onclick="handleFabClick()">
+  <svg id="fab-icon-search" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+  <svg id="fab-icon-collapse" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="10" y1="14" x2="21" y2="3"/><line x1="3" y1="21" x2="14" y2="10"/></svg>
+</button>
+
+<!-- PANEL BÚSQUEDA -->
+<div id="panel-busqueda">
+  <input id="busqueda-input" placeholder="Buscar grupos, disciplinas, cambios, notas…" oninput="ejecutarBusqueda(this.value)" onkeydown="if(event.key==='Escape'){cerrarBusqueda();}">
+  <div id="busqueda-resultados"></div>
+</div>
+
 </body>
 </html>
