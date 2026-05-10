@@ -174,7 +174,7 @@
   /* LOG PANEL */
   .log-panel { display:none; background:var(--bg); border-top:1px solid var(--border); padding:16px 16px 16px 52px; }
   .log-panel.open { display:block; }
-  .log-entry { display:grid; grid-template-columns:100px 180px 1fr; gap:12px; align-items:start; padding:8px 0; border-bottom:1px solid var(--border); font-size:12px; }
+  .log-entry { display:grid; grid-template-columns:100px 180px 1fr; gap:12px; align-items:start; padding:8px 0; border-bottom:1px solid var(--border); font-size:12px; min-width:0; }
   .log-entry:last-child { border-bottom:none; }
   .log-fecha { font-family:var(--mono); color:var(--text3); }
   .log-evento { color:var(--text); font-weight:500; }
@@ -194,7 +194,7 @@
   .timeline-body { display:none; }
   .timeline-body.open { display:block; }
   .timeline-table { width:100%; border-collapse:collapse; }
-  .timeline-row { display:grid; grid-template-columns:80px 1fr 130px 90px; gap:12px; align-items:center; padding:9px 16px; border-bottom:1px solid var(--border); font-size:13px; }
+  .timeline-row { display:grid; grid-template-columns:80px 1fr 130px 150px 90px; gap:12px; align-items:center; padding:9px 16px; border-bottom:1px solid var(--border); font-size:13px; }
   .timeline-row:last-child { border-bottom:none; }
   .timeline-row.header { background:var(--surface2); border-radius:var(--radius) var(--radius) 0 0; border:1px solid var(--border); border-bottom:1px solid var(--border); }
   .timeline-row:not(.header) { background:var(--surface); border-left:1px solid var(--border); border-right:1px solid var(--border); }
@@ -488,6 +488,7 @@
       </div>
       <!-- Campos solo para CAMBIO -->
       <div id="cambio-fields" style="display:none">
+        <div class="form-group"><label class="form-label">Título <span style="color:var(--accent)">*</span></label><input class="form-input" id="nc-cambio-titulo" placeholder="Título corto del cambio…" maxlength="80"></div>
         <div class="form-row">
           <div class="form-group"><label class="form-label">Tipo de cambio</label>
             <select class="form-select" id="e-impacto-tipo"><option value="">Seleccionar…</option><option>Cambio Menor</option><option>Cambio Arquitectónico</option><option>Cambio de Ingenierías</option><option>Cambio Mayor</option></select>
@@ -503,7 +504,7 @@
       </div>
       <!-- Campos comunes -->
       <div class="form-group"><label class="form-label">Fecha</label><input class="form-input" id="nc-fecha" type="date"></div>
-      <div class="form-group"><label class="form-label" id="nc-texto-label">Texto</label><textarea class="form-textarea" id="nc-texto" placeholder="Escribe la nota o descripción del cambio…" style="min-height:80px"></textarea></div>
+      <div class="form-group"><label class="form-label" id="nc-texto-label">Descripción</label><textarea class="form-textarea" id="nc-texto" placeholder="Escribe la nota o descripción del cambio…" style="min-height:80px"></textarea></div>
     </div>
     <div class="modal-footer">
       <button class="btn-secondary" onclick="closeModal('modal-nota-cambio')">Cancelar</button>
@@ -598,7 +599,7 @@ let state = {
   currentProyecto: null, entryTipo: 'nota',
   bubblePlan: false, disciplinasSeleccionadas: new Set(),
   cambioDiscsSeleccionadas: new Set(), editandoCambioId: null,
-  cambiosEliminados: [], borrandoCambioId: null
+  cambiosBorrados: [], cambiosEliminados: [], borrandoCambioId: null
 };
 
 // ── AUTH — Google Identity Services ──
@@ -733,6 +734,7 @@ async function loadAllData() {
     state.criterios = criterios || [];
     state.disciplinasProyecto = disciplinas || [];
     state.cambiosDetalle = cambiosDetalle || [];
+    state.cambiosBorrados = await api('getCambiosBorrados', {}) || [];
     renderDashboard();
     renderCriteriosBanner();
   } catch(e) { showToast('Error cargando datos: ' + e.message, 'error'); console.error(e); }
@@ -971,7 +973,7 @@ function renderDisciplina(proyecto, grupo, disciplina, log) {
                   ? `<div class="log-evento" style="display:flex;align-items:center;gap:6px;min-width:0;overflow:hidden">
                       <span style="font-family:var(--mono);font-size:10px;color:var(--accent);cursor:pointer;flex-shrink:0" onclick="scrollToNota('${e.hito_id}')" title="Ver nota completa">${e.hito_id}</span>
                       <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0" title="${notaRef?.titulo || ''}">${tituloDisplay}</span>
-                      ${notaRef?.tipo ? `<span style="font-family:var(--mono);font-size:9px;color:var(--text3);flex-shrink:0">${notaTipoAbrev[notaRef.tipo] || ''}</span>` : ''}
+                      ${notaRef?.tipo ? `<span style="font-family:var(--mono);font-size:9px;color:var(--text3);flex-shrink:0;margin-left:4px">${notaTipoAbrev[notaRef.tipo] || ''}</span>` : ''}
                     </div>`
                   : (() => {
                       const esAfectado = e.hito_id && e.hito_id.startsWith('Afectado por Cambio ');
@@ -981,7 +983,9 @@ function renderDisciplina(proyecto, grupo, disciplina, log) {
                         const link = entryIdCambio
                           ? `<span style="font-family:var(--mono);font-size:10px;color:var(--yellow);cursor:pointer;flex-shrink:0" onclick="scrollToCambio('${entryIdCambio}')" title="Ver detalle del cambio">${clave}</span>`
                           : `<span style="font-family:var(--mono);font-size:10px;color:var(--yellow);flex-shrink:0">${clave}</span>`;
-                        return `<div class="log-evento" style="display:flex;align-items:center;gap:6px">${link}<span>Afectado por Cambio</span></div>`;
+                        const cdEntry = (state.cambiosDetalle || []).find(cd => cd.clave_cambio === clave);
+                        const tituloEntry = cdEntry?.titulo ? `: ${cdEntry.titulo}` : '';
+                        return `<div class="log-evento" style="display:flex;align-items:center;gap:6px;min-width:0;overflow:hidden"><span style="flex-shrink:0">${link}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0">Afectado por Cambio${tituloEntry}</span></div>`;
                       }
                       return `<div class="log-evento">${e.hito_id || '—'}</div>`;
                     })()
@@ -1475,7 +1479,9 @@ async function guardarNotaCambio() {
   if (!fecha) { showToast('La fecha es requerida', 'error'); return; }
   if (esNota && !titulo) { showToast('El título es requerido', 'error'); return; }
   if (esNota && !tipoNota) { showToast('La clasificación es requerida', 'error'); return; }
-  if (!esNota && !texto) { showToast('El texto es requerido', 'error'); return; }
+  const tituloCambio = !esNota ? document.getElementById('nc-cambio-titulo').value.trim() : '';
+  if (!esNota && !tituloCambio) { showToast('El título del cambio es requerido', 'error'); return; }
+  if (!esNota && !texto) { showToast('La descripción es requerida', 'error'); return; }
   if (!state.currentProyecto) { showToast('Selecciona un proyecto primero', 'error'); return; }
 
   const estadoPaneles = capturarEstadoPaneles();
@@ -1559,6 +1565,7 @@ async function guardarNotaCambio() {
         await api('appendCambioDetalle', {
           entry_id: res.entry_id,
           clave_cambio: claveCambio,
+          titulo: tituloCambio,
           origen_cambio: document.getElementById('e-origen').value,
           disciplinas_afectadas: discs.join(','),
           hitos_afectados: hitos.join(','),
@@ -1810,6 +1817,31 @@ async function borrarProyecto() {
 }
 
 // ── NOTAS ──
+function renderCambiosBorrados(proyecto) {
+  const borrados = (state.cambiosBorrados || []).filter(c => c.proyecto_id === proyecto.proyecto_id);
+  if (borrados.length === 0) return '';
+  const panelId = 'cambios-borrados-panel';
+  const filas = borrados.map(c => `
+    <div style="padding:10px 0;border-bottom:1px solid var(--border);font-size:12px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${c.clave_cambio || '—'}</span>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${c.fecha_borrado ? formatDate(c.fecha_borrado) : '—'}</span>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">por ${c.borrado_por || '—'}</span>
+      </div>
+      <div style="color:var(--text2);font-size:12px;margin-bottom:2px">${c.motivo || '—'}</div>
+      ${c.alcance ? `<div style="color:var(--text3);font-size:11px;font-style:italic">${c.alcance}</div>` : ''}
+    </div>`).join('');
+  return `
+  <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
+    <button class="cambio-expand-btn" onclick="toggleCambioPanel('${panelId}')">
+      <span id="chevron-${panelId}" style="transition:transform 0.15s;display:inline-block">▶</span>
+      cambios eliminados (${borrados.length})
+    </button>
+    <div class="cambio-detail-panel" id="${panelId}" style="margin-top:8px">
+      ${filas}
+    </div>
+  </div>`;
+}
 function renderNotas(proyecto) {
   const notas = state.logEventos.filter(e => e.proyecto_id === proyecto.proyecto_id && (e.tipo_entry === 'nota' || e.tipo_entry === 'cambio_registrado'));
   const notasHTML = notas.length === 0
@@ -1881,7 +1913,11 @@ function renderNotas(proyecto) {
         const notaTipoAbrev = { 'Riesgo': 'RSG', 'Lección aprendida': 'LA', 'Decisión': 'DEC', 'Pendiente externo': 'PE', 'General': 'GEN' };
         const tipoTag = notaData?.tipo ? `<span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${notaTipoAbrev[notaData.tipo] || notaData.tipo}</span>` : '';
         const claveTag = esCambio && claveCambio ? `<span style="font-family:var(--mono);font-size:10px;color:var(--yellow);cursor:pointer" onclick="scrollToCambio('${n.entry_id}')" title="Ver detalle del cambio">⚡ ${claveCambio}</span>` : esCambio ? `<span style="color:var(--yellow);font-family:var(--mono);font-size:10px">⚡ cambio</span>` : '';
-        const tituloNota = notaData?.titulo ? `<div class="nota-titulo" style="font-weight:500;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%" title="${notaData.titulo}">${notaData.titulo}</div>` : '';
+        const tituloNota = notaData?.titulo
+          ? `<div class="nota-titulo" style="font-weight:500;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%" title="${notaData.titulo}">${notaData.titulo}</div>`
+          : esCambio && cd?.titulo
+            ? `<div class="nota-titulo" style="font-weight:500;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%" title="${cd.titulo}">${cd.titulo}</div>`
+            : '';
         const textoNota = esCambio ? (cd?.alcance || n.nota || '') : (notaData?.contenido || n.nota || n.hito_id || '');
         const claveNota = !esCambio && n.hito_id ? `<span style="font-family:var(--mono);font-size:10px;color:var(--text3);cursor:pointer" title="Ver nota">${n.hito_id}</span>` : '';
 
@@ -1906,6 +1942,7 @@ function renderNotas(proyecto) {
     </div>
     <div class="notas-body" id="notas-body">
       <div id="notas-lista">${notasHTML}</div>
+      ${renderCambiosBorrados(proyecto)}
       <div class="nota-form" id="nota-form">
         <textarea class="form-textarea" id="nota-texto-input" placeholder="Escribe la nota…" style="min-height:72px;margin-bottom:10px"></textarea>
         <div style="display:flex;gap:8px;justify-content:flex-end">
@@ -2143,29 +2180,118 @@ function renderTimeline(proyecto) {
   const hoy = new Date();
   const log = state.logEventos.filter(e => e.proyecto_id === proyecto.proyecto_id);
 
-  const rows = HITOS_TIMELINE.map(h => {
-    const fechaEsperada = h.offset !== null ? addBusinessDays(base, h.offset) : null;
-    const completado = log.some(e => e.hito_id === h.id && e.tipo_entry === 'hito_alcanzado');
-    const retrasado = !completado && fechaEsperada && fechaEsperada < hoy;
-    const enRiesgo = !completado && !retrasado && fechaEsperada && (fechaEsperada - hoy) < 7 * 24 * 60 * 60 * 1000;
-    const estadoLabel = completado ? 'completado' : retrasado ? 'retrasado' : enRiesgo ? 'en riesgo' : 'pendiente';
-    const estadoClass = completado ? 'completado' : retrasado ? 'retrasado' : enRiesgo ? 'en-riesgo' : 'pendiente';
-    return `
-    <div class="timeline-row">
-      <div class="timeline-hito-id">${h.id}</div>
-      <div class="timeline-hito-nombre">${h.nombre}</div>
-      <div class="timeline-fecha">${fechaEsperada ? formatDate(fechaEsperada) : '<span style="color:var(--text3)">variable</span>'}</div>
-      <div class="timeline-estado ${estadoClass}">${estadoLabel}</div>
-    </div>`;
-  }).join('');
+  // Helper: días hábiles entre dos fechas (positivo = retraso, negativo = anticipación)
+  function diffBusinessDays(dateA, dateB) {
+    let d = new Date(Math.min(dateA, dateB));
+    const end = new Date(Math.max(dateA, dateB));
+    let count = 0;
+    while (d < end) {
+      d.setDate(d.getDate() + 1);
+      if (d.getDay() !== 0 && d.getDay() !== 6) count++;
+    }
+    return dateA <= dateB ? count : -count;
+  }
 
-return `
+  // Helper: color semáforo para hito no alcanzado según días hábiles restantes
+  function colorProximidad(diasRestantes) {
+    if (diasRestantes === null) return 'var(--text3)';
+    if (diasRestantes < 0) return 'var(--red)';   // vencido
+    if (diasRestantes <= 3) return 'var(--red)';
+    if (diasRestantes <= 10) return 'var(--yellow)';
+    return 'var(--text3)';
+  }
+
+  // Construir filas — un hito puede tener múltiples instancias (v1, v2...)
+  const rows = [];
+
+  HITOS_TIMELINE.forEach(h => {
+    const alcances = log
+      .filter(e => e.hito_id === h.id && e.tipo_entry === 'hito_alcanzado')
+      .sort((a, b) => {
+        const ta = a.timestamp ? new Date(a.timestamp) : new Date(a.fecha_real + 'T12:00:00Z');
+        const tb = b.timestamp ? new Date(b.timestamp) : new Date(b.fecha_real + 'T12:00:00Z');
+        return ta - tb;
+      });
+
+    const totalVersiones = alcances.length;
+    const fechaEsperada = h.offset !== null ? addBusinessDays(base, h.offset) : null;
+
+    if (totalVersiones === 0) {
+      // Hito no alcanzado — una sola fila
+      const retrasado = fechaEsperada && fechaEsperada < hoy;
+      const diasRestantes = fechaEsperada ? diffBusinessDays(hoy, fechaEsperada) : null;
+      const enRiesgo = !retrasado && fechaEsperada && diasRestantes !== null && diasRestantes <= 10;
+      const estadoLabel = retrasado ? 'retrasado' : enRiesgo ? 'en riesgo' : 'pendiente';
+      const estadoClass = retrasado ? 'retrasado' : enRiesgo ? 'en-riesgo' : 'pendiente';
+      const colorFecha = colorProximidad(retrasado ? -1 : diasRestantes);
+      const contadorLabel = diasRestantes !== null
+        ? (retrasado
+            ? `+${Math.abs(diasRestantes)}d`
+            : diasRestantes === 0 ? '0d' : `-${diasRestantes}d`)
+        : '';
+
+      rows.push(`
+      <div class="timeline-row">
+        <div class="timeline-hito-id">${h.id}</div>
+        <div class="timeline-hito-nombre">${h.nombre}</div>
+        <div class="timeline-fecha">${fechaEsperada ? formatDate(fechaEsperada) : '<span style="color:var(--text3)">variable</span>'}</div>
+        <div class="timeline-fecha" style="color:${colorFecha}">— ${contadorLabel ? '(' + contadorLabel + ')' : ''}</div>
+        <div class="timeline-estado ${estadoClass}">${estadoLabel}</div>
+      </div>`);
+
+    } else {
+      // Una o más instancias alcanzadas
+      alcances.forEach((alcance, idx) => {
+        const version = totalVersiones > 1 ? idx + 1 : null;
+        const nombreConVersion = version ? `${h.nombre} v${version}` : h.nombre;
+        const esV1 = idx === 0;
+
+        // Fecha esperada: solo v1
+        const fechaEsperadaDisplay = esV1 && fechaEsperada
+          ? formatDate(fechaEsperada)
+          : '<span style="color:var(--text3)">N/A</span>';
+
+        // Fecha real de alcance
+        const fechaAlcanceRaw = alcance.fecha_real;
+        const fechaAlcance = fechaAlcanceRaw ? parseISODate(fechaAlcanceRaw) : null;
+
+        // Contador y color — solo v1 con fecha esperada
+        let fechaRealDisplay = '—';
+        if (fechaAlcance) {
+          if (esV1 && fechaEsperada) {
+            const diff = diffBusinessDays(fechaEsperada, fechaAlcance);
+            const anticipacion = diff < 0;
+            const puntual = diff === 0;
+            const color = anticipacion ? 'var(--green)' : puntual ? 'var(--text)' : 'var(--red)';
+            const signo = anticipacion ? '' : diff > 0 ? '+' : '';
+            fechaRealDisplay = `<span style="color:${color}">${formatDate(fechaAlcance)} (${signo}${diff}d)</span>`;
+          } else {
+            // v2+ — solo fecha, sin contador
+            fechaRealDisplay = `<span style="color:var(--text2)">${formatDate(fechaAlcance)}</span>`;
+          }
+        }
+
+        rows.push(`
+        <div class="timeline-row">
+          <div class="timeline-hito-id">${h.id}</div>
+          <div class="timeline-hito-nombre">${nombreConVersion}</div>
+          <div class="timeline-fecha">${fechaEsperadaDisplay}</div>
+          <div class="timeline-fecha">${fechaRealDisplay}</div>
+          <div class="timeline-estado completado">completado</div>
+        </div>`);
+      });
+    }
+  });
+
+  const totalFilas = rows.length;
+
+  return `
   <div class="timeline-section">
     <div class="timeline-header" id="timeline-toggle" onclick="toggleTimeline()">
       <div style="display:flex;align-items:center;gap:10px">
         <span style="font-size:10px;color:var(--text3);transition:transform 0.15s" id="timeline-chevron">▶</span>
         <span class="section-title" style="margin:0">Hitos del Proyecto</span>
-        <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${HITOS_TIMELINE.length}</span>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${totalFilas}</span>
       </div>
     </div>
     <div class="timeline-body" id="timeline-body">
@@ -2174,9 +2300,10 @@ return `
         <div class="col-header">Hito</div>
         <div class="col-header">Descripción</div>
         <div class="col-header">Fecha esperada</div>
+        <div class="col-header">Fecha real</div>
         <div class="col-header">Estado</div>
       </div>
-      ${rows}
+      ${rows.join('')}
     </div>
     </div>
   </div>`;
