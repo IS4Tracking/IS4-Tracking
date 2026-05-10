@@ -1876,16 +1876,28 @@ function renderCambiosBorrados(proyecto) {
   const borrados = (state.cambiosBorrados || []).filter(c => c.proyecto_id === proyecto.proyecto_id);
   if (borrados.length === 0) return '';
   const panelId = 'cambios-borrados-panel';
-  const filas = borrados.map(c => `
-    <div style="padding:10px 0;border-bottom:1px solid var(--border);font-size:12px">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-        <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${c.clave_cambio || '—'}</span>
+  const filas = borrados.map(c => {
+    // Parsear snapshot
+    let snap = [];
+    try { snap = JSON.parse(c.snapshot_cambio_detalle || '[]'); } catch(e) {}
+    const titulo = snap[13] || '—';
+    const alcance = snap[8] || '—';
+    const disciplinas = snap[3] ? snap[3].split(',').map(d => d.split('::')[1] || d).filter(Boolean).join(', ') : '—';
+    const clave = c.clave_cambio || snap[12] || '—';
+    const borradoPorNombre = (state.usuarios || []).find(u => u.email === c.borrado_por)?.nombre || c.borrado_por || '—';
+    return `
+    <div style="padding:12px 0;border-bottom:1px solid var(--border);font-size:12px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <span style="font-family:var(--mono);font-size:10px;color:var(--yellow)">${clave}</span>
         <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${c.fecha_borrado ? formatDate(c.fecha_borrado) : '—'}</span>
-        <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">por ${c.borrado_por || '—'}</span>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">por ${borradoPorNombre}</span>
       </div>
-      <div style="color:var(--text2);font-size:12px;margin-bottom:2px">${c.motivo || '—'}</div>
-      ${c.alcance ? `<div style="color:var(--text3);font-size:11px;font-style:italic">${c.alcance}</div>` : ''}
-    </div>`).join('');
+      <div style="font-weight:500;font-size:13px;color:var(--text);margin-bottom:4px">${titulo}</div>
+      <div style="color:var(--text2);font-size:12px;margin-bottom:6px;line-height:1.5">${alcance}</div>
+      ${disciplinas !== '—' ? `<div style="font-family:var(--mono);font-size:11px;color:var(--text3);margin-bottom:6px">Disciplinas: ${disciplinas}</div>` : ''}
+      <div style="font-size:11px;color:var(--text3);font-style:italic">Eliminado: ${c.motivo || '—'}</div>
+    </div>`;
+  }).join('');
   return `
   <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
     <button class="cambio-expand-btn" onclick="toggleCambioPanel('${panelId}')">
@@ -1901,7 +1913,11 @@ function renderNotas(proyecto) {
   const notas = state.logEventos.filter(e => e.proyecto_id === proyecto.proyecto_id && (e.tipo_entry === 'nota' || e.tipo_entry === 'cambio_registrado'));
   const notasHTML = notas.length === 0
     ? '<div style="color:var(--text3);font-family:var(--mono);font-size:12px;padding:4px 0">Sin notas registradas.</div>'
-    : notas.sort((a,b) => new Date(b.fecha_real) - new Date(a.fecha_real)).map(n => {
+    : notas.sort((a,b) => {
+        const ta = a.timestamp ? new Date(a.timestamp) : new Date((a.fecha_real || '') + 'T12:00:00');
+        const tb = b.timestamp ? new Date(b.timestamp) : new Date((b.fecha_real || '') + 'T12:00:00');
+        return ta - tb;
+      }).map(n => {
         const esCambio = n.tipo_entry === 'cambio_registrado';
         const esPM = state.rol === 'PM';
         // Parsear nota estructurada F3
@@ -2493,6 +2509,174 @@ function showToast(msg, type = 'success') {
   setTimeout(() => el.className = '', 3500);
 }
 document.querySelectorAll('.modal-overlay').forEach(o => o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); }));
+
+// ── FAB BÚSQUEDA + COLAPSAR ──
+let fabClickTimer = null;
+let fabClickCount = 0;
+
+function handleFabClick() {
+  fabClickCount++;
+  if (fabClickTimer) clearTimeout(fabClickTimer);
+  fabClickTimer = setTimeout(() => {
+    if (fabClickCount === 1) { toggleBusqueda(); }
+    else { colapsarTodo(); }
+    fabClickCount = 0;
+  }, 280);
+}
+
+function toggleBusqueda() {
+  const panel = document.getElementById('panel-busqueda');
+  const fab = document.getElementById('fab-buscar');
+  const isOpen = panel.classList.contains('open');
+  if (isOpen) { cerrarBusqueda(); return; }
+  panel.classList.add('open');
+  fab.classList.add('activo');
+  document.getElementById('fab-icon-search').style.display = 'none';
+  document.getElementById('fab-icon-collapse').style.display = 'block';
+  document.getElementById('busqueda-input').value = '';
+  document.getElementById('busqueda-resultados').innerHTML = '';
+  setTimeout(() => document.getElementById('busqueda-input').focus(), 50);
+}
+
+function cerrarBusqueda() {
+  const panel = document.getElementById('panel-busqueda');
+  if (panel) panel.classList.remove('open');
+  const fab = document.getElementById('fab-buscar');
+  if (!fab) return;
+  fab.classList.remove('activo');
+  document.getElementById('fab-icon-search').style.display = 'block';
+  document.getElementById('fab-icon-collapse').style.display = 'none';
+}
+
+function colapsarTodo() {
+  cerrarBusqueda();
+  document.querySelectorAll('.group-row.open').forEach(el => el.classList.remove('open'));
+  document.querySelectorAll('.log-panel.open').forEach(el => el.classList.remove('open'));
+  document.querySelectorAll('.cambio-detail-panel.open').forEach(el => {
+    el.classList.remove('open');
+    const chevron = document.getElementById('chevron-' + el.id);
+    if (chevron) chevron.style.transform = '';
+  });
+  const timelineBody = document.getElementById('timeline-body');
+  if (timelineBody) timelineBody.classList.remove('open');
+  const timelineToggle = document.getElementById('timeline-toggle');
+  if (timelineToggle) timelineToggle.classList.remove('open');
+  const timelineChevron = document.getElementById('timeline-chevron');
+  if (timelineChevron) timelineChevron.style.transform = '';
+  const notasBody = document.getElementById('notas-body');
+  if (notasBody) notasBody.classList.remove('open');
+  const notasToggle = document.getElementById('notas-toggle');
+  if (notasToggle) notasToggle.classList.remove('open');
+  const notasChevron = document.getElementById('notas-chevron');
+  if (notasChevron) notasChevron.style.transform = '';
+}
+
+function normalizarTexto(str) {
+  return (str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+}
+
+function ejecutarBusqueda(query) {
+  const q = normalizarTexto(query);
+  const contenedor = document.getElementById('busqueda-resultados');
+  if (!q) { contenedor.innerHTML = ''; return; }
+  if (!state.currentProyecto) return;
+  const pid = state.currentProyecto.proyecto_id;
+  const resultados = { grupos: [], disciplinas: [], cambios: [], notas: [] };
+
+  const gruposVistos = new Set();
+  state.eventosCatalogo.forEach(e => {
+    if (!e.grupo_id || gruposVistos.has(e.grupo_id)) return;
+    if (normalizarTexto(e.grupo_nombre).includes(q) || normalizarTexto(e.grupo_id).includes(q)) {
+      gruposVistos.add(e.grupo_id);
+      resultados.grupos.push({ id: e.grupo_id, nombre: e.grupo_nombre });
+    }
+  });
+
+  const activasSet = new Set(state.disciplinasProyecto.filter(d => d.proyecto_id === pid).map(d => d.disciplina_id));
+  const discsVistas = new Set();
+  state.eventosCatalogo.forEach(e => {
+    const key = `${e.grupo_id}::${e.disciplina_nombre}`;
+    if (!activasSet.has(key) || discsVistas.has(key)) return;
+    if (normalizarTexto(e.disciplina_nombre).includes(q)) {
+      discsVistas.add(key);
+      resultados.disciplinas.push({ grupoId: e.grupo_id, nombre: e.disciplina_nombre });
+    }
+  });
+
+  state.logEventos.filter(e => e.proyecto_id === pid && e.tipo_entry === 'cambio_registrado').forEach(e => {
+    const cd = (state.cambiosDetalle || []).find(c => c.entry_id === e.entry_id);
+    const titulo = cd?.titulo || '';
+    if (normalizarTexto(titulo).includes(q) || normalizarTexto(cd?.clave_cambio || '').includes(q))
+      resultados.cambios.push({ entry_id: e.entry_id, clave: cd?.clave_cambio || '', titulo });
+  });
+
+  state.logEventos.filter(e => e.proyecto_id === pid && e.tipo_entry === 'nota').forEach(e => {
+    let notaData = null;
+    try { notaData = JSON.parse(e.nota || '{}'); } catch(err) {}
+    const titulo = notaData?.titulo || e.nota || '';
+    if (normalizarTexto(titulo).includes(q))
+      resultados.notas.push({ entry_id: e.entry_id, hito_id: e.hito_id, titulo });
+  });
+
+  const total = resultados.grupos.length + resultados.disciplinas.length + resultados.cambios.length + resultados.notas.length;
+  if (total === 0) { contenedor.innerHTML = '<div id="busqueda-empty">Sin resultados</div>'; return; }
+
+  let html = '';
+  if (resultados.grupos.length > 0) {
+    html += `<div class="busqueda-grupo">Grupos</div>`;
+    html += resultados.grupos.map(g => `<div class="busqueda-item" onclick="irAGrupo('${g.id}')"><span class="busqueda-item-tipo">${g.id}</span><span>${g.nombre}</span></div>`).join('');
+  }
+  if (resultados.disciplinas.length > 0) {
+    html += `<div class="busqueda-grupo">Disciplinas</div>`;
+    html += resultados.disciplinas.map(d => `<div class="busqueda-item" onclick="irADisciplina('${d.grupoId}','${d.nombre}')"><span class="busqueda-item-tipo">${d.grupoId}</span><span>${d.nombre}</span></div>`).join('');
+  }
+  if (resultados.cambios.length > 0) {
+    html += `<div class="busqueda-grupo">Cambios</div>`;
+    html += resultados.cambios.map(c => `<div class="busqueda-item" onclick="irACambio('${c.entry_id}')"><span class="busqueda-item-tipo">${c.clave}</span><span>${c.titulo || '—'}</span></div>`).join('');
+  }
+  if (resultados.notas.length > 0) {
+    html += `<div class="busqueda-grupo">Notas</div>`;
+    html += resultados.notas.map(n => `<div class="busqueda-item" onclick="irANota('${n.entry_id}','${n.hito_id}')"><span class="busqueda-item-tipo">nota</span><span>${n.titulo}</span></div>`).join('');
+  }
+  contenedor.innerHTML = html;
+}
+
+function irAGrupo(grupoId) {
+  cerrarBusqueda();
+  const el = document.querySelector(`#group-${grupoId}`);
+  if (el) { if (!el.classList.contains('open')) el.querySelector('.group-header')?.click(); el.scrollIntoView({ behavior:'smooth', block:'center' }); }
+}
+
+function irADisciplina(grupoId, discNombre) {
+  cerrarBusqueda();
+  const grupo = document.querySelector(`#group-${grupoId}`);
+  if (grupo && !grupo.classList.contains('open')) grupo.querySelector('.group-header')?.click();
+  setTimeout(() => {
+    const discs = document.querySelectorAll('.disciplina-row');
+    for (const d of discs) {
+      if (normalizarTexto(d.querySelector('.disciplina-nombre')?.textContent || d.textContent).includes(normalizarTexto(discNombre))) {
+        d.scrollIntoView({ behavior:'smooth', block:'center' });
+        d.style.outline = '1px solid var(--accent)';
+        setTimeout(() => d.style.outline = '', 1500);
+        break;
+      }
+    }
+  }, 250);
+}
+
+function irACambio(entryId) {
+  cerrarBusqueda();
+  const notasBody = document.getElementById('notas-body');
+  if (notasBody && !notasBody.classList.contains('open')) document.getElementById('notas-toggle')?.click();
+  setTimeout(() => scrollToCambio(entryId), 200);
+}
+
+function irANota(entryId, hitoId) {
+  cerrarBusqueda();
+  const notasBody = document.getElementById('notas-body');
+  if (notasBody && !notasBody.classList.contains('open')) document.getElementById('notas-toggle')?.click();
+  setTimeout(() => scrollToNota(hitoId), 200);
+}
 </script>
 <script src="https://accounts.google.com/gsi/client" onload="initGoogleAPI()"></script>
 
