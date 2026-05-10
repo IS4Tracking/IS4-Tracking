@@ -567,6 +567,21 @@
   </div>
 </div>
 
+<!-- MODAL: BORRAR CAMBIO -->
+<div class="modal-overlay" id="modal-borrar-cambio">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header"><div class="modal-title">Eliminar cambio</div><button class="modal-close" onclick="closeModal('modal-borrar-cambio')">×</button></div>
+    <div class="modal-body">
+      <div style="font-size:13px;color:var(--text2);margin-bottom:16px">Esta acción no se puede deshacer. El cambio quedará registrado en el historial de eliminados.</div>
+      <div class="form-group"><label class="form-label">Motivo <span style="color:var(--accent)">*</span></label><textarea class="form-textarea" id="borrar-cambio-motivo" placeholder="Describe el motivo para eliminar este cambio…" style="min-height:80px"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('modal-borrar-cambio')">Cancelar</button>
+      <button class="btn-danger" id="btn-confirmar-borrar-cambio" onclick="confirmarBorrarCambio()">Eliminar cambio</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
@@ -583,7 +598,7 @@ let state = {
   currentProyecto: null, entryTipo: 'nota',
   bubblePlan: false, disciplinasSeleccionadas: new Set(),
   cambioDiscsSeleccionadas: new Set(), editandoCambioId: null,
-  cambiosEliminados: []
+  cambiosEliminados: [], borrandoCambioId: null
 };
 
 // ── AUTH — Google Identity Services ──
@@ -947,19 +962,29 @@ function renderDisciplina(proyecto, grupo, disciplina, log) {
             let notaRef = null;
             if (esNotaRef) { try { notaRef = JSON.parse(e.nota || '{}'); } catch(x) {} }
             const notaTipoAbrev = { 'Riesgo': 'RSG', 'Lección aprendida': 'LA', 'Decisión': 'DEC', 'Pendiente externo': 'PE', 'General': 'GEN' };
-            const tituloMaxLen = 38;
-            const tituloDisplay = notaRef?.titulo ? (notaRef.titulo.length > tituloMaxLen ? notaRef.titulo.slice(0, tituloMaxLen) + '…' : notaRef.titulo) : '';
+            const tituloDisplay = notaRef?.titulo || '';
             return `
             <div class="log-entry-wrap">
               <div class="log-entry${esNotaRef ? ' log-entry-nota-ref' : ''}">
                 <div class="log-fecha">${formatDate(e.fecha_real)}${e.timestamp ? '<span style="color:var(--text3);font-size:9px;margin-left:3px">' + new Date(e.timestamp).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}) + '</span>' : ''}</div>
                 ${esNotaRef
-                  ? `<div class="log-evento" style="display:flex;align-items:center;gap:6px">
-                      <span style="font-family:var(--mono);font-size:10px;color:var(--text3);cursor:pointer" onclick="scrollToNota('${e.hito_id}')" title="Ver nota completa">${e.hito_id}</span>
-                      <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px" title="${notaRef?.titulo || ''}">${tituloDisplay}</span>
-                      ${notaRef?.tipo ? `<span style="font-family:var(--mono);font-size:9px;color:var(--text3)">${notaTipoAbrev[notaRef.tipo] || ''}</span>` : ''}
+                  ? `<div class="log-evento" style="display:flex;align-items:center;gap:6px;min-width:0;overflow:hidden">
+                      <span style="font-family:var(--mono);font-size:10px;color:var(--accent);cursor:pointer;flex-shrink:0" onclick="scrollToNota('${e.hito_id}')" title="Ver nota completa">${e.hito_id}</span>
+                      <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0" title="${notaRef?.titulo || ''}">${tituloDisplay}</span>
+                      ${notaRef?.tipo ? `<span style="font-family:var(--mono);font-size:9px;color:var(--text3);flex-shrink:0">${notaTipoAbrev[notaRef.tipo] || ''}</span>` : ''}
                     </div>`
-                  : `<div class="log-evento">${e.hito_id || '—'}</div>`
+                  : (() => {
+                      const esAfectado = e.hito_id && e.hito_id.startsWith('Afectado por Cambio ');
+                      if (esAfectado) {
+                        const clave = e.hito_id.replace('Afectado por Cambio ', '');
+                        const entryIdCambio = (state.cambiosDetalle || []).find(cd => cd.clave_cambio === clave)?.entry_id;
+                        const link = entryIdCambio
+                          ? `<span style="font-family:var(--mono);font-size:10px;color:var(--yellow);cursor:pointer;flex-shrink:0" onclick="scrollToCambio('${entryIdCambio}')" title="Ver detalle del cambio">${clave}</span>`
+                          : `<span style="font-family:var(--mono);font-size:10px;color:var(--yellow);flex-shrink:0">${clave}</span>`;
+                        return `<div class="log-evento" style="display:flex;align-items:center;gap:6px">${link}<span>Afectado por Cambio</span></div>`;
+                      }
+                      return `<div class="log-evento">${e.hito_id || '—'}</div>`;
+                    })()
                 }
                 <div class="log-nota">${esNotaRef ? '' : (e.nota || '')}</div>
               </div>
@@ -1861,7 +1886,7 @@ function renderNotas(proyecto) {
         const claveNota = !esCambio && n.hito_id ? `<span style="font-family:var(--mono);font-size:10px;color:var(--text3);cursor:pointer" title="Ver nota">${n.hito_id}</span>` : '';
 
         return `
-        <div class="nota-entry">
+        <div class="nota-entry" data-entry-id="${n.entry_id}" data-hito-id="${n.hito_id || ''}">
           <div class="nota-meta" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${formatDate(n.fecha_real)} · ${n.registrado_por || state.user?.name || '—'}${claveTag ? ' · ' + claveTag : ''}${tipoTag ? ' · ' + tipoTag : ''}${cd?.impacto_tipo ? ` · <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${cd.impacto_tipo}</span>` : ''}</div>
           ${tituloNota}
           <div class="nota-texto">${textoNota}</div>
@@ -1914,23 +1939,21 @@ function scrollToCambio(entryId) {
 }
 
 function scrollToNota(claveNota) {
-  // Buscar la nota en el panel de notas y expandirlo si está cerrado
+  const notasToggle = document.getElementById('notas-toggle');
   const notasBody = document.getElementById('notas-body');
   if (notasBody && !notasBody.classList.contains('open')) {
-    document.getElementById('notas-toggle')?.click();
+    notasToggle?.click();
   }
   setTimeout(() => {
-    const entries = document.querySelectorAll('.nota-entry');
-    for (const el of entries) {
-      if (el.textContent.includes(claveNota)) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        el.style.outline = '1px solid var(--accent)';
-        setTimeout(() => { el.style.outline = ''; }, 1500);
-        break;
-      }
+    const el = document.querySelector(`.nota-entry[data-hito-id="${claveNota}"]`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.style.outline = '1px solid var(--accent)';
+      setTimeout(() => { el.style.outline = ''; }, 1500);
     }
-  }, 200);
+  }, 250);
 }
+
 
 function toggleCambioPanel(panelId) {
   const panel = document.getElementById(panelId);
@@ -1940,20 +1963,32 @@ function toggleCambioPanel(panelId) {
   if (chevron) chevron.style.transform = panel.classList.contains('open') ? 'rotate(90deg)' : '';
 }
 
-async function borrarCambio(entryId) {
-  const motivo = prompt('Motivo para eliminar este cambio (requerido):');
-  if (!motivo || !motivo.trim()) { showToast('Se requiere un motivo para eliminar el cambio', 'error'); return; }
+function borrarCambio(entryId) {
+  state.borrandoCambioId = entryId;
+  document.getElementById('borrar-cambio-motivo').value = '';
+  openModal('modal-borrar-cambio');
+}
+
+async function confirmarBorrarCambio() {
+  const motivo = document.getElementById('borrar-cambio-motivo').value.trim();
+  if (!motivo) { showToast('El motivo es requerido', 'error'); return; }
+  const entryId = state.borrandoCambioId;
+  if (!entryId) return;
+  const btn = document.getElementById('btn-confirmar-borrar-cambio');
+  btn.disabled = true; btn.textContent = 'Eliminando…';
   const estadoPaneles = capturarEstadoPaneles();
   try {
-    await api('borrarCambio', { entry_id: entryId, motivo: motivo.trim(), usuario: state.user?.email || '' });
+    await api('borrarCambio', { entry_id: entryId, motivo, usuario: state.user?.email || '' });
     state.logEventos = state.logEventos.filter(e => e.entry_id !== entryId);
     state.cambiosDetalle = (state.cambiosDetalle || []).filter(c => c.entry_id !== entryId);
+    closeModal('modal-borrar-cambio');
     showToast('Cambio eliminado', 'success');
     if (state.currentProyecto) {
       await openProyecto(state.currentProyecto.proyecto_id);
       restaurarEstadoPaneles(estadoPaneles);
     }
   } catch(e) { showToast('Error: ' + e.message, 'error'); }
+  finally { btn.disabled = false; btn.textContent = 'Eliminar cambio'; }
 }
 
 function editarImpactoCambio(entryId) {
