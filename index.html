@@ -723,10 +723,11 @@ async function api(action, body = {}) {
 // ── DATA ──
 async function loadAllData() {
   try {
-    const [proyectos, eventos, log, criterios, disciplinas, cambiosDetalle] = await Promise.all([
+    const [proyectos, eventos, log, criterios, disciplinas, cambiosDetalle, cambiosBorrados] = await Promise.all([
       api('getProyectos'), api('getEventosCatalogo'),
       api('getLogEventos'), api('getCriteriosPrograma'),
-      api('getDisciplinasProyecto'), api('getCambiosDetalle')
+      api('getDisciplinasProyecto'), api('getCambiosDetalle'),
+      api('getCambiosBorrados', {})
     ]);
     state.proyectos = proyectos || [];
     state.eventosCatalogo = eventos || [];
@@ -734,7 +735,7 @@ async function loadAllData() {
     state.criterios = criterios || [];
     state.disciplinasProyecto = disciplinas || [];
     state.cambiosDetalle = cambiosDetalle || [];
-    state.cambiosBorrados = await api('getCambiosBorrados', {}) || [];
+    state.cambiosBorrados = cambiosBorrados || [];
     renderDashboard();
     renderCriteriosBanner();
   } catch(e) { showToast('Error cargando datos: ' + e.message, 'error'); console.error(e); }
