@@ -114,7 +114,9 @@
   .hito-row { display:grid; grid-template-columns:120px 1fr 200px 80px; gap:12px; align-items:center; padding:10px 16px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); margin-bottom:4px; font-size:13px; cursor:pointer; transition:border-color 0.15s; }
   .hito-row:hover { border-color:var(--border2); }
   .hito-fecha { font-family:var(--mono); font-size:12px; color:var(--text2); }
-  .hito-row.retrasado { border-left:2px solid #ff5050; cursor:default; }
+  .hito-row.retrasado { border-left:2px solid #ff5050; cursor:pointer; }
+  .hito-row.tarea-vencida { border-left:2px solid #ff5050; cursor:pointer; }
+  .hito-row.tarea-proxima { cursor:pointer; }
   .hito-link { font-weight:500; cursor:pointer; color:var(--text); transition:color 0.15s; }
   .hito-link:hover { color:var(--accent); }
   .hito-link.secondary { font-size:12px; font-weight:400; color:var(--text2); }
@@ -145,7 +147,20 @@
 
   /* GROUPS */
   .groups-container { display:flex; flex-direction:column; gap:4px; }
-  .group-row { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; }
+  .group-row { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; transition:box-shadow 0.2s; }
+
+  /* Glow por grupo — identidad temática, siempre activo */
+  .group-row[data-grupo="G2"]  { border-color:rgba(127,119,221,0.45); box-shadow: inset 3px 0 12px -4px rgba(127,119,221,0.4), -1px 0 8px -2px rgba(127,119,221,0.25); }
+  .group-row[data-grupo="G3"]  { border-color:rgba(83,74,183,0.45);   box-shadow: inset 3px 0 12px -4px rgba(83,74,183,0.4),   -1px 0 8px -2px rgba(83,74,183,0.25); }
+  .group-row[data-grupo="G4"]  { border-color:rgba(55,138,221,0.45);  box-shadow: inset 3px 0 12px -4px rgba(55,138,221,0.4),  -1px 0 8px -2px rgba(55,138,221,0.25); }
+  .group-row[data-grupo="G5"]  { border-color:rgba(24,95,165,0.45);   box-shadow: inset 3px 0 12px -4px rgba(24,95,165,0.4),   -1px 0 8px -2px rgba(24,95,165,0.25); }
+  .group-row[data-grupo="G6"]  { border-color:rgba(29,158,117,0.45);  box-shadow: inset 3px 0 12px -4px rgba(29,158,117,0.4),  -1px 0 8px -2px rgba(29,158,117,0.25); }
+  .group-row[data-grupo="G7"]  { border-color:rgba(15,110,86,0.45);   box-shadow: inset 3px 0 12px -4px rgba(15,110,86,0.4),   -1px 0 8px -2px rgba(15,110,86,0.25); }
+  .group-row[data-grupo="G8"]  { border-color:rgba(8,80,65,0.6);      box-shadow: inset 3px 0 12px -4px rgba(8,80,65,0.5),     -1px 0 8px -2px rgba(8,80,65,0.3); }
+  .group-row[data-grupo="G9"]  { border-color:rgba(216,90,48,0.45);   box-shadow: inset 3px 0 12px -4px rgba(216,90,48,0.4),   -1px 0 8px -2px rgba(216,90,48,0.25); }
+  .group-row[data-grupo="G10"] { border-color:rgba(186,117,23,0.45);  box-shadow: inset 3px 0 12px -4px rgba(186,117,23,0.4),  -1px 0 8px -2px rgba(186,117,23,0.25); }
+  .group-row[data-grupo="G11"] { border-color:rgba(99,153,34,0.45);   box-shadow: inset 3px 0 12px -4px rgba(99,153,34,0.4),   -1px 0 8px -2px rgba(99,153,34,0.25); }
+  .group-row[data-grupo="G12"] { border-color:rgba(212,83,126,0.45);  box-shadow: inset 3px 0 12px -4px rgba(212,83,126,0.4),  -1px 0 8px -2px rgba(212,83,126,0.25); }
   .group-header { display:grid; grid-template-columns:24px 60px 1fr auto auto; gap:12px; align-items:center; padding:12px 16px; cursor:pointer; transition:background 0.15s; user-select:none; }
   .group-header:hover { background:var(--surface2); }
   .group-chevron { font-size:10px; color:var(--text3); transition:transform 0.15s; }
@@ -392,7 +407,7 @@
     <div class="topbar-brand">IS4</div>
     <div class="topbar-sep"></div>
     <div class="topbar-nav">
-      <button class="nav-btn active" onclick="showView('dashboard')" id="nav-dashboard">Dashboard</button>
+      <button class="nav-btn active" onclick="showView('dashboard')" id="nav-dashboard">Home</button>
       <button class="nav-btn" onclick="showView('criterios')" id="nav-criterios">Criterios</button>
     </div>
     <div class="topbar-user">
@@ -408,7 +423,7 @@
       <div id="criterios-banner-container"></div>
       <div class="page-header">
         <div>
-          <div class="page-title">Dashboard</div>
+           <div class="page-title">Home</div>
           <div class="page-sub" id="dashboard-date"></div>
         </div>
         <button class="btn-primary" onclick="openNuevoProyecto()" id="btn-nuevo-proyecto">+ Nuevo Proyecto</button>
@@ -416,12 +431,13 @@
       <div id="proyectos-list"><div class="loading"><div class="spinner"></div>Cargando proyectos…</div></div>
       <div class="hitos-section">
         <div id="hitos-proximos"><div class="loading"><div class="spinner"></div>Calculando…</div></div>
+        <div id="tareas-dashboard" style="margin-top:24px"></div>
       </div>
     </div>
 
     <!-- PROYECTO DETAIL -->
     <div class="view" id="view-proyecto-detail">
-      <button class="back-btn" onclick="showView('dashboard')">← Volver al dashboard</button>
+      <button class="back-btn" onclick="showView('dashboard')">← Volver</button>
       <div class="project-detail-header">
         <div>
           <div class="project-detail-title" id="detail-title"></div>
@@ -429,6 +445,7 @@
           <div id="detail-scoreboard"></div>
         </div>
         <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn-secondary" onclick="abrirInsights()" style="font-size:13px">📊 Insights</button>
           <button class="btn-secondary" onclick="openSettings()" style="font-size:13px">⚙️ Settings</button>
           <button class="btn-primary" onclick="openNuevoEntry()">+ Registrar evento</button>
         </div>
@@ -436,6 +453,22 @@
       <div id="detail-timeline"></div>
       <div id="detail-notas"></div>
       <div class="groups-container" id="groups-container"></div>
+    </div>
+
+    <!-- INSIGHTS / DASHBOARDS -->
+    <div class="view" id="view-insights">
+      <button class="back-btn" onclick="volverDeInsights()">← Volver al proyecto</button>
+      <div class="project-detail-header">
+        <div>
+          <div class="project-detail-title" id="insights-title"></div>
+          <div class="project-detail-meta" id="insights-meta"></div>
+        </div>
+      </div>
+      <div style="margin-top:32px;display:flex;flex-direction:column;align-items:center;gap:16px;padding:48px 0;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface)">
+        <div style="font-size:32px">📊</div>
+        <div style="font-size:15px;font-weight:500;color:var(--text)">Insights y Dashboards</div>
+        <div style="font-size:13px;color:var(--text2);font-family:var(--mono);text-align:center;max-width:400px;line-height:1.7">Esta sección está reservada para reportes, curva S, análisis de desvíos y dashboards ejecutivos.<br>Se construirá en la siguiente sesión dedicada.</div>
+      </div>
     </div>
 
     <!-- CRITERIOS -->
@@ -593,6 +626,10 @@
         </div>
       </div>
       <div class="form-group"><div class="form-toggle" onclick="toggleSettingsBubble()"><div class="toggle-switch" id="toggle-settings-bubble"></div><div class="toggle-label">Bubble Plan aplica</div></div></div>
+      <div class="form-group" id="historial-arq-section" style="display:none">
+        <label class="form-label">Historial de asignaciones</label>
+        <div id="historial-arq-lista" style="margin-top:6px;display:flex;flex-direction:column;gap:4px"></div>
+      </div>
       <div class="form-group"><label class="form-label">Notas</label><textarea class="form-textarea" id="s-notas" placeholder="Contexto del proyecto…"></textarea></div>
       <div class="danger-zone">
         <div class="danger-zone-title">Zona de peligro</div>
@@ -637,7 +674,8 @@ let state = {
   currentProyecto: null, entryTipo: 'nota',
   bubblePlan: false, disciplinasSeleccionadas: new Set(),
   cambioDiscsSeleccionadas: new Set(), editandoCambioId: null,
-  cambiosBorrados: [], cambiosEliminados: [], borrandoCambioId: null
+  cambiosBorrados: [], cambiosEliminados: [], borrandoCambioId: null,
+  diasPausaAcumulados: {}
 };
 
 // ── AUTH — Google Identity Services ──
@@ -779,6 +817,31 @@ async function loadAllData() {
   } catch(e) { showToast('Error cargando datos: ' + e.message, 'error'); console.error(e); }
 }
 
+// ── PAUSA — calcular días hábiles entre dos timestamps ──
+function calcBusinessDaysBetween(dateA, dateB) {
+  if (!dateA || !dateB) return 0;
+  const start = new Date(dateA);
+  const end = new Date(dateB);
+  if (end <= start) return 0;
+  let count = 0;
+  const cur = new Date(start);
+  while (cur < end) {
+    cur.setDate(cur.getDate() + 1);
+    const dow = cur.getDay();
+    if (dow !== 0 && dow !== 6) count++;
+  }
+  return count;
+}
+
+function getOffsetPausa(proyecto) {
+  if (!proyecto.fecha_pausa) return 0;
+  const pausaInicio = new Date(proyecto.fecha_pausa);
+  const pausaFin = proyecto.fecha_reactivacion
+    ? new Date(proyecto.fecha_reactivacion)
+    : new Date();
+  return calcBusinessDaysBetween(pausaInicio, pausaFin);
+}
+
 // ── DASHBOARD ──
 function renderDashboard() {
   const activos = state.proyectos.filter(p => !p.estado || p.estado === 'Activo');
@@ -815,18 +878,49 @@ function renderDashboard() {
   const proximos = [];
   const vencidos = [];
 
+  const limiteTareas = new Date(); limiteTareas.setDate(limiteTareas.getDate() + 3);
+  const tareasVencidas = [];
+  const tareasProximas = [];
+
   activos.forEach(p => {
     if (!p.fecha_aprobacion) return;
+    // Proyectos en pausa no aparecen en secciones de alertas
+    if (p.estado === 'En pausa') return;
+    // Filtro por rol: arquitecto ve solo sus proyectos asignados
+    if (state.rol === 'Arquitecto' && p.arquitecto_id !== state.user.email) return;
+    // Días hábiles de pausa acumulados — se suman a todos los offsets
+    const offsetPausa = getOffsetPausa(p);
     const logP = state.logEventos.filter(e => e.proyecto_id === p.proyecto_id);
     HITOS_TIMELINE.filter(h => h.offset !== null).forEach(h => {
       const completado = logP.some(e => e.hito_id === h.id && e.tipo_entry === 'hito_alcanzado');
       if (completado) return;
-      const fecha = addBusinessDays(parseISODate(p.fecha_aprobacion), h.offset);
+      const fecha = addBusinessDays(parseISODate(p.fecha_aprobacion), h.offset + offsetPausa);
       if (fecha < hoy) {
         vencidos.push({ proyecto: p.nombre, hito: h.nombre, hitoId: h.id, fecha: fecha.toISOString().split('T')[0], proyectoId: p.proyecto_id });
       } else if (fecha <= limite) {
         proximos.push({ proyecto: p.nombre, hito: h.nombre, hitoId: h.id, fecha: fecha.toISOString().split('T')[0], proyectoId: p.proyecto_id });
       }
+    });
+    // Tareas (disciplinas) vencidas y próximas 3 días
+    const activasSet = new Set(
+      state.disciplinasProyecto.filter(d => d.proyecto_id === p.proyecto_id).map(d => d.disciplina_id)
+    );
+    activasSet.forEach(discKey => {
+      const [gid, dNombre] = discKey.split('::');
+      if (!dNombre) return;
+      const completa = isDisciplinaCompleta(dNombre, gid, logP);
+      if (completa) return;
+      const cierreEvento = state.eventosCatalogo.find(e =>
+        e.grupo_id === gid && e.disciplina_nombre === dNombre &&
+        (e.es_cierre === 'TRUE' || e.es_cierre === 'true' || e.es_cierre === true)
+      );
+      if (!cierreEvento || !cierreEvento.offset_dias) return;
+      const offsetTarea = parseInt(cierreEvento.offset_dias, 10);
+      if (isNaN(offsetTarea)) return;
+      const fechaTarea = addBusinessDays(parseISODate(p.fecha_aprobacion), offsetTarea + offsetPausa);
+      const entry = { proyecto: p.nombre, tarea: dNombre, grupoId: gid, fecha: fechaTarea.toISOString().split('T')[0], proyectoId: p.proyecto_id };
+      if (fechaTarea < hoy) tareasVencidas.push(entry);
+      else if (fechaTarea <= limiteTareas) tareasProximas.push(entry);
     });
   });
 
@@ -854,6 +948,30 @@ function renderDashboard() {
     </div>`).join('')}`;
 
   hitosContainer.innerHTML = vencidosHTML + proximosHTML;
+
+  tareasVencidas.sort((a,b) => new Date(a.fecha) - new Date(b.fecha));
+  tareasProximas.sort((a,b) => new Date(a.fecha) - new Date(b.fecha));
+
+  const tareasContainer = document.getElementById('tareas-dashboard');
+  const tareasVencHTML = tareasVencidas.length === 0 ? '' : `
+    <div style="font-family:var(--mono);font-size:10px;color:#ff5050;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;margin-top:4px">⚠ Tareas vencidas — ${tareasVencidas.length}</div>
+    ${tareasVencidas.map(t => `<div class="hito-row tarea-vencida" onclick="openProyectoEnTarea('${t.proyectoId}','${t.grupoId}','${t.tarea.replace(/'/g,"\\'")}')">
+      <div class="hito-fecha" style="color:#ff5050">${formatDate(t.fecha)}</div>
+      <div class="hito-link">${t.tarea}</div>
+      <div class="hito-link secondary">${t.proyecto}</div>
+      <div></div>
+    </div>`).join('')}`;
+
+  const tareasProxHTML = tareasProximas.length === 0 ? '' : `
+    <div style="font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;margin-top:${tareasVencidas.length > 0 ? '16px' : '4px'}">Tareas — próximos 3 días</div>
+    ${tareasProximas.map(t => `<div class="hito-row tarea-proxima" onclick="openProyectoEnTarea('${t.proyectoId}','${t.grupoId}','${t.tarea.replace(/'/g,"\\'")}')">
+      <div class="hito-fecha">${formatDate(t.fecha)}</div>
+      <div class="hito-link">${t.tarea}</div>
+      <div class="hito-link secondary">${t.proyecto}</div>
+      <div></div>
+    </div>`).join('')}`;
+
+  tareasContainer.innerHTML = tareasVencHTML + tareasProxHTML;
 }
 
 function renderCriteriosBanner() {
@@ -958,7 +1076,7 @@ function renderGroups(proyecto) {
     const enProceso = disciplinas.filter(d => !isDisciplinaCompleta(d, g.grupo_id, log) && log.some(e => e.disciplina_id === `${g.grupo_id}::${d}`)).length;
     const nivel = completadas === disciplinas.length && disciplinas.length > 0 ? 'green' : enProceso > 0 ? 'yellow' : 'gray';
     return `
-    <div class="group-row" id="group-${g.grupo_id}">
+    <div class="group-row" id="group-${g.grupo_id}" data-grupo="${g.grupo_id}">
       <div class="group-header" onclick="toggleGroup('${g.grupo_id}')">
         <span class="group-chevron">▶</span>
         <span class="group-id">${g.grupo_id}</span>
@@ -1160,38 +1278,65 @@ async function openProyectoEnHito(proyectoId, hitoId) {
   const disciplinas = HITO_DISCIPLINAS[hitoId];
   if (!disciplinas || disciplinas.length === 0) return;
   setTimeout(() => {
-    console.log('openProyectoEnHito — hitoId:', hitoId, 'disciplinas:', disciplinas);
-    // Expandir grupos relevantes
     const gruposVistos = new Set();
     disciplinas.forEach(({ g }) => {
-      console.log('expandiendo grupo:', g, '— elemento:', document.getElementById(`group-${g}`));
       if (!gruposVistos.has(g)) {
         gruposVistos.add(g);
         const groupEl = document.getElementById(`group-${g}`);
-        if (groupEl && !groupEl.classList.contains('open')) {
-          groupEl.classList.add('open');
-        }
+        if (groupEl && !groupEl.classList.contains('open')) groupEl.classList.add('open');
       }
     });
-    // Expandir log panels de disciplinas bloqueantes
     disciplinas.forEach(({ g, d }) => {
       const safeId = `${proyectoId}_${g}_${d}`.replace(/[^a-zA-Z0-9_]/g, '_');
       const logPanel = document.getElementById(`log_${safeId}`);
-      if (logPanel && !logPanel.classList.contains('open')) {
-        logPanel.classList.add('open');
-      }
+      if (logPanel && !logPanel.classList.contains('open')) logPanel.classList.add('open');
     });
-    // Scroll a la primera disciplina bloqueante
     const { g, d } = disciplinas[0];
     const safeId = `${proyectoId}_${g}_${d}`.replace(/[^a-zA-Z0-9_]/g, '_');
-    const discEl = document.getElementById(`log_${safeId}`)?.closest('[onclick]') ||
-                   document.getElementById(`log_${safeId}`);
-    if (discEl) {
-      discEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      discEl.style.background = 'rgba(255,80,80,0.08)';
-      setTimeout(() => discEl.style.background = '', 2000);
+    const discRow = document.getElementById(`log_${safeId}`)?.closest('.disciplina-row') ||
+                    document.getElementById(`log_${safeId}`)?.previousElementSibling ||
+                    document.getElementById(`log_${safeId}`);
+    if (discRow) {
+      discRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      discRow.style.transition = 'background 0.3s';
+      discRow.style.background = 'rgba(255,80,80,0.10)';
+      setTimeout(() => { discRow.style.background = ''; }, 2200);
     }
   }, 800);
+}
+
+async function openProyectoEnTarea(proyectoId, grupoId, disciplina) {
+  await openProyecto(proyectoId);
+  setTimeout(() => {
+    const groupEl = document.getElementById(`group-${grupoId}`);
+    if (groupEl && !groupEl.classList.contains('open')) groupEl.classList.add('open');
+    const safeId = `${proyectoId}_${grupoId}_${disciplina}`.replace(/[^a-zA-Z0-9_]/g, '_');
+    const logPanel = document.getElementById(`log_${safeId}`);
+    if (logPanel && !logPanel.classList.contains('open')) logPanel.classList.add('open');
+    const discRow = logPanel?.previousElementSibling || logPanel;
+    if (discRow) {
+      discRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      discRow.style.transition = 'background 0.3s';
+      discRow.style.background = 'rgba(88,166,255,0.10)';
+      setTimeout(() => { discRow.style.background = ''; }, 2200);
+    }
+  }, 800);
+}
+
+// ── INSIGHTS ──
+function abrirInsights() {
+  const p = state.currentProyecto;
+  if (!p) return;
+  document.getElementById('insights-title').textContent = p.nombre;
+  document.getElementById('insights-meta').textContent = `${p.clave_innovasport ? p.clave_innovasport + ' · ' : ''}${p.tipo_proyecto || '—'} · Insights y Dashboards`;
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-insights').classList.add('active');
+  document.getElementById('fab-buscar')?.classList.remove('visible');
+}
+
+function volverDeInsights() {
+  if (state.currentProyecto) openProyecto(state.currentProyecto.proyecto_id);
+  else showView('dashboard');
 }
 
 // ── NUEVO PROYECTO ──
@@ -1763,6 +1908,10 @@ async function evaluarHitos(proyectoId, logOverride) {
 
   const TRIGGERS = {
     'H01': () => true, // auto al crear — siempre alcanzado
+    'H03': () => {
+      const p = state.proyectos.find(x => x.proyecto_id === proyectoId);
+      return !!(p && p.arquitecto_id && p.arquitecto_id.trim() !== '');
+    },
     'H22': () => todasCierran('G5', ['Zonificación','Mueble de Gorras']),
     'H23': () => todasCierran('G6', ['HVAC','Proyecto Eléctrico']),
     'H24': () => todasCierran('G7', ['Pantallas','Antenas WiFi','Bocinas','Contador de Personas','Validación Contactos','Validación Voz y Datos','Validación Site','Validación Cámaras']),
@@ -1829,7 +1978,33 @@ function openSettings() {
   sel.innerHTML = '<option value="">Sin asignar</option>';
   state.usuarios.filter(u => u.rol === 'Arquitecto').forEach(u => sel.innerHTML += `<option value="${u.email}">${u.nombre}</option>`);
   sel.value = p.arquitecto_id || '';
+  // Cargar historial de arquitecto
+  cargarHistorialArquitecto(p.proyecto_id);
   openModal('modal-settings');
+}
+
+async function cargarHistorialArquitecto(proyectoId) {
+  const seccion = document.getElementById('historial-arq-section');
+  const lista = document.getElementById('historial-arq-lista');
+  try {
+    const historial = await api('getHistorialArquitecto', { proyecto_id: proyectoId });
+    if (!historial || historial.length === 0) { seccion.style.display = 'none'; return; }
+    seccion.style.display = 'block';
+    lista.innerHTML = historial.map(h => `
+      <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--surface2);border-radius:var(--radius);font-size:12px">
+        <span style="flex:1;font-weight:500">${h.nombre_arquitecto || h.arquitecto_id}</span>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${h.timestamp ? new Date(h.timestamp).toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}) + ' ' + new Date(h.timestamp).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}) : '—'}</span>
+        <button style="background:none;border:none;color:var(--text3);font-size:11px;cursor:pointer;padding:2px 6px;font-family:var(--mono);transition:color 0.15s" onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--text3)'" onclick="borrarEntryHistorial('${h.ha_id}','${proyectoId}')">✕</button>
+      </div>`).join('');
+  } catch(e) { seccion.style.display = 'none'; }
+}
+
+async function borrarEntryHistorial(haId, proyectoId) {
+  if (!confirm('¿Eliminar esta asignación del historial?')) return;
+  try {
+    await api('borrarEntryHistorialArquitecto', { ha_id: haId });
+    await cargarHistorialArquitecto(proyectoId);
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
 }
 
 function toggleSettingsBubble() {
@@ -1843,18 +2018,39 @@ async function guardarSettings() {
   const btn = document.getElementById('btn-guardar-settings');
   btn.disabled = true; btn.textContent = 'Guardando…';
   try {
+    const estadoAnterior = state.currentProyecto.estado || 'Activo';
+    const estadoNuevo = document.getElementById('s-estado').value;
+    const ahora = new Date().toISOString();
+
+    // Calcular timestamps de pausa/reactivación según transición de estado
+    let fecha_pausa = state.currentProyecto.fecha_pausa || '';
+    let fecha_reactivacion = state.currentProyecto.fecha_reactivacion || '';
+
+    if (estadoAnterior !== 'En pausa' && estadoNuevo === 'En pausa') {
+      // Activo → En pausa: registrar inicio de pausa, limpiar reactivación previa
+      fecha_pausa = ahora;
+      fecha_reactivacion = '';
+    } else if (estadoAnterior === 'En pausa' && estadoNuevo !== 'En pausa') {
+      // En pausa → Activo/Cerrado: registrar reactivación
+      fecha_reactivacion = ahora;
+    }
+
     await api('actualizarProyecto', {
       proyecto_id: state.currentProyecto.proyecto_id,
       nombre, clave_innovasport: document.getElementById('s-clave').value,
       tipo_proyecto: document.getElementById('s-tipo').value,
       fecha_aprobacion: document.getElementById('s-fecha').value,
       arquitecto_id: document.getElementById('s-arquitecto').value,
-      estado: document.getElementById('s-estado').value,
+      estado: estadoNuevo,
       bubble_plan_aplica: document.getElementById('toggle-settings-bubble').classList.contains('on'),
-      notas: document.getElementById('s-notas').value
+      notas: document.getElementById('s-notas').value,
+      fecha_pausa,
+      fecha_reactivacion
     });
+
     closeModal('modal-settings');
-    showToast('Proyecto actualizado', 'success');
+    const msgPausa = estadoNuevo === 'En pausa' ? ' · Proyecto en pausa' : estadoAnterior === 'En pausa' ? ' · Proyecto reactivado' : '';
+    showToast('Proyecto actualizado' + msgPausa, 'success');
     await loadAllData();
     const updated = state.proyectos.find(p => p.proyecto_id === state.currentProyecto.proyecto_id);
     if (updated) { state.currentProyecto = updated; openProyecto(updated.proyecto_id); }
