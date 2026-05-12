@@ -197,9 +197,12 @@
   .log-nota { color:var(--text3); font-style:italic; flex-shrink:0; max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .log-empty { color:var(--text3); font-size:12px; font-family:var(--mono); padding:8px 0; }
   .log-entry-wrap { position:relative; }
-  .log-entry-wrap:hover .btn-borrar-entry { opacity:1; }
+  .log-entry-wrap:hover .btn-borrar-entry,
+  .log-entry-wrap:hover .btn-editar-entry { opacity:1; }
   .btn-borrar-entry { opacity:0; position:absolute; right:0; top:50%; transform:translateY(-50%); background:none; border:none; color:var(--text3); font-size:11px; cursor:pointer; padding:2px 6px; transition:all 0.15s; font-family:var(--mono); }
   .btn-borrar-entry:hover { color:var(--red); }
+  .btn-editar-entry { opacity:0; position:absolute; right:20px; top:50%; transform:translateY(-50%); background:none; border:none; color:var(--text3); font-size:11px; cursor:pointer; padding:2px 6px; transition:all 0.15s; font-family:var(--mono); }
+  .btn-editar-entry:hover { color:var(--accent); }
 
   /* TIMELINE EN DETALLE */
   .timeline-section { margin-top:28px; margin-bottom:4px; }
@@ -643,6 +646,21 @@
   </div>
 </div>
 
+<!-- MODAL: EDITAR LOG ENTRY -->
+<div class="modal-overlay" id="modal-editar-entry">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header"><div class="modal-title">Editar entrada del log</div><button class="modal-close" onclick="closeModal('modal-editar-entry')">×</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Fecha</label><input class="form-input" id="ee-fecha" type="date"></div>
+      <div class="form-group"><label class="form-label">Nota <span style="color:var(--text3)">(opcional)</span></label><textarea class="form-textarea" id="ee-nota" placeholder="Contexto, observaciones, riesgos…" style="min-height:80px"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('modal-editar-entry')">Cancelar</button>
+      <button class="btn-primary" id="btn-guardar-editar-entry" onclick="confirmarEditarEntry()">Guardar cambios</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL: BORRAR CAMBIO -->
 <div class="modal-overlay" id="modal-borrar-cambio">
   <div class="modal" style="max-width:420px">
@@ -799,11 +817,11 @@ async function api(action, body = {}) {
 // ── DATA ──
 async function loadAllData() {
   try {
-    const [proyectos, eventos, log, criterios, disciplinas, cambiosDetalle, cambiosBorrados] = await Promise.all([
+    const [proyectos, eventos, log, criterios, disciplinas, cambiosDetalle, cambiosBorrados, historialArq] = await Promise.all([
       api('getProyectos'), api('getEventosCatalogo'),
       api('getLogEventos'), api('getCriteriosPrograma'),
       api('getDisciplinasProyecto'), api('getCambiosDetalle'),
-      api('getCambiosBorrados', {})
+      api('getCambiosBorrados', {}), api('getHistorialArquitecto', {})
     ]);
     state.proyectos = proyectos || [];
     state.eventosCatalogo = eventos || [];
@@ -812,6 +830,7 @@ async function loadAllData() {
     state.disciplinasProyecto = disciplinas || [];
     state.cambiosDetalle = cambiosDetalle || [];
     state.cambiosBorrados = cambiosBorrados || [];
+    state.historialArquitecto = historialArq || [];
     renderDashboard();
     renderCriteriosBanner();
   } catch(e) { showToast('Error cargando datos: ' + e.message, 'error'); console.error(e); }
@@ -844,32 +863,49 @@ function getOffsetPausa(proyecto) {
 
 // ── DASHBOARD ──
 function renderDashboard() {
+  // Visibles en listado: activos + pausados. Cerrados van en sección colapsable.
+  const visibles = state.proyectos.filter(p => !p.estado || p.estado === 'Activo' || p.estado === 'En pausa');
+  const cerrados = state.proyectos.filter(p => p.estado === 'Cerrado');
+  // Para alertas: solo activos (sin pausa)
   const activos = state.proyectos.filter(p => !p.estado || p.estado === 'Activo');
   const container = document.getElementById('proyectos-list');
 
-  if (activos.length === 0) {
+  const renderCard = p => {
+    const enPausa = p.estado === 'En pausa';
+    const { nivel, label } = enPausa ? { nivel: 'gray', label: 'En pausa' } : calcRiesgo(p);
+    return `<div class="project-card risk-${nivel}" onclick="openProyecto('${p.proyecto_id}')" style="${enPausa ? 'opacity:0.75' : ''}">
+      <div>
+        <div class="project-name">${p.nombre || '—'}${enPausa ? ' <span style="font-family:var(--mono);font-size:10px;color:var(--text3);font-weight:400">(Pausado)</span>' : ''}</div>
+        <div style="${enPausa ? 'filter:grayscale(1);opacity:0.6' : ''}">${renderScoreboard(p.proyecto_id)}</div>
+        <div class="project-meta">
+          ${p.clave_innovasport ? `<div class="meta-item"><span class="label">Clave&nbsp;</span>${p.clave_innovasport}</div>` : ''}
+          <div class="meta-item"><span class="label">Tipo&nbsp;</span>${p.tipo_proyecto || '—'}</div>
+          <div class="meta-item"><span class="label">Aprobación&nbsp;</span>${formatDate(p.fecha_aprobacion)}</div>
+          <div class="meta-item"><span class="label">Entrega est.&nbsp;</span>${calcFechaEntrega(p.fecha_aprobacion)}</div>
+          ${p.arquitecto_id ? `<div class="meta-item"><span class="label">Arq.&nbsp;</span>${(state.usuarios.find(u => u.email === p.arquitecto_id)?.nombre) || p.arquitecto_id}</div>` : ''}
+        </div>
+      </div>
+      <div class="project-right">
+        <div class="semaforo ${nivel}"></div>
+        <div class="desvio-badge ${nivel}">${label}</div>
+      </div>
+    </div>`;
+  };
+
+  if (visibles.length === 0) {
     container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📋</div>No hay proyectos activos.<br>Crea el primero con el botón de arriba.</div>`;
   } else {
-    container.innerHTML = `<div class="project-grid">${activos.map(p => {
-      const { nivel, label } = calcRiesgo(p);
-      return `<div class="project-card risk-${nivel}" onclick="openProyecto('${p.proyecto_id}')">
-        <div>
-          <div class="project-name">${p.nombre || '—'}</div>
-          ${renderScoreboard(p.proyecto_id)}
-          <div class="project-meta">
-            ${p.clave_innovasport ? `<div class="meta-item"><span class="label">Clave&nbsp;</span>${p.clave_innovasport}</div>` : ''}
-            <div class="meta-item"><span class="label">Tipo&nbsp;</span>${p.tipo_proyecto || '—'}</div>
-            <div class="meta-item"><span class="label">Aprobación&nbsp;</span>${formatDate(p.fecha_aprobacion)}</div>
-            <div class="meta-item"><span class="label">Entrega est.&nbsp;</span>${calcFechaEntrega(p.fecha_aprobacion)}</div>
-            ${p.arquitecto_id ? `<div class="meta-item"><span class="label">Arq.&nbsp;</span>${(state.usuarios.find(u => u.email === p.arquitecto_id)?.nombre) || p.arquitecto_id}</div>` : ''}
-          </div>
-        </div>
-        <div class="project-right">
-          <div class="semaforo ${nivel}"></div>
-          <div class="desvio-badge ${nivel}">${label}</div>
+    const cerradosHTML = cerrados.length === 0 ? '' : `
+      <div style="margin-top:12px">
+        <button class="cambio-expand-btn" onclick="toggleCambioPanel('panel-cerrados')" style="font-size:11px;color:var(--text3)">
+          <span id="chevron-panel-cerrados" style="transition:transform 0.15s;display:inline-block">▶</span>
+          proyectos cerrados (${cerrados.length})
+        </button>
+        <div class="cambio-detail-panel" id="panel-cerrados" style="margin-top:8px;padding:0">
+          <div class="project-grid">${cerrados.map(renderCard).join('')}</div>
         </div>
       </div>`;
-    }).join('')}</div>`;
+    container.innerHTML = `<div class="project-grid">${visibles.map(renderCard).join('')}</div>${cerradosHTML}`;
   }
 
   // Hitos próximos y vencidos
@@ -1165,11 +1201,49 @@ function renderDisciplina(proyecto, grupo, disciplina, log) {
                 }
                 <div class="log-nota">${esNotaRef ? '' : (e.nota || '')}</div>
               </div>
-              ${state.rol === 'PM' ? `<button class="btn-borrar-entry" onclick="borrarEntry('${e.entry_id}')" title="Borrar entrada">✕</button>` : ''}
+              ${state.rol === 'PM' ? `
+                <button class="btn-editar-entry" onclick="abrirEditarEntry('${e.entry_id}')" title="Editar entrada">✎</button>
+                <button class="btn-borrar-entry" onclick="borrarEntry('${e.entry_id}')" title="Borrar entrada">✕</button>` : ''}
             </div>`;
           }).join('')}
     </div>
   </div>`;
+}
+
+function abrirEditarEntry(entryId) {
+  const e = state.logEventos.find(x => x.entry_id === entryId);
+  if (!e) return;
+  state._editandoEntryId = entryId;
+  document.getElementById('ee-fecha').value = (() => {
+    const s = (e.fecha_real || '').toString().trim();
+    const m = s.match(/(\d{4}-\d{2}-\d{2})/);
+    return m ? m[1] : '';
+  })();
+  document.getElementById('ee-nota').value = e.nota || '';
+  openModal('modal-editar-entry');
+}
+
+async function confirmarEditarEntry() {
+  const entryId = state._editandoEntryId;
+  if (!entryId) return;
+  const fecha = document.getElementById('ee-fecha').value;
+  const nota = document.getElementById('ee-nota').value;
+  const btn = document.getElementById('btn-guardar-editar-entry');
+  btn.disabled = true; btn.textContent = 'Guardando…';
+  const estadoPaneles = capturarEstadoPaneles();
+  try {
+    await api('editarLogEvento', { entry_id: entryId, fecha_real: fecha, nota });
+    // Actualizar localmente
+    const idx = state.logEventos.findIndex(x => x.entry_id === entryId);
+    if (idx >= 0) { state.logEventos[idx].fecha_real = fecha; state.logEventos[idx].nota = nota; }
+    closeModal('modal-editar-entry');
+    showToast('Entrada actualizada', 'success');
+    if (state.currentProyecto) {
+      await openProyecto(state.currentProyecto.proyecto_id);
+      restaurarEstadoPaneles(estadoPaneles);
+    }
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+  finally { btn.disabled = false; btn.textContent = 'Guardar cambios'; }
 }
 
 async function borrarEntry(entryId) {
@@ -1277,50 +1351,12 @@ async function openProyectoEnHito(proyectoId, hitoId) {
   await openProyecto(proyectoId);
   const disciplinas = HITO_DISCIPLINAS[hitoId];
   if (!disciplinas || disciplinas.length === 0) return;
-  setTimeout(() => {
-    const gruposVistos = new Set();
-    disciplinas.forEach(({ g }) => {
-      if (!gruposVistos.has(g)) {
-        gruposVistos.add(g);
-        const groupEl = document.getElementById(`group-${g}`);
-        if (groupEl && !groupEl.classList.contains('open')) groupEl.classList.add('open');
-      }
-    });
-    disciplinas.forEach(({ g, d }) => {
-      const safeId = `${proyectoId}_${g}_${d}`.replace(/[^a-zA-Z0-9_]/g, '_');
-      const logPanel = document.getElementById(`log_${safeId}`);
-      if (logPanel && !logPanel.classList.contains('open')) logPanel.classList.add('open');
-    });
-    const { g, d } = disciplinas[0];
-    const safeId = `${proyectoId}_${g}_${d}`.replace(/[^a-zA-Z0-9_]/g, '_');
-    const discRow = document.getElementById(`log_${safeId}`)?.closest('.disciplina-row') ||
-                    document.getElementById(`log_${safeId}`)?.previousElementSibling ||
-                    document.getElementById(`log_${safeId}`);
-    if (discRow) {
-      discRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      discRow.style.transition = 'background 0.3s';
-      discRow.style.background = 'rgba(255,80,80,0.10)';
-      setTimeout(() => { discRow.style.background = ''; }, 2200);
-    }
-  }, 800);
+  await navegarADisciplinas(proyectoId, disciplinas, 'red');
 }
 
 async function openProyectoEnTarea(proyectoId, grupoId, disciplina) {
   await openProyecto(proyectoId);
-  setTimeout(() => {
-    const groupEl = document.getElementById(`group-${grupoId}`);
-    if (groupEl && !groupEl.classList.contains('open')) groupEl.classList.add('open');
-    const safeId = `${proyectoId}_${grupoId}_${disciplina}`.replace(/[^a-zA-Z0-9_]/g, '_');
-    const logPanel = document.getElementById(`log_${safeId}`);
-    if (logPanel && !logPanel.classList.contains('open')) logPanel.classList.add('open');
-    const discRow = logPanel?.previousElementSibling || logPanel;
-    if (discRow) {
-      discRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      discRow.style.transition = 'background 0.3s';
-      discRow.style.background = 'rgba(88,166,255,0.10)';
-      setTimeout(() => { discRow.style.background = ''; }, 2200);
-    }
-  }, 800);
+  await navegarADisciplinas(proyectoId, [{ g: grupoId, d: disciplina }], 'blue');
 }
 
 // ── INSIGHTS ──
@@ -1337,6 +1373,48 @@ function abrirInsights() {
 function volverDeInsights() {
   if (state.currentProyecto) openProyecto(state.currentProyecto.proyecto_id);
   else showView('dashboard');
+}
+
+async function navegarADisciplinas(proyectoId, disciplinas, color) {
+  // Esperar a que el DOM tenga el primer grupo renderizado
+  const primerGrupoId = disciplinas[0].g;
+  await new Promise(resolve => {
+    const check = () => {
+      if (document.getElementById(`group-${primerGrupoId}`)) resolve();
+      else requestAnimationFrame(check);
+    };
+    check();
+  });
+
+  // Expandir grupos
+  const gruposVistos = new Set();
+  disciplinas.forEach(({ g }) => {
+    if (!gruposVistos.has(g)) {
+      gruposVistos.add(g);
+      const groupEl = document.getElementById(`group-${g}`);
+      if (groupEl && !groupEl.classList.contains('open')) groupEl.classList.add('open');
+    }
+  });
+
+  // Abrir log panels
+  disciplinas.forEach(({ g, d }) => {
+    const safeId = `${proyectoId}_${g}_${d}`.replace(/[^a-zA-Z0-9_]/g, '_');
+    const logPanel = document.getElementById(`log_${safeId}`);
+    if (logPanel && !logPanel.classList.contains('open')) logPanel.classList.add('open');
+  });
+
+  // Scroll y highlight a la primera disciplina
+  await new Promise(r => setTimeout(r, 60));
+  const { g, d } = disciplinas[0];
+  const safeId = `${proyectoId}_${g}_${d}`.replace(/[^a-zA-Z0-9_]/g, '_');
+  const logPanel = document.getElementById(`log_${safeId}`);
+  const discRow = logPanel?.previousElementSibling || logPanel;
+  if (discRow) {
+    discRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    discRow.style.transition = 'background 0.3s';
+    discRow.style.background = color === 'red' ? 'rgba(255,80,80,0.10)' : 'rgba(88,166,255,0.10)';
+    setTimeout(() => { discRow.style.background = ''; }, 2200);
+  }
 }
 
 // ── NUEVO PROYECTO ──
@@ -1910,7 +1988,21 @@ async function evaluarHitos(proyectoId, logOverride) {
     'H01': () => true, // auto al crear — siempre alcanzado
     'H03': () => {
       const p = state.proyectos.find(x => x.proyecto_id === proyectoId);
-      return !!(p && p.arquitecto_id && p.arquitecto_id.trim() !== '');
+      if (!p || !p.arquitecto_id || !p.arquitecto_id.trim()) return false;
+      // Solo disparar si no hay ningún hito_alcanzado H03 con el arquitecto actual
+      const alcancesH03 = log.filter(e => e.hito_id === 'H03' && e.tipo_entry === 'hito_alcanzado');
+      // Si ya existe al menos uno y el arquitecto no cambió desde el último, no re-disparar
+      if (alcancesH03.length > 0) {
+        const historial = (state.historialArquitecto || []).filter(h => h.proyecto_id === proyectoId);
+        // Si hay historial, el último entry corresponde al arquitecto actual — ya está registrado
+        if (historial.length === 0) return false; // ya alcanzado, sin cambio posterior
+        const ultimoHistorial = historial.sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp))[0];
+        const ultimoAlcance = alcancesH03.sort((a,b) => new Date(b.timestamp||b.fecha_real) - new Date(a.timestamp||a.fecha_real))[0];
+        // Solo re-disparar si el último cambio de arquitecto es posterior al último alcance
+        return ultimoHistorial && ultimoAlcance &&
+          new Date(ultimoHistorial.timestamp) > new Date(ultimoAlcance.timestamp || ultimoAlcance.fecha_real + 'T12:00:00Z');
+      }
+      return true; // nunca alcanzado — disparar
     },
     'H22': () => todasCierran('G5', ['Zonificación','Mueble de Gorras']),
     'H23': () => todasCierran('G6', ['HVAC','Proyecto Eléctrico']),
@@ -1969,7 +2061,13 @@ function openSettings() {
   document.getElementById('s-nombre').value = p.nombre || '';
   document.getElementById('s-clave').value = p.clave_innovasport || '';
   document.getElementById('s-tipo').value = p.tipo_proyecto || '';
-  document.getElementById('s-fecha').value = p.fecha_aprobacion ? p.fecha_aprobacion.toString().split('T')[0].substring(0,10) : '';
+  document.getElementById('s-fecha').value = (() => {
+    if (!p.fecha_aprobacion) return '';
+    const s = p.fecha_aprobacion.toString().trim();
+    // Formato ISO completo o solo fecha
+    const match = s.match(/(\d{4}-\d{2}-\d{2})/);
+    return match ? match[1] : '';
+  })();
   document.getElementById('s-notas').value = p.notas || '';
   document.getElementById('s-estado').value = p.estado || 'Activo';
   const bubbleOn = p.bubble_plan_aplica === true || p.bubble_plan_aplica === 'TRUE';
@@ -2164,7 +2262,11 @@ function renderNotas(proyecto) {
               </div>`;
             }).join('');
 
-        const textoNota = esCambio ? (cd?.alcance || n.nota || '') : (notaData?.contenido || n.nota || n.hito_id || '');
+        // Texto de contenido — cubre notas estructuradas (JSON) y notas legacy (texto plano)
+        const textoNota = esCambio
+          ? (cd?.alcance || n.nota || '')
+          : (notaData?.contenido || (typeof n.nota === 'string' && !n.nota.startsWith('{') ? n.nota : '') || '');
+
         const expandHTML = esCambio ? `
           <button class="cambio-expand-btn" onclick="toggleCambioPanel('${panelId}')">
             <span id="chevron-${panelId}" style="transition:transform 0.15s;display:inline-block">▶</span> ver detalle
@@ -2182,14 +2284,19 @@ function renderNotas(proyecto) {
               ${histHTML}
             </div>
           </div>`
-        : textoNota ? `
-          <button class="cambio-expand-btn" onclick="toggleCambioPanel('${panelId}')">
-            <span id="chevron-${panelId}" style="transition:transform 0.15s;display:inline-block">▶</span> ver detalle
-          </button>
-          <div class="cambio-detail-panel" id="${panelId}">
-            <div class="cambio-detail-alcance">${textoNota}</div>
-            ${notaData?.referencia_disciplina ? `<div style="margin-top:6px;font-family:var(--mono);font-size:11px;color:var(--text3)">Ref: ${notaData.referencia_disciplina}</div>` : ''}
-          </div>` : '';
+        : `
+          ${textoNota ? `
+            <button class="cambio-expand-btn" onclick="toggleCambioPanel('${panelId}')">
+              <span id="chevron-${panelId}" style="transition:transform 0.15s;display:inline-block">▶</span> ver detalle
+            </button>
+            <div class="cambio-detail-panel" id="${panelId}">
+              <div class="cambio-detail-alcance">${textoNota}</div>
+              ${notaData?.disc_ref ? `<div style="margin-top:6px;font-family:var(--mono);font-size:11px;color:var(--text3)">Ref: ${notaData.disc_ref}</div>` : ''}
+            </div>` : ''}
+          ${esPM ? `<div style="margin-top:6px;display:flex;gap:8px">
+            <button class="btn-secondary" style="font-size:12px;padding:4px 10px" onclick="abrirEditarNota('${n.entry_id}')">✏️ Editar</button>
+            <button class="btn-danger" style="font-size:12px;padding:4px 10px" onclick="borrarNota('${n.entry_id}','${n.hito_id || ''}','${state.currentProyecto?.proyecto_id || ''}')">Eliminar</button>
+          </div>` : ''}`;
 
         const notaTipoAbrev = { 'Riesgo': 'RSG', 'Lección aprendida': 'LA', 'Decisión': 'DEC', 'Pendiente externo': 'PE', 'General': 'GEN' };
         const tipoTag = notaData?.tipo ? `<span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${notaTipoAbrev[notaData.tipo] || notaData.tipo}</span>` : '';
@@ -2231,6 +2338,44 @@ function renderNotas(proyecto) {
       </div>
     </div>
   </div>`;
+}
+
+function abrirEditarNota(entryId) {
+  const n = state.logEventos.find(x => x.entry_id === entryId);
+  if (!n) return;
+  let notaData = null;
+  try { notaData = JSON.parse(n.nota || '{}'); } catch(e) {}
+  // Reusar el modal de nota/cambio en modo edición
+  state.editandoNotaId = entryId;
+  document.getElementById('nc-fecha').value = (() => {
+    const s = (n.fecha_real || '').toString().trim();
+    const m = s.match(/(\d{4}-\d{2}-\d{2})/);
+    return m ? m[1] : '';
+  })();
+  document.getElementById('nc-titulo').value = notaData?.titulo || '';
+  document.getElementById('nc-tipo-nota').value = notaData?.tipo || '';
+  document.getElementById('nc-texto').value = notaData?.contenido || n.nota || '';
+  selectNotaCambioTipo('nota');
+  const title = document.getElementById('nota-cambio-title');
+  const btn = document.getElementById('btn-guardar-nc');
+  title.textContent = 'Editar nota';
+  btn.textContent = 'Guardar cambios';
+  buildNotaGrupoSelector();
+  openModal('modal-nota-cambio');
+}
+
+async function borrarNota(entryId, hitoId, proyectoId) {
+  if (!confirm('¿Eliminar esta nota?\nEsta acción no se puede deshacer.')) return;
+  const estadoPaneles = capturarEstadoPaneles();
+  try {
+    await api('borrarNota', { entry_id: entryId, hito_id: hitoId, proyecto_id: proyectoId });
+    state.logEventos = state.logEventos.filter(e => e.entry_id !== entryId && !(e.hito_id === hitoId && e.tipo_entry === 'nota_ref'));
+    showToast('Nota eliminada', 'success');
+    if (state.currentProyecto) {
+      await openProyecto(state.currentProyecto.proyecto_id);
+      restaurarEstadoPaneles(estadoPaneles);
+    }
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
 }
 
 function scrollToCambio(entryId) {
