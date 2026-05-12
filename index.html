@@ -1236,11 +1236,7 @@ function abrirEditarEntry(entryId) {
   const e = state.logEventos.find(x => x.entry_id === entryId);
   if (!e) return;
   state._editandoEntryId = entryId;
-  document.getElementById('ee-fecha').value = (() => {
-    const s = (e.fecha_real || '').toString().trim();
-    const m = s.match(/(\d{4}-\d{2}-\d{2})/);
-    return m ? m[1] : '';
-  })();
+  document.getElementById('ee-fecha').value = normalizarFechaParaInput(e.fecha_real);
   document.getElementById('ee-nota').value = e.nota || '';
   openModal('modal-editar-entry');
 }
@@ -1586,11 +1582,12 @@ function openNuevoEntry() {
 }
 
 function openNotaCambio(modoEdicion = false, cambioData = null) {
-  document.getElementById('nc-fecha').value = cambioData?.fecha || new Date().toISOString().split('T')[0];
+  document.getElementById('nc-fecha').value = normalizarFechaParaInput(cambioData?.fecha) || new Date().toISOString().split('T')[0];
   document.getElementById('nc-texto').value = cambioData?.texto || '';
   document.getElementById('e-impacto-tipo').value = cambioData?.impacto_tipo || '';
   document.getElementById('e-origen').value = cambioData?.origen || '';
   document.getElementById('nc-titulo').value = cambioData?.titulo || '';
+  document.getElementById('nc-cambio-titulo').value = cambioData?.titulo || '';
   document.getElementById('nc-tipo-nota').value = cambioData?.tipo_nota || '';
   document.getElementById('nc-nota-grupo').value = '';
   document.getElementById('nc-nota-disciplina').innerHTML = '<option value="">—</option>';
@@ -2110,13 +2107,7 @@ function openSettings() {
   document.getElementById('s-nombre').value = p.nombre || '';
   document.getElementById('s-clave').value = p.clave_innovasport || '';
   document.getElementById('s-tipo').value = p.tipo_proyecto || '';
-  document.getElementById('s-fecha').value = (() => {
-    if (!p.fecha_aprobacion) return '';
-    const s = p.fecha_aprobacion.toString().trim();
-    // Formato ISO completo o solo fecha
-    const match = s.match(/(\d{4}-\d{2}-\d{2})/);
-    return match ? match[1] : '';
-  })();
+  document.getElementById('s-fecha').value = normalizarFechaParaInput(p.fecha_aprobacion);
   document.getElementById('s-notas').value = p.notas || '';
   document.getElementById('s-estado').value = p.estado || 'Activo';
   const bubbleOn = p.bubble_plan_aplica === true || p.bubble_plan_aplica === 'TRUE';
@@ -2412,11 +2403,7 @@ function abrirEditarNota(entryId) {
   // Pre-llenar tipo primero para que los campos estén visibles
   selectNotaCambioTipo('nota');
   // Fecha
-  document.getElementById('nc-fecha').value = (() => {
-    const s = (n.fecha_real || '').toString().trim();
-    const m = s.match(/(\d{4}-\d{2}-\d{2})/);
-    return m ? m[1] : '';
-  })();
+  document.getElementById('nc-fecha').value = normalizarFechaParaInput(n.fecha_real);
   // Campos de nota — con fallback para notas legacy sin JSON
   document.getElementById('nc-titulo').value = notaData?.titulo || '';
   document.getElementById('nc-tipo-nota').value = notaData?.tipo || '';
@@ -2661,6 +2648,24 @@ function obsoletarCriterio(id) {
 }
 
 // ── HELPERS DE FECHA ──
+function normalizarFechaParaInput(val) {
+  // Convierte cualquier representación de fecha a YYYY-MM-DD para input[type=date]
+  if (!val) return '';
+  const s = val.toString().trim();
+  // Ya está en formato YYYY-MM-DD
+  const isoMatch = s.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (isoMatch) return isoMatch[1];
+  // Formato de Apps Script: "Sat May 02 2026 00:00:00 GMT..."
+  const d = new Date(s);
+  if (!isNaN(d.getTime())) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${dd}`;
+  }
+  return '';
+}
+
 function parseTimestamp(ts) {
   if (!ts) return null;
   const s = ts.toString().trim();
