@@ -189,12 +189,13 @@
   /* LOG PANEL */
   .log-panel { display:none; background:var(--bg); border-top:1px solid var(--border); padding:16px 16px 16px 52px; }
   .log-panel.open { display:block; }
-  .log-entry { display:flex; gap:12px; align-items:start; padding:8px 0; border-bottom:1px solid var(--border); font-size:12px; min-width:0; overflow:hidden; }
+  .log-entry { display:flex; flex-direction:column; gap:2px; padding:5px 0; border-bottom:1px solid var(--border); font-size:12px; min-width:0; }
   .log-entry:last-child { border-bottom:none; }
-  .log-fecha { font-family:var(--mono); color:var(--text3); flex-shrink:0; min-width:100px; }
+  .log-entry-top { display:flex; gap:8px; align-items:baseline; min-width:0; overflow:hidden; }
+  .log-fecha { font-family:var(--mono); color:var(--text3); flex-shrink:0; font-size:11px; white-space:nowrap; }
   .log-tipo { font-family:var(--mono); font-size:10px; color:var(--text3); background:var(--surface2); padding:1px 5px; border-radius:2px; flex-shrink:0; }
-  .log-evento { color:var(--text); font-weight:500; flex:1; min-width:0; overflow:hidden; }
-  .log-nota { color:var(--text3); font-style:italic; flex-shrink:0; max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .log-evento { color:var(--text); font-weight:500; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .log-nota { color:var(--text3); font-style:italic; font-size:11px; padding-left:2px; line-height:1.4; white-space:normal; word-break:break-word; }
   .log-empty { color:var(--text3); font-size:12px; font-family:var(--mono); padding:8px 0; }
   .log-entry-wrap { position:relative; }
   .log-entry-wrap:hover .btn-borrar-entry,
@@ -1196,29 +1197,31 @@ function renderDisciplina(proyecto, grupo, disciplina, log) {
             return `
             <div class="log-entry-wrap">
               <div class="log-entry${esNotaRef ? ' log-entry-nota-ref' : ''}">
-                <div class="log-fecha">${formatDate(e.fecha_real)}${e.timestamp ? '<span style="color:var(--text3);font-size:9px;margin-left:3px">' + new Date(e.timestamp).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}) + '</span>' : ''}</div>
-                ${esNotaRef
-                  ? `<div class="log-evento" style="display:flex;align-items:center;gap:6px;min-width:0;overflow:hidden">
-                      <span style="font-family:var(--mono);font-size:10px;color:var(--accent);cursor:pointer;flex-shrink:0" onclick="scrollToNota('${e.hito_id}')" title="Ver nota completa">${e.hito_id}</span>
-                      <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0" title="${notaRef?.titulo || ''}">${tituloDisplay}</span>
-                      ${notaRef?.tipo ? `<span style="font-family:var(--mono);font-size:9px;color:var(--text3);flex-shrink:0;margin-left:4px">${notaTipoAbrev[notaRef.tipo] || ''}</span>` : ''}
-                    </div>`
-                  : (() => {
-                      const esAfectado = e.hito_id && e.hito_id.startsWith('Afectado por Cambio ');
-                      if (esAfectado) {
-                        const clave = e.hito_id.replace('Afectado por Cambio ', '');
-                        const entryIdCambio = (state.cambiosDetalle || []).find(cd => cd.clave_cambio === clave)?.entry_id;
-                        const link = entryIdCambio
-                          ? `<span style="font-family:var(--mono);font-size:10px;color:var(--yellow);cursor:pointer;flex-shrink:0" onclick="scrollToCambio('${entryIdCambio}')" title="Ver detalle del cambio">${clave}</span>`
-                          : `<span style="font-family:var(--mono);font-size:10px;color:var(--yellow);flex-shrink:0">${clave}</span>`;
-                        const cdEntry = (state.cambiosDetalle || []).find(cd => cd.clave_cambio === clave);
-                        const tituloEntry = cdEntry?.titulo ? `: ${cdEntry.titulo}` : '';
-                        return `<div class="log-evento" style="display:flex;align-items:center;gap:6px;min-width:0;overflow:hidden"><span style="flex-shrink:0">${link}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0">Afectado por Cambio${tituloEntry}</span></div>`;
-                      }
-                      return `<div class="log-evento">${e.hito_id || '—'}</div>`;
-                    })()
-                }
-                <div class="log-nota">${esNotaRef ? '' : (e.nota || '')}</div>
+                <div class="log-entry-top">
+                  <div class="log-fecha">${formatDate(e.fecha_real)}${formatHora(e.timestamp) ? '<span style="color:var(--text3);font-size:9px;margin-left:3px">' + formatHora(e.timestamp) + '</span>' : ''}</div>
+                  ${esNotaRef
+                    ? `<div class="log-evento" style="display:flex;align-items:center;gap:6px;min-width:0;overflow:hidden">
+                        <span style="font-family:var(--mono);font-size:10px;color:var(--accent);cursor:pointer;flex-shrink:0" onclick="scrollToNota('${e.hito_id}')" title="Ver nota completa">${e.hito_id}</span>
+                        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0" title="${notaRef?.titulo || ''}">${tituloDisplay}</span>
+                        ${notaRef?.tipo ? `<span style="font-family:var(--mono);font-size:9px;color:var(--text3);flex-shrink:0;margin-left:4px">${notaTipoAbrev[notaRef.tipo] || ''}</span>` : ''}
+                      </div>`
+                    : (() => {
+                        const esAfectado = e.hito_id && e.hito_id.startsWith('Afectado por Cambio ');
+                        if (esAfectado) {
+                          const clave = e.hito_id.replace('Afectado por Cambio ', '');
+                          const entryIdCambio = (state.cambiosDetalle || []).find(cd => cd.clave_cambio === clave)?.entry_id;
+                          const link = entryIdCambio
+                            ? `<span style="font-family:var(--mono);font-size:10px;color:var(--yellow);cursor:pointer;flex-shrink:0" onclick="scrollToCambio('${entryIdCambio}')" title="Ver detalle del cambio">${clave}</span>`
+                            : `<span style="font-family:var(--mono);font-size:10px;color:var(--yellow);flex-shrink:0">${clave}</span>`;
+                          const cdEntry = (state.cambiosDetalle || []).find(cd => cd.clave_cambio === clave);
+                          const tituloEntry = cdEntry?.titulo ? `: ${cdEntry.titulo}` : '';
+                          return `<div class="log-evento" style="display:flex;align-items:center;gap:6px;min-width:0;overflow:hidden"><span style="flex-shrink:0">${link}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0">Afectado por Cambio${tituloEntry}</span></div>`;
+                        }
+                        return `<div class="log-evento">${e.hito_id || '—'}</div>`;
+                      })()
+                  }
+                </div>
+                ${!esNotaRef && e.nota ? `<div class="log-nota">${e.nota}</div>` : ''}
               </div>
               ${state.rol === 'PM' ? `
                 <button class="btn-editar-entry" onclick="abrirEditarEntry('${e.entry_id}')" title="Editar entrada">✎</button>
@@ -2368,7 +2371,7 @@ function renderNotas(proyecto) {
 
         return `
         <div class="nota-entry" data-entry-id="${n.entry_id}" data-hito-id="${n.hito_id || ''}">
-          <div class="nota-meta" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${formatDate(n.fecha_real)}${n.timestamp ? `<span style="font-size:9px;color:var(--text3)">${new Date(n.timestamp).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})}</span>` : ''} · ${n.registrado_por || state.user?.name || '—'}${claveTag ? ' · ' + claveTag : ''}${tipoTag ? ' · ' + tipoTag : ''}${cd?.impacto_tipo ? ` · <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${cd.impacto_tipo}</span>` : ''}</div>
+          <div class="nota-meta" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${formatDate(n.fecha_real)}${formatHora(n.timestamp) ? `<span style="font-size:9px;color:var(--text3)">${formatHora(n.timestamp)}</span>` : ''} · ${n.registrado_por || state.user?.name || '—'}${claveTag ? ' · ' + claveTag : ''}${tipoTag ? ' · ' + tipoTag : ''}${cd?.impacto_tipo ? ` · <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${cd.impacto_tipo}</span>` : ''}</div>
           ${tituloNota}
           ${expandHTML}
         </div>`;
@@ -2654,6 +2657,23 @@ function obsoletarCriterio(id) {
       catch(e) { showToast('Error: ' + e.message, 'error'); }
     }
   });
+}
+
+// ── HELPERS DE FECHA ──
+function parseTimestamp(ts) {
+  if (!ts) return null;
+  const s = ts.toString().trim();
+  let d = new Date(s);
+  if (!isNaN(d.getTime())) return d;
+  const match = s.match(/(\w{3} \w{3} \d{2} \d{4} \d{2}:\d{2}:\d{2})/);
+  if (match) { d = new Date(match[1]); if (!isNaN(d.getTime())) return d; }
+  return null;
+}
+
+function formatHora(ts) {
+  const d = parseTimestamp(ts);
+  if (!d) return '';
+  return d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
 }
 
 // ── TIMELINE / FECHAS ──
