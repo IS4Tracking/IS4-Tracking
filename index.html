@@ -661,6 +661,23 @@
   </div>
 </div>
 
+<!-- MODAL: CONFIRMACIÓN GENÉRICA -->
+<div class="modal-overlay" id="modal-confirmar-borrado">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-header">
+      <div class="modal-title" id="confirmar-borrado-titulo">Confirmar eliminación</div>
+      <button class="modal-close" onclick="closeModal('modal-confirmar-borrado')">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="confirmar-borrado-mensaje" style="font-size:13px;color:var(--text2);line-height:1.6"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('modal-confirmar-borrado')">Cancelar</button>
+      <button class="btn-danger" id="btn-confirmar-borrado" onclick="ejecutarConfirmarBorrado()">Eliminar</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL: BORRAR CAMBIO -->
 <div class="modal-overlay" id="modal-borrar-cambio">
   <div class="modal" style="max-width:420px">
@@ -693,7 +710,9 @@ let state = {
   bubblePlan: false, disciplinasSeleccionadas: new Set(),
   cambioDiscsSeleccionadas: new Set(), editandoCambioId: null,
   cambiosBorrados: [], cambiosEliminados: [], borrandoCambioId: null,
-  diasPausaAcumulados: {}
+  diasPausaAcumulados: {},
+  _editandoEntryId: null, editandoNotaId: null,
+  _confirmarBorradoFn: null
 };
 
 // ── AUTH — Google Identity Services ──
@@ -1246,19 +1265,26 @@ async function confirmarEditarEntry() {
   finally { btn.disabled = false; btn.textContent = 'Guardar cambios'; }
 }
 
-async function borrarEntry(entryId) {
-  if (!confirm('¿Borrar esta entrada del log?\nEsta acción no se puede deshacer.')) return;
-  const estadoPaneles = capturarEstadoPaneles();
-  try {
-    await api('borrarLogEvento', { entry_id: entryId });
-    // Remover localmente antes de re-renderizar — evita brinco visual
-    state.logEventos = state.logEventos.filter(e => e.entry_id !== entryId);
-    showToast('Entrada borrada', 'success');
-    if (state.currentProyecto) {
-      await openProyecto(state.currentProyecto.proyecto_id);
-      restaurarEstadoPaneles(estadoPaneles);
+function borrarEntry(entryId) {
+  const e = state.logEventos.find(x => x.entry_id === entryId);
+  const eventoLabel = e?.hito_id ? `"${e.hito_id}"` : 'esta entrada';
+  confirmarBorrado({
+    titulo: 'Eliminar entrada del log',
+    mensaje: `Vas a eliminar el evento ${eventoLabel} del ${formatDate(e?.fecha_real)}.<br><br>El registro se archivará y ya no aparecerá en el log de la tarea.`,
+    labelBoton: 'Eliminar entrada',
+    onConfirm: async () => {
+      const estadoPaneles = capturarEstadoPaneles();
+      try {
+        await api('borrarLogEvento', { entry_id: entryId });
+        state.logEventos = state.logEventos.filter(x => x.entry_id !== entryId);
+        showToast('Entrada eliminada', 'success');
+        if (state.currentProyecto) {
+          await openProyecto(state.currentProyecto.proyecto_id);
+          restaurarEstadoPaneles(estadoPaneles);
+        }
+      } catch(e) { showToast('Error: ' + e.message, 'error'); }
     }
-  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+  });
 }
 
 function toggleGroup(id) { document.getElementById(`group-${id}`)?.classList.toggle('open'); }
@@ -1582,6 +1608,8 @@ function openNotaCambio(modoEdicion = false, cambioData = null) {
     ? cambioData.disciplinas_afectadas.split(',').map(s => s.trim()).filter(Boolean)
     : [];
 
+  document.querySelector('.entry-tipo-selector').style.display = '';
+  state.editandoNotaId = null;
   selectNotaCambioTipo(modoEdicion ? 'cambio_registrado' : 'nota');
   if (modoEdicion) buildCambioDiscSelector(preselected);
   openModal('modal-nota-cambio');
@@ -1780,7 +1808,24 @@ async function guardarNotaCambio() {
   }
 
   try {
-    if (state.editandoCambioId) {
+    if (state.editandoNotaId) {
+      // Modo edición de nota existente
+      const notaJsonActualizado = JSON.stringify({ titulo, tipo: tipoNota, contenido: texto, disc_ref: notaDiscKey });
+      await api('editarNota', {
+        entry_id: state.editandoNotaId,
+        fecha_real: fecha,
+        nota_json: notaJsonActualizado
+      });
+      // Actualizar localmente
+      const idx = state.logEventos.findIndex(x => x.entry_id === state.editandoNotaId);
+      if (idx >= 0) {
+        state.logEventos[idx].fecha_real = fecha;
+        state.logEventos[idx].nota = notaJsonActualizado;
+      }
+      state.editandoNotaId = null;
+      closeModal('modal-nota-cambio');
+      showToast('Nota actualizada', 'success');
+    } else if (state.editandoCambioId) {
       const discs = [...(state.cambioDiscsSeleccionadas || [])];
       const hitos = getHitosAfectados(discs);
       await api('editarCambioDetalle', {
@@ -2097,12 +2142,18 @@ async function cargarHistorialArquitecto(proyectoId) {
   } catch(e) { seccion.style.display = 'none'; }
 }
 
-async function borrarEntryHistorial(haId, proyectoId) {
-  if (!confirm('¿Eliminar esta asignación del historial?')) return;
-  try {
-    await api('borrarEntryHistorialArquitecto', { ha_id: haId });
-    await cargarHistorialArquitecto(proyectoId);
-  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+function borrarEntryHistorial(haId, proyectoId) {
+  confirmarBorrado({
+    titulo: 'Eliminar asignación del historial',
+    mensaje: 'Vas a eliminar este registro de asignación de arquitecto.<br><br>El dato se perderá permanentemente.',
+    labelBoton: 'Eliminar registro',
+    onConfirm: async () => {
+      try {
+        await api('borrarEntryHistorialArquitecto', { ha_id: haId });
+        await cargarHistorialArquitecto(proyectoId);
+      } catch(e) { showToast('Error: ' + e.message, 'error'); }
+    }
+  });
 }
 
 function toggleSettingsBubble() {
@@ -2133,11 +2184,13 @@ async function guardarSettings() {
       fecha_reactivacion = ahora;
     }
 
+    const fechaInput = document.getElementById('s-fecha').value;
     await api('actualizarProyecto', {
       proyecto_id: state.currentProyecto.proyecto_id,
       nombre, clave_innovasport: document.getElementById('s-clave').value,
       tipo_proyecto: document.getElementById('s-tipo').value,
-      fecha_aprobacion: document.getElementById('s-fecha').value,
+      // Solo enviar fecha si el usuario la llenó — nunca sobreescribir con vacío
+      ...(fechaInput ? { fecha_aprobacion: fechaInput } : {}),
       arquitecto_id: document.getElementById('s-arquitecto').value,
       estado: estadoNuevo,
       bubble_plan_aplica: document.getElementById('toggle-settings-bubble').classList.contains('on'),
@@ -2156,18 +2209,24 @@ async function guardarSettings() {
   finally { btn.disabled = false; btn.textContent = 'Guardar cambios'; }
 }
 
-async function borrarProyecto() {
+function borrarProyecto() {
   const p = state.currentProyecto;
   if (!p) return;
-  if (!confirm(`¿Borrar "${p.nombre}"?\n\nEsta acción no se puede deshacer.`)) return;
-  try {
-    await api('borrarProyecto', { proyecto_id: p.proyecto_id });
-    closeModal('modal-settings');
-    showToast('Proyecto borrado', 'success');
-    state.currentProyecto = null;
-    await loadAllData();
-    showView('dashboard');
-  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+  confirmarBorrado({
+    titulo: 'Eliminar proyecto',
+    mensaje: `Vas a eliminar <strong>${p.nombre}</strong> y todo su historial de eventos, notas y cambios.<br><br>Esta acción no se puede deshacer.`,
+    labelBoton: 'Eliminar proyecto',
+    onConfirm: async () => {
+      try {
+        await api('borrarProyecto', { proyecto_id: p.proyecto_id });
+        closeModal('modal-settings');
+        showToast('Proyecto eliminado', 'success');
+        state.currentProyecto = null;
+        await loadAllData();
+        showView('dashboard');
+      } catch(e) { showToast('Error: ' + e.message, 'error'); }
+    }
+  });
 }
 
 // ── NOTAS ──
@@ -2285,18 +2344,17 @@ function renderNotas(proyecto) {
             </div>
           </div>`
         : `
-          ${textoNota ? `
-            <button class="cambio-expand-btn" onclick="toggleCambioPanel('${panelId}')">
-              <span id="chevron-${panelId}" style="transition:transform 0.15s;display:inline-block">▶</span> ver detalle
-            </button>
-            <div class="cambio-detail-panel" id="${panelId}">
-              <div class="cambio-detail-alcance">${textoNota}</div>
-              ${notaData?.disc_ref ? `<div style="margin-top:6px;font-family:var(--mono);font-size:11px;color:var(--text3)">Ref: ${notaData.disc_ref}</div>` : ''}
+          <button class="cambio-expand-btn" onclick="toggleCambioPanel('${panelId}')">
+            <span id="chevron-${panelId}" style="transition:transform 0.15s;display:inline-block">▶</span> ver detalle
+          </button>
+          <div class="cambio-detail-panel" id="${panelId}">
+            ${textoNota ? `<div class="cambio-detail-alcance">${textoNota}</div>` : '<div style="color:var(--text3);font-family:var(--mono);font-size:12px">Sin contenido registrado.</div>'}
+            ${notaData?.disc_ref ? `<div style="margin-top:6px;font-family:var(--mono);font-size:11px;color:var(--text3)">Ref: ${notaData.disc_ref}</div>` : ''}
+            ${esPM ? `<div style="margin-top:10px;display:flex;gap:8px">
+              <button class="btn-secondary" style="font-size:12px;padding:5px 12px" onclick="abrirEditarNota('${n.entry_id}')">✏️ Editar nota</button>
+              <button class="btn-danger" style="font-size:12px;padding:5px 12px" onclick="borrarNota('${n.entry_id}','${n.hito_id || ''}','${state.currentProyecto?.proyecto_id || ''}')">Eliminar nota</button>
             </div>` : ''}
-          ${esPM ? `<div style="margin-top:6px;display:flex;gap:8px">
-            <button class="btn-secondary" style="font-size:12px;padding:4px 10px" onclick="abrirEditarNota('${n.entry_id}')">✏️ Editar</button>
-            <button class="btn-danger" style="font-size:12px;padding:4px 10px" onclick="borrarNota('${n.entry_id}','${n.hito_id || ''}','${state.currentProyecto?.proyecto_id || ''}')">Eliminar</button>
-          </div>` : ''}`;
+          </div>`;
 
         const notaTipoAbrev = { 'Riesgo': 'RSG', 'Lección aprendida': 'LA', 'Decisión': 'DEC', 'Pendiente externo': 'PE', 'General': 'GEN' };
         const tipoTag = notaData?.tipo ? `<span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${notaTipoAbrev[notaData.tipo] || notaData.tipo}</span>` : '';
@@ -2345,37 +2403,51 @@ function abrirEditarNota(entryId) {
   if (!n) return;
   let notaData = null;
   try { notaData = JSON.parse(n.nota || '{}'); } catch(e) {}
-  // Reusar el modal de nota/cambio en modo edición
   state.editandoNotaId = entryId;
+  state.editandoCambioId = null; // asegurar que no hay modo cambio activo
+  // Pre-llenar tipo primero para que los campos estén visibles
+  selectNotaCambioTipo('nota');
+  // Fecha
   document.getElementById('nc-fecha').value = (() => {
     const s = (n.fecha_real || '').toString().trim();
     const m = s.match(/(\d{4}-\d{2}-\d{2})/);
     return m ? m[1] : '';
   })();
+  // Campos de nota — con fallback para notas legacy sin JSON
   document.getElementById('nc-titulo').value = notaData?.titulo || '';
   document.getElementById('nc-tipo-nota').value = notaData?.tipo || '';
-  document.getElementById('nc-texto').value = notaData?.contenido || n.nota || '';
-  selectNotaCambioTipo('nota');
-  const title = document.getElementById('nota-cambio-title');
-  const btn = document.getElementById('btn-guardar-nc');
-  title.textContent = 'Editar nota';
-  btn.textContent = 'Guardar cambios';
+  document.getElementById('nc-texto').value = notaData?.contenido || (typeof n.nota === 'string' && !n.nota.startsWith('{') ? n.nota : '') || '';
+  // Header y botón del modal
+  document.getElementById('nota-cambio-title').textContent = 'Editar nota';
+  document.getElementById('btn-guardar-nc').textContent = 'Guardar cambios';
+  // Ocultar selector de tipo (en edición no se puede cambiar entre nota/cambio)
+  document.querySelector('.entry-tipo-selector').style.display = 'none';
   buildNotaGrupoSelector();
   openModal('modal-nota-cambio');
 }
 
-async function borrarNota(entryId, hitoId, proyectoId) {
-  if (!confirm('¿Eliminar esta nota?\nEsta acción no se puede deshacer.')) return;
-  const estadoPaneles = capturarEstadoPaneles();
-  try {
-    await api('borrarNota', { entry_id: entryId, hito_id: hitoId, proyecto_id: proyectoId });
-    state.logEventos = state.logEventos.filter(e => e.entry_id !== entryId && !(e.hito_id === hitoId && e.tipo_entry === 'nota_ref'));
-    showToast('Nota eliminada', 'success');
-    if (state.currentProyecto) {
-      await openProyecto(state.currentProyecto.proyecto_id);
-      restaurarEstadoPaneles(estadoPaneles);
+function borrarNota(entryId, hitoId, proyectoId) {
+  const n = state.logEventos.find(x => x.entry_id === entryId);
+  let notaData = null;
+  try { notaData = JSON.parse(n?.nota || '{}'); } catch(e) {}
+  const tituloNota = notaData?.titulo ? `"${notaData.titulo}"` : hitoId ? `${hitoId}` : 'esta nota';
+  confirmarBorrado({
+    titulo: 'Eliminar nota',
+    mensaje: `Vas a eliminar la nota ${tituloNota}.<br><br>El registro se archivará y ya no aparecerá en el proyecto.`,
+    labelBoton: 'Eliminar nota',
+    onConfirm: async () => {
+      const estadoPaneles = capturarEstadoPaneles();
+      try {
+        await api('borrarNota', { entry_id: entryId, hito_id: hitoId, proyecto_id: proyectoId });
+        state.logEventos = state.logEventos.filter(e => e.entry_id !== entryId && !(e.hito_id === hitoId && e.tipo_entry === 'nota_ref'));
+        showToast('Nota eliminada', 'success');
+        if (state.currentProyecto) {
+          await openProyecto(state.currentProyecto.proyecto_id);
+          restaurarEstadoPaneles(estadoPaneles);
+        }
+      } catch(e) { showToast('Error: ' + e.message, 'error'); }
     }
-  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+  });
 }
 
 function scrollToCambio(entryId) {
@@ -2422,6 +2494,23 @@ function toggleCambioPanel(panelId) {
   if (!panel) return;
   panel.classList.toggle('open');
   if (chevron) chevron.style.transform = panel.classList.contains('open') ? 'rotate(90deg)' : '';
+}
+
+// ── MODAL CONFIRMACIÓN GENÉRICO ──
+function confirmarBorrado({ titulo, mensaje, labelBoton, onConfirm }) {
+  document.getElementById('confirmar-borrado-titulo').textContent = titulo || 'Confirmar eliminación';
+  document.getElementById('confirmar-borrado-mensaje').innerHTML = mensaje || '¿Estás seguro?';
+  document.getElementById('btn-confirmar-borrado').textContent = labelBoton || 'Eliminar';
+  state._confirmarBorradoFn = onConfirm;
+  openModal('modal-confirmar-borrado');
+}
+
+function ejecutarConfirmarBorrado() {
+  closeModal('modal-confirmar-borrado');
+  if (typeof state._confirmarBorradoFn === 'function') {
+    state._confirmarBorradoFn();
+    state._confirmarBorradoFn = null;
+  }
 }
 
 function borrarCambio(entryId) {
@@ -2539,20 +2628,32 @@ async function confirmarLectura(id) {
   try { await api('confirmarLecturaCriterio', { criterio_id: id }); showToast('Lectura confirmada', 'success'); await loadAllData(); renderCriteriosList(); renderCriteriosBanner(); }
   catch(e) { showToast('Error: ' + e.message, 'error'); }
 }
-async function rechazarCriterio(id) {
-  if (!confirm('¿Rechazar este criterio? Se marcará como obsoleto.')) return;
+function rechazarCriterio(id) {
+  confirmarBorrado({
+    titulo: 'Rechazar criterio',
+    mensaje: 'Vas a rechazar este criterio. Se marcará como obsoleto y dejará de ser visible para el equipo.',
+    labelBoton: 'Rechazar criterio',
+    onConfirm: async () => {
   try {
-    await api('obsoletarCriterio', { criterio_id: id });
-    showToast('Criterio rechazado', 'success');
-    await loadAllData();
-    renderCriteriosList();
-  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+        await api('obsoletarCriterio', { criterio_id: id });
+        showToast('Criterio rechazado', 'success');
+        await loadAllData();
+        renderCriteriosList();
+      } catch(e) { showToast('Error: ' + e.message, 'error'); }
+    }
+  });
 }
 
-async function obsoletarCriterio(id) {
-  if (!confirm('¿Marcar este criterio como obsoleto?')) return;
+function obsoletarCriterio(id) {
+  confirmarBorrado({
+    titulo: 'Obsoletizar criterio',
+    mensaje: 'Vas a marcar este criterio como obsoleto. Dejará de aparecer en la lista activa del equipo.',
+    labelBoton: 'Obsoletizar',
+    onConfirm: async () => {
   try { await api('obsoletarCriterio', { criterio_id: id }); showToast('Criterio obsoletado', 'success'); await loadAllData(); renderCriteriosList(); }
-  catch(e) { showToast('Error: ' + e.message, 'error'); }
+      catch(e) { showToast('Error: ' + e.message, 'error'); }
+    }
+  });
 }
 
 // ── TIMELINE / FECHAS ──
