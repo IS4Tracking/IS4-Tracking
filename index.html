@@ -2106,6 +2106,7 @@ function calcVersionHito(log, hitoId) {
 function openSettings() {
     const p = state.currentProyecto;
   if (!p) return;
+  console.log('DEBUG openSettings — fecha_aprobacion:', JSON.stringify(p.fecha_aprobacion), '| tipo:', typeof p.fecha_aprobacion);
   document.getElementById('s-nombre').value = p.nombre || '';
   document.getElementById('s-clave').value = p.clave_innovasport || '';
   document.getElementById('s-tipo').value = p.tipo_proyecto || '';
