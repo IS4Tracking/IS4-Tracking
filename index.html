@@ -3259,7 +3259,13 @@ function abrirSnapshot(entryId) {
       </div>
       <div style="flex:1;background:var(--surface2);border-radius:6px;padding:10px 12px">
         <div style="font-size:10px;color:var(--text3);margin-bottom:2px">En proceso</div>
-        <div styl
+        <div style=\"font-size:20px;font-weight:500\">${enProceso}</div>
+      </div>
+      <div style=\"flex:1;background:var(--surface2);border-radius:6px;padding:10px 12px\">
+        <div style=\"font-size:10px;color:var(--text3);margin-bottom:2px\">Pendientes</div>
+        <div style=\"font-size:20px;font-weight:500\">${pendientes}</div>
+      </div>
+    </div>\`;
 
 function openNuevaEntrega() {
   const proyecto = state.currentProyecto;
