@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>IS4 · Store Planning Tracking</title>
 <link rel="icon" type="image/x-icon" href="favicon.ico">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -42,6 +43,51 @@
   ::-webkit-scrollbar { width:4px; height:4px; }
   ::-webkit-scrollbar-track { background:var(--bg); }
   ::-webkit-scrollbar-thumb { background:var(--border2); border-radius:2px; }
+
+  /* INSIGHTS */
+  .ins-kpi-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-top:16px; }
+  .ins-kpi { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:14px 16px; }
+  .ins-kpi-label { font-size:12px; color:var(--text2); margin-bottom:6px; }
+  .ins-kpi-value { font-size:22px; font-weight:500; color:var(--text); line-height:1; }
+  .ins-kpi-sub { font-size:11px; color:var(--text2); margin-top:4px; font-family:var(--mono); }
+  .ins-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px; }
+  .ins-card-title { font-size:13px; font-weight:500; color:var(--text); }
+  .ins-card-hint { font-size:11px; color:var(--text2); font-family:var(--mono); margin-top:2px; }
+  .ins-section-label { font-size:10px; font-weight:500; color:var(--text3); letter-spacing:.08em; text-transform:uppercase; }
+  .ins-zb { background:var(--surface2); border:1px solid var(--border); border-radius:var(--radius); color:var(--text2); font-size:13px; width:28px; height:28px; cursor:pointer; display:flex; align-items:center; justify-content:center; font-family:var(--sans); transition:all 0.15s; }
+  .ins-zb:hover { border-color:var(--border2); color:var(--text); }
+  .ins-leg-item { display:flex; align-items:center; gap:6px; font-size:11px; color:var(--text2); font-family:var(--mono); }
+  .ins-toggle-bar { display:flex; gap:3px; background:var(--surface2); border-radius:var(--radius); padding:3px; }
+  .ins-toggle-btn { font-size:11px; padding:4px 12px; border-radius:6px; border:none; background:transparent; color:var(--text2); cursor:pointer; font-family:var(--sans); transition:all 0.15s; }
+  .ins-toggle-btn.active { background:var(--surface); border:1px solid var(--border); color:var(--text); }
+  .ins-cat-label { font-size:10px; font-weight:500; color:var(--text3); letter-spacing:.07em; text-transform:uppercase; padding-bottom:8px; border-bottom:1px solid var(--border); margin-bottom:8px; }
+  .ins-cat-label.critica { color:var(--red); }
+  .ins-cat-label.slack { color:var(--yellow); }
+  .ins-grupos-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+  .ins-grupo-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:10px 12px; }
+  .ins-grupo-card.critica { border-left:2px solid var(--red); }
+  .ins-grupo-card.slack { border-left:2px solid var(--yellow); }
+  .ins-grupo-nombre { font-size:12px; font-weight:500; color:var(--text); margin-bottom:7px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .ins-prog-bar { height:4px; border-radius:2px; background:var(--border); overflow:hidden; margin-bottom:5px; }
+  .ins-prog-fill { height:100%; border-radius:2px; }
+  .ins-prog-ok { background:var(--green); } .ins-prog-warn { background:var(--yellow); } .ins-prog-danger { background:var(--red); }
+  .ins-grupo-meta { font-size:11px; color:var(--text2); font-family:var(--mono); display:flex; justify-content:space-between; }
+  .ins-bloq { font-size:10px; padding:1px 6px; border-radius:3px; background:var(--red-bg); color:var(--red); }
+  .ins-comp-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; margin-top:8px; }
+  .ins-comp-card { background:var(--surface2); border-radius:var(--radius); padding:8px 10px; display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .ins-comp-nombre { font-size:11px; color:var(--text2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .ins-sem { width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+  .ins-sem-verde { background:var(--green); } .ins-sem-gris { background:var(--text3); } .ins-sem-rojo { background:var(--red); }
+  .ins-hito-row { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid var(--border); }
+  .ins-hito-row:last-child { border-bottom:none; }
+  .ins-hito-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+  .ins-hito-nombre { font-size:13px; color:var(--text); flex:1; }
+  .ins-rc { font-size:10px; padding:1px 6px; border-radius:3px; background:var(--red-bg); color:var(--red); flex-shrink:0; }
+  .ins-hito-fecha { font-size:11px; font-family:var(--mono); color:var(--text2); flex-shrink:0; }
+  .ins-delta { font-size:11px; padding:2px 7px; border-radius:3px; flex-shrink:0; }
+  .ins-delta-ok { background:var(--green-bg); color:var(--green); }
+  .ins-delta-warn { background:var(--yellow-bg); color:var(--yellow); }
+  .ins-delta-na { background:var(--surface2); color:var(--text3); }
 
   /* LOGIN */
   #login-screen { min-height:100vh; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:32px; transition:opacity 0.2s; }
@@ -469,11 +515,51 @@
           <div class="project-detail-meta" id="insights-meta"></div>
         </div>
       </div>
-      <div style="margin-top:32px;display:flex;flex-direction:column;align-items:center;gap:16px;padding:48px 0;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface)">
-        <div style="font-size:32px">📊</div>
-        <div style="font-size:15px;font-weight:500;color:var(--text)">Reportes</div>
-        <div style="font-size:13px;color:var(--text2);font-family:var(--mono);text-align:center;max-width:400px;line-height:1.7">Esta sección está reservada para reportes, curva S, análisis de desvíos y dashboards ejecutivos.<br>Se construirá en la siguiente sesión dedicada.</div>
+
+      <!-- KPIs -->
+      <div class="ins-kpi-grid" id="ins-kpis"></div>
+
+      <!-- Curva S -->
+      <div class="ins-card" style="margin-top:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div>
+            <div class="ins-card-title">Curva S — avance de hitos</div>
+            <div class="ins-card-hint">Planeado vs. real · offsets del sistema</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:4px">
+            <button class="ins-zb" id="ins-zIn">+</button>
+            <button class="ins-zb" id="ins-zOut">−</button>
+            <button class="ins-zb" id="ins-zReset" style="font-size:11px">⤢</button>
+          </div>
+        </div>
+        <div style="display:flex;gap:16px;margin-bottom:10px;flex-wrap:wrap">
+          <div class="ins-leg-item"><svg width="22" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="#58a6ff" stroke-width="2"/><circle cx="11" cy="4" r="3.5" fill="#58a6ff" stroke="var(--bg)" stroke-width="1.5"/></svg><span>Planeado</span></div>
+          <div class="ins-leg-item"><svg width="22" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="#44cc88" stroke-width="2" stroke-dasharray="5,3"/><circle cx="11" cy="4" r="3.5" fill="#44cc88" stroke="var(--bg)" stroke-width="1.5"/></svg><span>Real (hito alcanzado)</span></div>
+        </div>
+        <div style="position:relative">
+          <div id="ins-chart-scroller" style="overflow-x:auto;overflow-y:hidden;width:100%">
+            <div id="ins-chart-inner" style="position:relative;height:260px">
+              <canvas id="ins-canvas" style="display:block;height:260px!important" role="img" aria-label="Curva S de avance de hitos planeados vs reales"></canvas>
+            </div>
+          </div>
+          <div id="ins-tip" style="position:fixed;display:none;background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius);padding:8px 10px;font-size:11px;pointer-events:none;z-index:200;min-width:180px;max-width:230px"></div>
+        </div>
       </div>
+
+      <!-- Avance por grupo -->
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:24px;margin-bottom:12px">
+        <div class="ins-section-label">Avance por grupo</div>
+        <div class="ins-toggle-bar">
+          <button class="ins-toggle-btn active" onclick="insSetVista('A',this)">Por etapa</button>
+          <button class="ins-toggle-btn" onclick="insSetVista('B',this)">Por responsable</button>
+          <button class="ins-toggle-btn" onclick="insSetVista('C',this)">Por criticidad</button>
+        </div>
+      </div>
+      <div id="ins-grupos"></div>
+
+      <!-- Hitos clave -->
+      <div class="ins-section-label" style="margin-top:24px;margin-bottom:12px">Hitos clave</div>
+      <div class="ins-card" id="ins-hitos"></div>
     </div>
 
     <!-- CRITERIOS -->
@@ -1470,10 +1556,369 @@ function abrirInsights() {
   const p = state.currentProyecto;
   if (!p) return;
   document.getElementById('insights-title').textContent = p.nombre;
-  document.getElementById('insights-meta').textContent = `${p.clave_innovasport ? p.clave_innovasport + ' · ' : ''}${p.tipo_proyecto || '—'} · Insights y Dashboards`;
+  document.getElementById('insights-meta').textContent = `${p.clave_innovasport ? p.clave_innovasport + ' · ' : ''}${p.tipo_proyecto || '—'} · Aprobación: ${formatDate(p.fecha_aprobacion)} · Entrega est.: ${calcFechaEntrega(p.fecha_aprobacion)}`;
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById('view-insights').classList.add('active');
   document.getElementById('fab-buscar')?.classList.remove('visible');
+  renderInsights(p);
+}
+
+// ── RUTA CRÍTICA ──
+const RC_IDS = new Set(['G4','G6','G13','G14','G15']);
+const SLACK_IDS = new Set(['G5','G7','G8','G9']);
+
+// ── VISTAS DE AGRUPACIÓN ──
+const INS_VISTAS = {
+  A:[
+    {label:'Inputs',    ids:['G0','G1','G2','G3']},
+    {label:'Diseño',    ids:['G4']},
+    {label:'Int / Ext', ids:['G5','G6','G7','G8','G9','G10','G11','G12']},
+    {label:'Cruces',    ids:['G13']},
+    {label:'Entregas',  ids:['G14','G15']},
+  ],
+  B:[
+    {label:'Interno Store Planning',   ids:['G1','G4','G13']},
+    {label:'Validadores',              ids:['G0','G2','G3']},
+    {label:'Mobiliario',               ids:['G5']},
+    {label:'Instalaciones',            ids:['G6']},
+    {label:'Redes y sistemas',         ids:['G7']},
+    {label:'Prevención',               ids:['G8']},
+    {label:'Marketing sensorial',      ids:['G9']},
+    {label:'Excelencia operativa',     ids:['G10']},
+    {label:'Precios unitarios',        ids:['G11']},
+    {label:'Control de proyectos',     ids:['G12']},
+    {label:'Proveedor arquitectónico', ids:['G14','G15']},
+  ],
+  C:[
+    {label:'Ruta crítica', ids:['G4','G6','G13','G14','G15'], tipo:'critica'},
+    {label:'Con slack',    ids:['G5','G7','G8','G9'],         tipo:'slack'},
+    {label:'De soporte',   ids:['G0','G1','G2','G3','G10','G11','G12'], tipo:'soporte'},
+  ],
+};
+
+// ── HITOS DE RUTA CRÍTICA PARA LA LISTA DE HITOS CLAVE ──
+const HITOS_CLAVE_IDS = new Set(['H01','H11','H23','H34','H36']);
+
+let insChart = null;
+let insZoomIdx = 0;
+const INS_ZOOM_STEPS = [1, 1.5, 2.5, 4, 6];
+
+function renderInsights(p) {
+  const proyectoId = p.proyecto_id;
+  const log = state.logEventos.filter(e => e.proyecto_id === proyectoId);
+  const base = parseISODate(p.fecha_aprobacion);
+  const hoy = new Date();
+
+  // ── KPIs ──
+  const { hitosAlcanzados, total } = calcScoreboard(proyectoId);
+  const pctAvance = Math.round((hitosAlcanzados / total) * 100);
+
+  // Desviación: promedio de días de retraso en hitos alcanzados con offset conocido
+  let sumDelta = 0, countDelta = 0;
+  log.filter(e => e.tipo_entry === 'hito_alcanzado').forEach(e => {
+    const h = HITOS_TIMELINE.find(h => h.id === e.hito_id);
+    if (!h || h.offset === null) return;
+    const esperada = addBusinessDays(base, h.offset);
+    const real = parseISODate(e.fecha_real);
+    if (!real) return;
+    const diff = diffBD(esperada, real);
+    sumDelta += diff; countDelta++;
+  });
+  const desviacion = countDelta > 0 ? Math.round(sumDelta / countDelta) : 0;
+
+  // Hitos vencidos sin registrar
+  const alcanzadosSet = new Set(log.filter(e => e.tipo_entry === 'hito_alcanzado').map(e => e.hito_id));
+  const vencidos = HITOS_TIMELINE.filter(h => {
+    if (h.offset === null || alcanzadosSet.has(h.id)) return false;
+    const esperada = addBusinessDays(base, h.offset);
+    return esperada < hoy;
+  }).length;
+
+  // Cambios registrados
+  const cambios = log.filter(e => e.tipo_entry === 'cambio').length;
+  const cambiosConImpacto = state.cambiosDetalle.filter(cd => {
+    const entry = log.find(e => e.entry_id === cd.entry_id);
+    return entry && (cd.dias_impacto_calculado && parseInt(cd.dias_impacto_calculado) !== 0);
+  }).length;
+
+  const kpiColor = (val, umbrales) => {
+    if (val <= umbrales[0]) return 'var(--green)';
+    if (val <= umbrales[1]) return 'var(--yellow)';
+    return 'var(--red)';
+  };
+
+  document.getElementById('ins-kpis').innerHTML = `
+    <div class="ins-kpi">
+      <div class="ins-kpi-label">Hitos alcanzados</div>
+      <div class="ins-kpi-value" style="color:${pctAvance>=50?'var(--green)':'var(--accent)'}">${hitosAlcanzados} / ${total}</div>
+      <div class="ins-kpi-sub">${pctAvance}% completado</div>
+    </div>
+    <div class="ins-kpi">
+      <div class="ins-kpi-label">Desviación promedio</div>
+      <div class="ins-kpi-value" style="color:${desviacion===0?'var(--green)':desviacion<=3?'var(--yellow)':'var(--red)'}">${desviacion===0?'—':(desviacion>0?'+':'')+desviacion+' días'}</div>
+      <div class="ins-kpi-sub">vs. plan original</div>
+    </div>
+    <div class="ins-kpi">
+      <div class="ins-kpi-label">Hitos vencidos</div>
+      <div class="ins-kpi-value" style="color:${vencidos===0?'var(--green)':vencidos<=2?'var(--yellow)':'var(--red)'}">${vencidos}</div>
+      <div class="ins-kpi-sub">sin registrar</div>
+    </div>
+    <div class="ins-kpi">
+      <div class="ins-kpi-label">Cambios registrados</div>
+      <div class="ins-kpi-value">${cambios}</div>
+      <div class="ins-kpi-sub">${cambiosConImpacto} con impacto en tiempo</div>
+    </div>`;
+
+  // ── GRUPOS ──
+  insSetVista('A', document.querySelector('.ins-toggle-btn'));
+
+  // ── HITOS CLAVE ──
+  renderInsHitos(p, log, base);
+
+  // ── CURVA S ──
+  insZoomIdx = 0;
+  buildInsChart(p, log, base);
+
+  // zoom buttons
+  document.getElementById('ins-zIn').onclick = () => { if(insZoomIdx<INS_ZOOM_STEPS.length-1){insZoomIdx++;buildInsChart(p,log,base);} };
+  document.getElementById('ins-zOut').onclick = () => { if(insZoomIdx>0){insZoomIdx--;buildInsChart(p,log,base);} };
+  document.getElementById('ins-zReset').onclick = () => { insZoomIdx=0;buildInsChart(p,log,base); };
+}
+
+function diffBD(dateA, dateB) {
+  let d = new Date(Math.min(dateA,dateB));
+  const end = new Date(Math.max(dateA,dateB));
+  let count = 0;
+  while(d < end){ d.setDate(d.getDate()+1); if(d.getDay()!==0&&d.getDay()!==6) count++; }
+  return dateA <= dateB ? count : -count;
+}
+
+function insGrupoStats(gid, proyectoId) {
+  const log = state.logEventos.filter(e => e.proyecto_id === proyectoId);
+  const activasSet = new Set(state.disciplinasProyecto.filter(d=>d.proyecto_id===proyectoId).map(d=>d.disciplina_id));
+  const disciplinas = getDisciplinasGrupo(gid).filter(d => activasSet.has(`${gid}::${d}`) && tareaOpcionalAplica(gid,d));
+  if (!disciplinas.length) return null;
+  const completadas = disciplinas.filter(d => isDisciplinaCompleta(d,gid,log)).length;
+  const bloqueadas = disciplinas.filter(d => !isDisciplinaCompleta(d,gid,log) && !log.some(e=>e.disciplina_id===`${gid}::${d}`)).length;
+  const pct = Math.round((completadas/disciplinas.length)*100);
+  const grupoNombre = state.eventosCatalogo.find(e=>e.grupo_id===gid)?.grupo_nombre || gid;
+  return { gid, nombre:`${gid} — ${grupoNombre}`, pct, completadas, total:disciplinas.length, bloqueadas, completo:completadas===disciplinas.length };
+}
+
+function insRenderGrupoCard(stats, tipo) {
+  const borde = tipo==='critica'?' critica':tipo==='slack'?' slack':'';
+  const colorPct = stats.pct===100?'ins-prog-ok':stats.pct>=40?'ins-prog-warn':'ins-prog-danger';
+  const bloqHTML = stats.bloqueadas>0?`<span class="ins-bloq">${stats.bloqueadas} bloq.</span>`:'';
+  return `<div class="ins-grupo-card${borde}">
+    <div class="ins-grupo-nombre">${stats.nombre}</div>
+    <div class="ins-prog-bar"><div class="ins-prog-fill ${colorPct}" style="width:${stats.pct}%"></div></div>
+    <div class="ins-grupo-meta"><span>${stats.completadas}/${stats.total} tareas</span>${bloqHTML}</div>
+  </div>`;
+}
+
+function insRenderCompletados(ids, proyectoId) {
+  const comps = ids.map(id=>insGrupoStats(id,proyectoId)).filter(s=>s&&s.completo);
+  if(!comps.length) return '';
+  const cards = comps.map(s=>{
+    // sem: para simplificar, gris = completado (sem real viene del delta de hitos, aquí mostramos completado)
+    return `<div class="ins-comp-card"><span class="ins-comp-nombre">${s.nombre}</span><div class="ins-sem ins-sem-gris" title="completado"></div></div>`;
+  }).join('');
+  return `<div style="margin-top:8px;font-size:10px;color:var(--text3);font-family:var(--mono);margin-bottom:6px">✓ ${comps.length} grupo${comps.length>1?'s':''} completado${comps.length>1?'s':''}</div><div class="ins-comp-grid">${cards}</div>`;
+}
+
+function insSetVista(clave, btn) {
+  document.querySelectorAll('.ins-toggle-btn').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  const p = state.currentProyecto;
+  if(!p) return;
+  const secciones = INS_VISTAS[clave];
+  document.getElementById('ins-grupos').innerHTML = secciones.map(sec=>{
+    const activos = sec.ids.map(id=>insGrupoStats(id,p.proyecto_id)).filter(s=>s&&!s.completo);
+    const grid = activos.length?`<div class="ins-grupos-grid">${activos.map(s=>insRenderGrupoCard(s,sec.tipo||'')).join('')}</div>`:'';
+    const comps = insRenderCompletados(sec.ids, p.proyecto_id);
+    if(!activos.length&&!comps) return '';
+    return `<div style="margin-bottom:20px"><div class="ins-cat-label ${sec.tipo||''}">${sec.label}</div>${grid}${comps}</div>`;
+  }).join('');
+}
+
+function renderInsHitos(p, log, base) {
+  const hoy = new Date();
+  const alcanzadosMap = {};
+  log.filter(e=>e.tipo_entry==='hito_alcanzado').forEach(e=>{ if(!alcanzadosMap[e.hito_id]) alcanzadosMap[e.hito_id]=e; });
+
+  const rows = HITOS_TIMELINE.filter(h=>HITOS_CLAVE_IDS.has(h.id)).map(h=>{
+    const alcanzado = alcanzadosMap[h.id];
+    const esperada = h.offset!==null ? addBusinessDays(base,h.offset) : null;
+    const esRC = RC_IDS.has(h.id.slice(0,2)) || ['H11','H23','H34','H36'].includes(h.id);
+    const rcBadge = ['H11','H23','H34','H36','H01'].includes(h.id)?`<span class="ins-rc">ruta crítica</span>`:'';
+
+    if(alcanzado) {
+      const real = parseISODate(alcanzado.fecha_real);
+      const delta = esperada&&real ? diffBD(esperada,real) : null;
+      const dotColor = delta===null?'var(--green)':delta<=0?'var(--green)':delta<=3?'var(--yellow)':'var(--red)';
+      const deltaHTML = delta===null?`<span class="ins-delta ins-delta-ok">completado</span>`:
+        delta===0?`<span class="ins-delta ins-delta-ok">a tiempo</span>`:
+        delta>0?`<span class="ins-delta ins-delta-warn">+${delta}d</span>`:
+        `<span class="ins-delta ins-delta-ok">${delta}d</span>`;
+      return `<div class="ins-hito-row">
+        <div class="ins-hito-dot" style="background:${dotColor}"></div>
+        <div class="ins-hito-nombre">${h.id} — ${h.nombre}</div>
+        ${rcBadge}
+        <div class="ins-hito-fecha">${real?formatDate(real):'—'}</div>
+        ${deltaHTML}
+      </div>`;
+    } else {
+      const vencido = esperada&&esperada<hoy;
+      const dotColor = vencido?'var(--red)':'var(--border2)';
+      return `<div class="ins-hito-row">
+        <div class="ins-hito-dot" style="background:${dotColor}"></div>
+        <div class="ins-hito-nombre">${h.id} — ${h.nombre}</div>
+        ${rcBadge}
+        <div class="ins-hito-fecha">${esperada?formatDate(esperada):'—'}</div>
+        <span class="ins-delta ins-delta-na">${vencido?'vencido':'pendiente'}</span>
+      </div>`;
+    }
+  }).join('');
+
+  document.getElementById('ins-hitos').innerHTML = rows;
+}
+
+function buildInsChart(p, log, base) {
+  const CONTAINER_W = document.getElementById('ins-chart-scroller').parentElement.offsetWidth || 640;
+  const W = Math.max(CONTAINER_W, Math.round(640 * INS_ZOOM_STEPS[insZoomIdx]));
+  const inner = document.getElementById('ins-chart-inner');
+  const canvas = document.getElementById('ins-canvas');
+  inner.style.width = W + 'px';
+  canvas.style.width = W + 'px';
+  canvas.width = W;
+  canvas.height = 260;
+
+  // Calcular puntos planeados desde HITOS_TIMELINE + offsets
+  const sorted = HITOS_TIMELINE.filter(h=>h.offset!==null).sort((a,b)=>a.offset-b.offset);
+  const TOTAL_H = HITOS_TIMELINE.filter(h=>h.offset!==null).length;
+  const MAX_D = 43;
+  const planByOffset = {};
+  sorted.forEach(h=>{ if(!planByOffset[h.offset]) planByOffset[h.offset]=[]; planByOffset[h.offset].push(h); });
+  const planOffsets = Object.keys(planByOffset).map(Number).sort((a,b)=>a-b);
+  let cumP=0;
+  const planPts = [{x:0,y:0,hitos:[]}];
+  planOffsets.forEach(off=>{ cumP+=planByOffset[off].length; planPts.push({x:off,y:Math.round((cumP/TOTAL_H)*100),hitos:planByOffset[off],count:planByOffset[off].length}); });
+
+  // Calcular puntos reales desde log
+  const alcanzados = log.filter(e=>e.tipo_entry==='hito_alcanzado');
+  const realByOffset = {};
+  alcanzados.forEach(e=>{
+    const h = HITOS_TIMELINE.find(h=>h.id===e.hito_id);
+    if(!h||h.offset===null) return;
+    const real = parseISODate(e.fecha_real);
+    if(!real) return;
+    const dReal = Math.round(diffBD(base, real) * (real>=base?1:-1));
+    // días hábiles reales desde aprobación
+    let dR=0, tmp=new Date(base);
+    while(tmp<real){tmp.setDate(tmp.getDate()+1);if(tmp.getDay()!==0&&tmp.getDay()!==6)dR++;}
+    if(real<base){let tmp2=new Date(real);dR=0;while(tmp2<base){tmp2.setDate(tmp2.getDate()+1);if(tmp2.getDay()!==0&&tmp2.getDay()!==6)dR++;} dR=-dR;}
+    if(!realByOffset[dR]) realByOffset[dR]=[];
+    const delta = h.offset!==null ? dR-h.offset : null;
+    realByOffset[dR].push({...h, offsetReal:dR, delta, fechaReal:e.fecha_real});
+  });
+  const realOffsets = Object.keys(realByOffset).map(Number).sort((a,b)=>a-b);
+  let cumR=0;
+  const realPts = [{x:0,y:0,hitos:[]}];
+  realOffsets.forEach(off=>{ cumR+=realByOffset[off].length; realPts.push({x:off,y:Math.round((cumR/TOTAL_H)*100),hitos:realByOffset[off],count:realByOffset[off].length}); });
+
+  // Semanas para eje X
+  const weekLabels=[];
+  for(let s=0;s<=8;s++){
+    const d=Math.round((s/8)*MAX_D);
+    const dt=addBusinessDays(base,d);
+    weekLabels.push({value:d,label:formatDate(dt)+' · S'+(s+1)});
+  }
+
+  // Línea de hoy
+  let HOY_D=0;
+  const hoy=new Date();
+  let tmp=new Date(base);
+  while(tmp<hoy){tmp.setDate(tmp.getDate()+1);if(tmp.getDay()!==0&&tmp.getDay()!==6)HOY_D++;}
+
+  const todayPlugin={
+    id:'insTodayLine',
+    afterDraw(chart){
+      const{ctx,chartArea:{top,bottom},scales:{x}}=chart;
+      const xi=x.getPixelForValue(HOY_D);
+      ctx.save();ctx.setLineDash([3,4]);ctx.strokeStyle='rgba(139,148,158,0.4)';ctx.lineWidth=1;
+      ctx.beginPath();ctx.moveTo(xi,top);ctx.lineTo(xi,bottom);ctx.stroke();
+      ctx.setLineDash([]);ctx.fillStyle='#6e7681';ctx.font='9px monospace';
+      ctx.fillText('hoy',xi+4,top+11);ctx.restore();
+    }
+  };
+
+  const multiDotPlugin={
+    id:'insMultiDot',
+    afterDatasetsDraw(chart){
+      const{ctx,scales:{x,y}}=chart;
+      [{points:planPts,color:'#58a6ff'},{points:realPts,color:'#44cc88'}].forEach(({points,color})=>{
+        points.forEach(pt=>{
+          if(!pt.hitos||!pt.hitos.length) return;
+          const cx=x.getPixelForValue(pt.x),cy=y.getPixelForValue(pt.y);
+          const r=pt.count>1?8:5;
+          ctx.save();ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);
+          ctx.fillStyle=color;ctx.fill();
+          ctx.strokeStyle='#0b0e14';ctx.lineWidth=1.5;ctx.stroke();
+          if(pt.count>1){ctx.fillStyle='#0b0e14';ctx.font='bold 9px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(pt.count,cx,cy);}
+          ctx.restore();
+        });
+      });
+    }
+  };
+
+  if(insChart) insChart.destroy();
+  insChart = new Chart(canvas,{
+    type:'line',
+    plugins:[todayPlugin,multiDotPlugin],
+    data:{datasets:[
+      {label:'Planeado',data:planPts,borderColor:'#58a6ff',borderWidth:2,pointRadius:0,tension:0.35,fill:false,parsing:{xAxisKey:'x',yAxisKey:'y'}},
+      {label:'Real',data:realPts,borderColor:'#44cc88',borderWidth:2,borderDash:[6,3],pointRadius:0,tension:0.35,fill:false,parsing:{xAxisKey:'x',yAxisKey:'y'}},
+    ]},
+    options:{
+      responsive:false,animation:false,
+      plugins:{legend:{display:false},tooltip:{enabled:false}},
+      scales:{
+        x:{type:'linear',min:0,max:MAX_D,grid:{color:'rgba(48,54,61,0.8)'},ticks:{color:'#6e7681',font:{size:9,family:'DM Mono, monospace'},maxRotation:0,autoSkip:false,callback(val){const w=weekLabels.find(wl=>wl.value===Math.round(val));return w?w.label:'';},values:weekLabels.map(wl=>wl.value)}},
+        y:{min:0,max:100,grid:{color:'rgba(48,54,61,0.8)'},ticks:{color:'#6e7681',font:{size:10},callback:v=>v+'%'}}
+      },
+      onHover:(evt,els)=>{
+        const tip=document.getElementById('ins-tip');
+        const allPts=[...planPts.map(pt=>({...pt,isReal:false})),...realPts.map(pt=>({...pt,isReal:true}))];
+        const scales=insChart.scales;
+        let found=null;
+        for(const pt of [...realPts.map(pt=>({...pt,isReal:true})),...planPts.map(pt=>({...pt,isReal:false}))]) {
+          if(!pt.hitos||!pt.hitos.length) continue;
+          const cx=scales.x.getPixelForValue(pt.x),cy=scales.y.getPixelForValue(pt.y);
+          const r=pt.count>1?10:7;
+          const dist=Math.sqrt((evt.x-cx)**2+(evt.y-cy)**2);
+          if(dist<=r){found=pt;break;}
+        }
+        if(!found){tip.style.display='none';canvas.style.cursor='default';return;}
+        canvas.style.cursor='pointer';
+        const rows=found.hitos.map((h,i)=>{
+          const esperadaFmt=h.offset!==null?formatDate(addBusinessDays(base,h.offset)):'—';
+          const realFmt=h.fechaReal?formatDate(parseISODate(h.fechaReal)):'—';
+          const d=h.delta;
+          const deltaStr=d===null?'':d===0?'<span style="color:var(--text2)">✓ a tiempo</span>':d>0?`<span style="color:var(--red)">+${d}d retraso</span>`:`<span style="color:var(--green)">${d}d anticipado</span>`;
+          return `${i>0?'<div style="height:1px;background:var(--border);margin:5px 0"></div>':''}
+            <div style="font-weight:500;color:var(--text);margin-bottom:2px">${h.id} — ${h.nombre}</div>
+            <div style="font-family:var(--mono);font-size:10px;color:var(--text2)">Esperado: ${esperadaFmt}</div>
+            ${found.isReal?`<div style="font-family:var(--mono);font-size:10px;color:var(--text2)">Real: ${realFmt}</div><div style="font-size:11px;font-weight:500;margin-top:2px">${deltaStr}</div>`:'<div style="font-size:10px;color:var(--text3)">Pendiente</div>'}`;
+        }).join('');
+        tip.innerHTML=rows;
+        let lx=evt.native.clientX+14,ty=evt.native.clientY-20;
+        if(lx+235>window.innerWidth) lx=evt.native.clientX-240;
+        if(ty<0) ty=evt.native.clientY+10;
+        tip.style.left=lx+'px';tip.style.top=ty+'px';tip.style.display='block';
+      }
+    }
+  });
+  canvas.addEventListener('mouseleave',()=>{document.getElementById('ins-tip').style.display='none';});
 }
 
 function volverDeInsights() {
