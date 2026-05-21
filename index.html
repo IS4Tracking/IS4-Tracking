@@ -568,7 +568,10 @@
         <div class="form-group"><label class="form-label">Tarea</label><select class="form-select" id="e-disciplina" onchange="updateEventos()"><option value="">Seleccionar tarea…</option></select></div>
       </div>
       <div class="form-group"><label class="form-label">Evento</label><select class="form-select" id="e-evento"><option value="">Seleccionar evento…</option></select></div>
-      <div class="form-group"><label class="form-label">Fecha real</label><input class="form-input" id="e-fecha" type="date" placeholder="DD/MM/AAAA"></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Fecha real</label><input class="form-input" id="e-fecha" type="date" placeholder="DD/MM/AAAA"></div>
+        <div class="form-group"><label class="form-label">Hora <span style="color:var(--text3)">(opcional)</span></label><input class="form-input" id="e-hora" type="time"></div>
+      </div>
       <div class="form-group"><label class="form-label">Nota <span style="color:var(--text3)">(opcional)</span></label><textarea class="form-textarea" id="e-nota" placeholder="Contexto, observaciones, riesgos…" style="min-height:60px"></textarea></div>
     </div>
     <div class="modal-footer">
@@ -891,7 +894,7 @@ async function loadAllData() {
       api('getLogEventos'), api('getCriteriosPrograma'),
       api('getDisciplinasProyecto'), api('getCambiosDetalle'),
       api('getCambiosBorrados', {}), api('getHistorialArquitecto', {}),
-      api('getSnapshotsEntrega', { proyecto_id: '' })
+      api('getSnapshotsEntrega', {})
     ]);
     state.proyectos = proyectos || [];
     state.eventosCatalogo = eventos || [];
@@ -1646,7 +1649,11 @@ async function guardarProyecto() {
 
 // ── NUEVO ENTRY ──
 function openNuevoEntry() {
-  document.getElementById('e-fecha').value = new Date().toISOString().split('T')[0];
+  const _ahora = new Date();
+  const _fechaLocal = `${_ahora.getFullYear()}-${String(_ahora.getMonth()+1).padStart(2,'0')}-${String(_ahora.getDate()).padStart(2,'0')}`;
+  const _horaLocal = `${String(_ahora.getHours()).padStart(2,'0')}:${String(_ahora.getMinutes()).padStart(2,'0')}`;
+  document.getElementById('e-fecha').value = _fechaLocal;
+  document.getElementById('e-hora').value = _horaLocal;
   document.getElementById('e-nota').value = '';
   document.getElementById('e-grupo').value = '';
   document.getElementById('e-disciplina').innerHTML = '<option value="">Seleccionar tarea…</option>';
@@ -2029,6 +2036,13 @@ let _pendingEntregaParcialData = null;
 
 async function guardarEntry() {
   const fecha = document.getElementById('e-fecha').value;
+  const hora = document.getElementById('e-hora').value;
+  const _offsetMin = new Date().getTimezoneOffset();
+  const _offsetSign = _offsetMin <= 0 ? '+' : '-';
+  const _offsetHH = String(Math.floor(Math.abs(_offsetMin)/60)).padStart(2,'0');
+  const _offsetMM = String(Math.abs(_offsetMin)%60).padStart(2,'0');
+  const _offsetStr = `${_offsetSign}${_offsetHH}:${_offsetMM}`;
+  const fechaTimestamp = fecha && hora ? `${fecha}T${hora}:00${_offsetStr}` : (fecha ? `${fecha}T12:00:00${_offsetStr}` : '');
   const grupo = document.getElementById('e-grupo').value;
   const disciplina = document.getElementById('e-disciplina').value;
   const evento = document.getElementById('e-evento').value;
@@ -2072,7 +2086,7 @@ async function guardarEntry() {
   btn.disabled = true; btn.textContent = 'Guardando…';
   try {
     const res = await api('appendLogEvento', {
-      proyecto_id: proyectoId, fecha_real: fecha,
+      proyecto_id: proyectoId, fecha_real: fecha, fecha_hora: fechaTimestamp,
       disciplina_id: discKey, hito_id: evento,
       tipo_entry: 'evento', nota: document.getElementById('e-nota').value, version_timeline_activa: '1'
     });
