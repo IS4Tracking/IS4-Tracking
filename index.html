@@ -3259,13 +3259,35 @@ function abrirSnapshot(entryId) {
       </div>
       <div style="flex:1;background:var(--surface2);border-radius:6px;padding:10px 12px">
         <div style="font-size:10px;color:var(--text3);margin-bottom:2px">En proceso</div>
-        <div style=\"font-size:20px;font-weight:500\">${enProceso}</div>
+        <div style="font-size:20px;font-weight:500">${enProceso}</div>
       </div>
-      <div style=\"flex:1;background:var(--surface2);border-radius:6px;padding:10px 12px\">
-        <div style=\"font-size:10px;color:var(--text3);margin-bottom:2px\">Pendientes</div>
-        <div style=\"font-size:20px;font-weight:500\">${pendientes}</div>
+      <div style="flex:1;background:var(--surface2);border-radius:6px;padding:10px 12px">
+        <div style="font-size:10px;color:var(--text3);margin-bottom:2px">Pendientes</div>
+        <div style="font-size:20px;font-weight:500">${pendientes}</div>
       </div>
-    </div>\`;
+    </div>`;
+
+  // Render agrupado por grupo
+  const html = Object.entries(grupos).map(([gid, g]) => {
+    const filas = g.disciplinas.map(({ dk, dNombre, info }) => {
+      const incluida = !seleccion || seleccion.includes(dk);
+      const estadoLabel = !incluida ? 'no incluida' : info.completa ? 'completado' : info.ultimo_evento || 'pendiente';
+      const estadoClass = !incluida ? 'pendiente' : info.completa ? 'completado' : info.ultimo_evento ? 'en-proceso' : 'pendiente';
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px">
+        <span style="color:var(--text2)">${dNombre}</span>
+        <span class="disciplina-estado ${estadoClass}">${estadoLabel}</span>
+      </div>`;
+    }).join('');
+    return `<div style="margin-bottom:12px">
+      <div style="font-size:10px;font-weight:500;color:var(--text3);letter-spacing:0.04em;margin-bottom:4px;text-transform:uppercase">${gid} — ${g.nombre}</div>
+      ${filas}
+    </div>`;
+  }).join('');
+
+  document.getElementById('modal-snapshot-title').textContent = 'Estado al momento de la entrega';
+  document.getElementById('modal-snapshot-body').innerHTML = metricas + (html || '<p style="color:var(--text3)">Sin datos</p>');
+  document.getElementById('modal-snapshot').classList.add('open');
+}
 
 function openNuevaEntrega() {
   const proyecto = state.currentProyecto;
