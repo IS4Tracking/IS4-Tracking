@@ -179,6 +179,7 @@
   .disciplina-estado.en-proceso { background:rgba(68,136,255,0.15); color:var(--blue); }
   .disciplina-estado.completado { background:rgba(68,204,136,0.15); color:var(--green); }
   .disciplina-estado.afectado { background:rgba(255,170,0,0.15); color:var(--yellow); }
+  .disciplina-estado.bloqueada { background:rgba(255,107,107,0.15); color:var(--red); }
   .vobo-badge { font-family:var(--mono); font-size:10px; padding:2px 6px; border-radius:3px; white-space:nowrap; }
   .vobo-badge.v1 { background:var(--surface2); color:var(--text3); }
   .vobo-badge.v2 { background:rgba(120,120,120,0.2); color:#aaa; }
@@ -449,7 +450,7 @@
           <div id="detail-scoreboard"></div>
         </div>
         <div style="display:flex;gap:8px;align-items:center">
-          <button class="btn-secondary" onclick="abrirInsights()" style="font-size:13px">📊 Insights</button>
+          <button class="btn-secondary" onclick="abrirInsights()" style="font-size:13px">📊 Reportes</button>
           <button class="btn-secondary" onclick="openSettings()" style="font-size:13px">⚙️ Settings</button>
           <button class="btn-primary" onclick="openNuevoEntry()">+ Registrar evento</button>
         </div>
@@ -470,7 +471,7 @@
       </div>
       <div style="margin-top:32px;display:flex;flex-direction:column;align-items:center;gap:16px;padding:48px 0;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface)">
         <div style="font-size:32px">📊</div>
-        <div style="font-size:15px;font-weight:500;color:var(--text)">Insights y Dashboards</div>
+        <div style="font-size:15px;font-weight:500;color:var(--text)">Reportes</div>
         <div style="font-size:13px;color:var(--text2);font-family:var(--mono);text-align:center;max-width:400px;line-height:1.7">Esta sección está reservada para reportes, curva S, análisis de desvíos y dashboards ejecutivos.<br>Se construirá en la siguiente sesión dedicada.</div>
       </div>
     </div>
@@ -490,6 +491,47 @@
 </div>
 
 <!-- MODAL: NUEVO PROYECTO -->
+<div class="modal-overlay" id="modal-snapshot">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title" id="modal-snapshot-title">Estado del proyecto</div><button class="modal-close" onclick="closeModal('modal-snapshot')">×</button></div>
+    <div class="modal-body" id="modal-snapshot-body"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-nueva-entrega">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title">Nueva Entrega</div><button class="modal-close" onclick="closeModal('modal-nueva-entrega')">×</button></div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Número de entrega</label>
+        <input class="form-input" id="ne-numero" type="number" min="1" placeholder="Ej. 1">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Cambios relacionados (opcional)</label>
+        <div id="ne-cambios-list" style="display:flex;flex-direction:column;gap:6px;max-height:200px;overflow-y:auto;margin-top:4px;"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('modal-nueva-entrega')">Cancelar</button>
+      <button class="btn-primary" onclick="confirmarNuevaEntrega()">Crear Entrega</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-entrega-parcial">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title">Entrega Parcial — Seleccionar disciplinas</div><button class="modal-close" onclick="closeModal('modal-entrega-parcial')">×</button></div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--text2);margin-bottom:12px">Selecciona las disciplinas incluidas en esta entrega parcial:</p>
+      <div id="ep-disciplinas-list" style="display:flex;flex-direction:column;gap:6px;max-height:300px;overflow-y:auto;"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('modal-entrega-parcial')">Cancelar</button>
+      <button class="btn-primary" onclick="confirmarEntregaParcial()">Confirmar</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-proyecto">
   <div class="modal">
     <div class="modal-header"><div class="modal-title">Nuevo Proyecto</div><button class="modal-close" onclick="closeModal('modal-proyecto')">×</button></div>
@@ -630,6 +672,13 @@
         </div>
       </div>
       <div class="form-group"><div class="form-toggle" onclick="toggleSettingsBubble()"><div class="toggle-switch" id="toggle-settings-bubble"></div><div class="toggle-label">Bubble Plan aplica</div></div></div>
+      ${state.rol === 'PM' ? `
+      <div class="form-group" style="border-top:1px solid var(--border);padding-top:12px;margin-top:4px">
+        <label class="form-label" style="margin-bottom:8px">Tareas opcionales</label>
+        <div class="form-toggle" onclick="toggleTareaOpcional('alarma_sismica')"><div class="toggle-switch" id="toggle-alarma-sismica"></div><div class="toggle-label">Alarma Sísmica (G8)</div></div>
+        <div class="form-toggle" onclick="toggleTareaOpcional('puerta_emergencia')" style="margin-top:8px"><div class="toggle-switch" id="toggle-puerta-emergencia"></div><div class="toggle-label">Puerta de Emergencia (G8)</div></div>
+        <div class="form-toggle" onclick="toggleTareaOpcional('proyector_laser')" style="margin-top:8px"><div class="toggle-switch" id="toggle-proyector-laser"></div><div class="toggle-label">Proyector Láser (G7)</div></div>
+      </div>` : ''}
       <div class="form-group" id="historial-arq-section" style="display:none">
         <label class="form-label">Historial de asignaciones</label>
         <div id="historial-arq-lista" style="margin-top:6px;display:flex;flex-direction:column;gap:4px"></div>
@@ -837,11 +886,12 @@ async function api(action, body = {}) {
 // ── DATA ──
 async function loadAllData() {
   try {
-    const [proyectos, eventos, log, criterios, disciplinas, cambiosDetalle, cambiosBorrados, historialArq] = await Promise.all([
+    const [proyectos, eventos, log, criterios, disciplinas, cambiosDetalle, cambiosBorrados, historialArq, snapshots] = await Promise.all([
       api('getProyectos'), api('getEventosCatalogo'),
       api('getLogEventos'), api('getCriteriosPrograma'),
       api('getDisciplinasProyecto'), api('getCambiosDetalle'),
-      api('getCambiosBorrados', {}), api('getHistorialArquitecto', {})
+      api('getCambiosBorrados', {}), api('getHistorialArquitecto', {}),
+      api('getSnapshotsEntrega', { proyecto_id: '' })
     ]);
     state.proyectos = proyectos || [];
     state.eventosCatalogo = eventos || [];
@@ -851,6 +901,7 @@ async function loadAllData() {
     state.cambiosDetalle = cambiosDetalle || [];
     state.cambiosBorrados = cambiosBorrados || [];
     state.historialArquitecto = historialArq || [];
+    state.snapshotsEntrega = snapshots || [];
     renderDashboard();
     renderCriteriosBanner();
   } catch(e) { showToast('Error cargando datos: ' + e.message, 'error'); console.error(e); }
@@ -1127,7 +1178,7 @@ function renderGroups(proyecto) {
     state.eventosCatalogo.some(e => e.grupo_id === g.grupo_id && activasSet.has(`${e.grupo_id}::${e.disciplina_nombre}`))
   );
   document.getElementById('groups-container').innerHTML = grupos.map(g => {
-    const disciplinas = getDisciplinasGrupo(g.grupo_id).filter(d => activasSet.has(`${g.grupo_id}::${d}`));
+    const disciplinas = getDisciplinasGrupo(g.grupo_id).filter(d => activasSet.has(`${g.grupo_id}::${d}`) && tareaOpcionalAplica(g.grupo_id, d));
     const completadas = disciplinas.filter(d => isDisciplinaCompleta(d, g.grupo_id, log)).length;
     const enProceso = disciplinas.filter(d => !isDisciplinaCompleta(d, g.grupo_id, log) && log.some(e => e.disciplina_id === `${g.grupo_id}::${d}`)).length;
     const nivel = completadas === disciplinas.length && disciplinas.length > 0 ? 'green' : enProceso > 0 ? 'yellow' : 'gray';
@@ -1140,7 +1191,10 @@ function renderGroups(proyecto) {
         <span class="group-progress">${completadas}/${disciplinas.length}</span>
         <div class="semaforo ${nivel}"></div>
       </div>
-      <div class="group-body">${disciplinas.map(d => renderDisciplina(proyecto, g, d, log)).join('')}</div>
+      <div class="group-body">
+        ${disciplinas.filter(d => tareaOpcionalAplica(g.grupo_id, d)).map(d => renderDisciplina(proyecto, g, d, log)).join('')}
+        ${g.grupo_id === 'G14' && state.currentUser?.rol === 'PM' ? `<div style="padding:10px 16px;border-top:1px solid var(--border)"><button class="btn-secondary" onclick="openNuevaEntrega()">+ Nueva Entrega</button></div>` : ''}
+      </div>
     </div>`;
   }).join('');
 }
@@ -1167,8 +1221,15 @@ function renderDisciplina(proyecto, grupo, disciplina, log) {
     return evs.length > 0 ? evs[evs.length - 1] : null;
   })();
   const afectado = !completa && ultimoEvento && ultimoEvento.hito_id && ultimoEvento.hito_id.startsWith('Afectado por Cambio');
-  const estado = completa ? 'completado' : afectado ? 'afectado' : eventos.length > 0 ? 'en-proceso' : 'pendiente';
-  const estadoLabel = completa ? 'completado' : afectado ? 'afectado' : eventos.length > 0 ? 'en proceso' : 'pendiente';
+  const EVENTOS_BLOQUEANTES = new Set([
+    'Solicitud Enviada',      // G3, G4, G5, G6, G7, G8, G9, G10
+    'Ajustes Solicitados SP', // G5, G6, G7, G8, G9, G10, G11
+    'Vobo Solicitado',        // G5, G6, G7, G8, G9, G10, G11
+    'Revisión Enviada',       // G14 Arquitectónico N y Catálogo N
+  ]);
+  const esBloqueante = !completa && !afectado && ultimoEvento && EVENTOS_BLOQUEANTES.has(ultimoEvento.hito_id);
+  const estado = completa ? 'completado' : afectado ? 'afectado' : esBloqueante ? 'bloqueada' : eventos.length > 0 ? 'en-proceso' : 'pendiente';
+  const estadoLabel = completa ? 'completado' : afectado ? 'afectado' : esBloqueante ? 'bloqueada' : eventos.length > 0 ? 'en proceso' : 'pendiente';
   const vobos = contarVoBos(disciplina, grupo.grupo_id, log);
   const voboBadgeClass = vobos === 0 ? '' : vobos === 1 ? 'v1' : vobos === 2 ? 'v2' : vobos === 3 ? 'v3' : vobos === 4 ? 'v4' : 'v5plus';
   const voboLabel = vobos === 1 ? '1 Vo.Bo.' : vobos > 1 ? `${vobos} Vo.Bo.` : '';
@@ -1217,15 +1278,32 @@ function renderDisciplina(proyecto, grupo, disciplina, log) {
                           const tituloEntry = cdEntry?.titulo ? `: ${cdEntry.titulo}` : '';
                           return `<div class="log-evento" style="display:flex;align-items:center;gap:6px;min-width:0;overflow:hidden"><span style="flex-shrink:0">${link}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0">Afectado por Cambio${tituloEntry}</span></div>`;
                         }
+                        const esEntregaG15 = e.disciplina_id && e.disciplina_id.startsWith('G15::') &&
+                          ['Entrega Preliminar','Entrega Parcial','Entrega Final'].includes(e.hito_id);
+                        if (esEntregaG15) {
+                          const snapExiste = (state.snapshotsEntrega || []).some(s => s.entry_id === e.entry_id);
+                          return `<div class="log-evento" style="display:flex;align-items:center;gap:6px">
+                            <span>${e.hito_id}</span>
+                            ${snapExiste ? `<span style="font-family:var(--mono);font-size:9px;color:var(--accent);cursor:pointer" onclick="abrirSnapshot('${e.entry_id}')" title="Ver estado del proyecto">↗ ver estado</span>` : ''}
+                          </div>`;
+                        }
                         return `<div class="log-evento">${e.hito_id || '—'}</div>`;
                       })()
                   }
                 </div>
                 ${!esNotaRef && e.nota ? `<div class="log-nota">${e.nota}</div>` : ''}
               </div>
-              ${state.rol === 'PM' ? `
+              ${(() => {
+                const esVoboAR = e.tipo_entry === 'vobo_ar';
+                const esTareaVoboAR = ['G11::Iluminación','G6::HVAC'].includes(e.disciplina_id);
+                const puedeEditar =
+                  state.rol === 'PM' ||
+                  (state.rol === 'Arquitecto' && !esVoboAR) ||
+                  (state.rol === 'Validador' && esVoboAR && esTareaVoboAR);
+                return puedeEditar ? `
                 <button class="btn-editar-entry" onclick="abrirEditarEntry('${e.entry_id}')" title="Editar entrada">✎</button>
-                <button class="btn-borrar-entry" onclick="borrarEntry('${e.entry_id}')" title="Borrar entrada">✕</button>` : ''}
+                <button class="btn-borrar-entry" onclick="borrarEntry('${e.entry_id}')" title="Borrar entrada">✕</button>` : '';
+              })()}
             </div>`;
           }).join('')}
     </div>
@@ -1946,6 +2024,9 @@ async function guardarNotaCambio() {
   finally { btn.disabled = false; btn.textContent = 'Guardar'; }
 }
 
+// Estado temporal para flujo Entrega Parcial
+let _pendingEntregaParcialData = null;
+
 async function guardarEntry() {
   const fecha = document.getElementById('e-fecha').value;
   const grupo = document.getElementById('e-grupo').value;
@@ -1953,15 +2034,67 @@ async function guardarEntry() {
   const evento = document.getElementById('e-evento').value;
   if (!fecha || !grupo || !disciplina || !evento) { showToast('Todos los campos son requeridos', 'error'); return; }
   if (!state.currentProyecto) { showToast('Selecciona un proyecto primero', 'error'); return; }
+
+  const proyectoId = state.currentProyecto.proyecto_id;
+  const discKey = `${grupo}::${disciplina}`;
+
+  // ── Bloqueo Entrega Final en G15 ──
+  if (grupo === 'G15' && evento === 'Entrega Final') {
+    const numStr = disciplina.replace('Ejecutivo Entrega ', '');
+    const arqKey = `G14::Arquitectónico Entrega ${numStr}`;
+    const catKey = `G14::Catálogo Entrega ${numStr}`;
+    const arqCompleta = isDisciplinaCompleta(`Arquitectónico Entrega ${numStr}`, 'G14', state.logEventos.filter(e => e.proyecto_id === proyectoId));
+    const catCompleta = isDisciplinaCompleta(`Catálogo Entrega ${numStr}`, 'G14', state.logEventos.filter(e => e.proyecto_id === proyectoId));
+    if (!arqCompleta && !catCompleta) { showToast('Arquitectónico y Catálogo de la Entrega pendientes de cierre', 'error'); return; }
+    if (!arqCompleta) { showToast(`Arquitectónico Entrega ${numStr} pendiente de cierre`, 'error'); return; }
+    if (!catCompleta) { showToast(`Catálogo Entrega ${numStr} pendiente de cierre`, 'error'); return; }
+  }
+
+  // ── Intercepción Entrega Parcial — requiere selección de disciplinas ──
+  if (grupo === 'G15' && evento === 'Entrega Parcial') {
+    _pendingEntregaParcialData = { fecha, grupo, disciplina, proyectoId };
+    const logP = state.logEventos.filter(e => e.proyecto_id === proyectoId);
+    const activasSet = new Set(
+      state.disciplinasProyecto.filter(d => d.proyecto_id === proyectoId && d.aplica === 'TRUE').map(d => d.disciplina_id)
+    );
+    const todasDiscs = [...activasSet];
+    document.getElementById('ep-disciplinas-list').innerHTML = todasDiscs.map(dk => `
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+        <input type="checkbox" value="${dk}" checked style="accent-color:var(--accent)">
+        <span>${dk}</span>
+      </label>`).join('');
+    document.getElementById('modal-entrega-parcial').classList.add('open');
+    return; // esperar confirmación del usuario
+  }
+
   const estadoPaneles = capturarEstadoPaneles();
   const btn = document.getElementById('btn-guardar-entry');
   btn.disabled = true; btn.textContent = 'Guardando…';
   try {
-    await api('appendLogEvento', {
-      proyecto_id: state.currentProyecto.proyecto_id, fecha_real: fecha,
-      disciplina_id: `${grupo}::${disciplina}`, hito_id: evento,
+    const res = await api('appendLogEvento', {
+      proyecto_id: proyectoId, fecha_real: fecha,
+      disciplina_id: discKey, hito_id: evento,
       tipo_entry: 'evento', nota: document.getElementById('e-nota').value, version_timeline_activa: '1'
     });
+
+    // ── Snapshot automático en Entrega Preliminar / Entrega Final ──
+    if (grupo === 'G15' && (evento === 'Entrega Preliminar' || evento === 'Entrega Final')) {
+      await guardarSnapshotEntrega(proyectoId, res.entry_id, null);
+    }
+
+    // ── Vínculo G14↔G15: nota_ref en Arquitectónico N al registrar Preliminar o Parcial ──
+    if (grupo === 'G15' && (evento === 'Entrega Preliminar' || evento === 'Entrega Parcial')) {
+      const numStr = disciplina.replace('Ejecutivo Entrega ', '');
+      await api('appendLogEvento', {
+        proyecto_id: proyectoId,
+        fecha_real: fecha,
+        disciplina_id: `G14::Arquitectónico Entrega ${numStr}`,
+        hito_id: res.entry_id,
+        tipo_entry: 'nota_ref',
+        nota: JSON.stringify({ titulo: `${evento} — Ejecutivo Entrega ${numStr}` }),
+        version_timeline_activa: '1'
+      });
+    }
     closeModal('modal-entry');
     showToast('Evento registrado', 'success');
     const logFresco = await api('getLogEventos', { proyecto_id: state.currentProyecto.proyecto_id });
@@ -2025,7 +2158,7 @@ async function evaluarHitos(proyectoId, logOverride) {
   function algunaSolicitud(grupoId, disciplinas) {
     return disciplinas.some(d => {
       const discKey = `${grupoId}::${d}`;
-      return log.some(e => e.disciplina_id === discKey && e.hito_id && e.hito_id.toLowerCase().includes('solicitud'));
+      return log.some(e => e.disciplina_id === discKey && e.hito_id === 'Solicitud Enviada');
     });
   }
 
@@ -2051,8 +2184,8 @@ async function evaluarHitos(proyectoId, logOverride) {
     },
     'H22': () => todasCierran('G5', ['Zonificación','Mueble de Gorras']),
     'H23': () => todasCierran('G6', ['HVAC','Proyecto Eléctrico']),
-    'H24': () => todasCierran('G7', ['Pantallas','Antenas WiFi','Bocinas','Contador de Personas','Validación Contactos','Validación Voz y Datos','Validación Site','Validación Cámaras']),
-    'H25': () => todasCierran('G8', state.eventosCatalogo.filter(e => e.grupo_id === 'G8').map(e => e.disciplina_nombre).filter((v,i,a) => a.indexOf(v) === i)),
+    'H24': () => todasCierran('G7', ['Pantallas','Antenas WiFi','Bocinas','Contador de Personas','Validación Contactos','Validación Voz y Datos','Validación Site','Validación Cámaras'].filter(d => tareaOpcionalAplica('G7', d))),
+    'H25': () => todasCierran('G8', state.eventosCatalogo.filter(e => e.grupo_id === 'G8').map(e => e.disciplina_nombre).filter((v,i,a) => a.indexOf(v) === i).filter(d => tareaOpcionalAplica('G8', d))),
     'H26': () => todasCierran('G9', ['Aromas','Validación Pantallas','Validación Bocinas']),
     'H27': () => todasCierran('G10', ['Caminadora','Mueble de Servicios']),
     'H28': () => todasCierran('G11', state.eventosCatalogo.filter(e => e.grupo_id === 'G11').map(e => e.disciplina_nombre).filter((v,i,a) => a.indexOf(v) === i)),
@@ -2061,9 +2194,12 @@ async function evaluarHitos(proyectoId, logOverride) {
     'H31': () => hitsAlcanzados.has('H24'),
     'H32': () => hitsAlcanzados.has('H25'),
     'H33': () => hitsAlcanzados.has('H26'),
-    'H34': () => ['H30','H31','H32','H33'].every(h => hitsAlcanzados.has(h)),
-    'H36': () => tieneCierre('G15', 'Proyecto Ejecutivo'),
-  };
+    'H34': () => ['H30','H31','H32','H33'].every(h => hitsAlcanzados.has(h)) && (() => {
+      const evs = log.filter(e => e.disciplina_id === 'G13::Cruce General' && e.tipo_entry === 'evento')
+        .sort((a,b) => new Date(a.timestamp||a.fecha_real+'T12:00:00Z') - new Date(b.timestamp||b.fecha_real+'T12:00:00Z'));
+      return evs.length > 0 && evs[evs.length-1].hito_id === 'Cruce General Cerrado';
+    })(),
+    };
 
   for (const [hitoId, condicion] of Object.entries(TRIGGERS)) {
     // Registrar si: nunca alcanzado, O alcanzado pero reabierto por cambio posterior
@@ -2071,6 +2207,27 @@ async function evaluarHitos(proyectoId, logOverride) {
       nuevosHitos.push(hitoId);
     }
   }
+
+  // H36 iterativo — una instancia por cada Entrega Final registrada en G15
+  const entregasFinales = log.filter(e =>
+    e.proyecto_id === proyectoId &&
+    e.tipo_entry === 'evento' &&
+    e.disciplina_id.startsWith('G15::Ejecutivo Entrega ') &&
+    e.hito_id === 'Entrega Final'
+  );
+  for (const ef of entregasFinales) {
+    const numStr = ef.disciplina_id.replace('G15::Ejecutivo Entrega ', '');
+    const hitoIterativo = `H36-${numStr}`;
+    const yaRegistrado = log.some(e => e.hito_id === hitoIterativo && e.tipo_entry === 'hito_alcanzado');
+    if (!yaRegistrado) nuevosHitos.push(hitoIterativo);
+  }
+
+  const G13_AUTO = {
+    'H23': 'Instalaciones Validadas',
+    'H24': 'Redes / Sistemas Validadas',
+    'H25': 'Prevención Validada',
+    'H26': 'Marketing Sensorial Validado',
+  };
 
   for (const hitoId of nuevosHitos) {
     await api('appendLogEvento', {
@@ -2082,6 +2239,19 @@ async function evaluarHitos(proyectoId, logOverride) {
       nota: 'Alcanzado automáticamente', version_timeline_activa: '1'
     });
     showToast(`🎯 Hito ${hitoId} alcanzado`, 'success');
+
+    if (G13_AUTO[hitoId]) {
+      await api('appendLogEvento', {
+        proyecto_id: proyectoId,
+        fecha_real: new Date().toISOString().split('T')[0],
+        disciplina_id: 'G13::Cruce General',
+        hito_id: G13_AUTO[hitoId],
+        tipo_entry: 'evento',
+        version_hito: '1',
+        nota: 'Registrado automáticamente',
+        version_timeline_activa: '1'
+      });
+    }
   }
 
   return nuevosHitos;
@@ -2112,6 +2282,13 @@ function openSettings() {
   document.getElementById('s-estado').value = p.estado || 'Activo';
   const bubbleOn = p.bubble_plan_aplica === true || p.bubble_plan_aplica === 'TRUE';
   document.getElementById('toggle-settings-bubble').classList.toggle('on', bubbleOn);
+  if (state.rol === 'PM') {
+    const tareas = p.tareas_opcionales ? JSON.parse(p.tareas_opcionales) : {};
+    ['alarma_sismica','puerta_emergencia','proyector_laser'].forEach(t => {
+      const el = document.getElementById(`toggle-${t.replace(/_/g,'-')}`);
+      if (el) el.classList.toggle('on', tareas[t] === true || tareas[t] === 'true');
+    });
+  }
   const sel = document.getElementById('s-arquitecto');
   sel.innerHTML = '<option value="">Sin asignar</option>';
   state.usuarios.filter(u => u.rol === 'Arquitecto').forEach(u => sel.innerHTML += `<option value="${u.email}">${u.nombre}</option>`);
@@ -2155,6 +2332,10 @@ function toggleSettingsBubble() {
   const toggle = document.getElementById('toggle-settings-bubble');
   toggle.classList.toggle('on');
 }
+function toggleTareaOpcional(key) {
+  const el = document.getElementById(`toggle-${key.replace(/_/g,'-')}`);
+  if (el) el.classList.toggle('on');
+}
 
 async function guardarSettings() {
   const nombre = document.getElementById('s-nombre').value.trim();
@@ -2190,6 +2371,11 @@ async function guardarSettings() {
       estado: estadoNuevo,
       bubble_plan_aplica: document.getElementById('toggle-settings-bubble').classList.contains('on'),
       notas: document.getElementById('s-notas').value,
+      tareas_opcionales: state.rol === 'PM' ? JSON.stringify({
+        alarma_sismica:    document.getElementById('toggle-alarma-sismica')?.classList.contains('on') || false,
+        puerta_emergencia: document.getElementById('toggle-puerta-emergencia')?.classList.contains('on') || false,
+        proyector_laser:   document.getElementById('toggle-proyector-laser')?.classList.contains('on') || false,
+      }) : (state.currentProyecto.tareas_opcionales || '{}'),
       fecha_pausa,
       fecha_reactivacion
     });
@@ -2894,20 +3080,54 @@ function getGruposUnicos() {
   return grupos;
 }
 function getDisciplinasGrupo(gid) { return [...new Set(state.eventosCatalogo.filter(e => e.grupo_id === gid).map(e => e.disciplina_nombre))]; }
+function getTareasOpcionalesActivas() {
+  const p = state.currentProyecto;
+  if (!p) return {};
+  try { return JSON.parse(p.tareas_opcionales || '{}'); } catch(e) { return {}; }
+}
+function tareaOpcionalAplica(grupoId, disciplina) {
+  const MAP = {
+    'G8::Alarma Sísmica':      'alarma_sismica',
+    'G8::Puerta de Emergencia':'puerta_emergencia',
+    'G7::Proyector Láser':     'proyector_laser',
+  };
+  const key = MAP[`${grupoId}::${disciplina}`];
+  if (!key) return true; // no es tarea opcional — siempre aplica
+  const activas = getTareasOpcionalesActivas();
+  return activas[key] === true || activas[key] === 'true';
+}
 function isDisciplinaCompleta(disciplina, grupoId, log) {
+  const discKey = `${grupoId}::${disciplina}`;
+  const eventosDisc = log.filter(e => e.disciplina_id === discKey && e.tipo_entry === 'evento');
+  const tieneEv = (nombre) => eventosDisc.some(e => e.hito_id === nombre);
+
+  // Override G2 — cierre por condiciones múltiples
+  if (grupoId === 'G2') {
+    const G2_CIERRE = {
+      'Plano de Conjunto':        () => tieneEv('Recepción de PDF') && tieneEv('Recepción de DWG'),
+      'Huella del Local':         () => tieneEv('Recepción de PDF') && tieneEv('Recepción de DWG'),
+      'Fachada':                  () => tieneEv('Recepción de PDF') && tieneEv('Recepción de DWG'),
+      'Manual de Adaptaciones':   () => tieneEv('Recepción de PDF'),
+      'Levantamiento':            () => tieneEv('Recepción de PDF') && tieneEv('Recepción de DWG'),
+    };
+    if (disciplina in G2_CIERRE) return G2_CIERRE[disciplina]();
+  }
+
+  // Override G4 — Layout Validación Operaciones + Comercial requiere ambos eventos
+  if (grupoId === 'G4' && disciplina === 'Layout - Validación Operaciones + Comercial') {
+    return tieneEv('Validación Operaciones') && tieneEv('Validación Comercial');
+  }
+
+  // Lógica genérica — último evento === evento de cierre del catálogo
   const cierre = state.eventosCatalogo.find(e => e.grupo_id === grupoId && e.disciplina_nombre === disciplina && (e.es_cierre === 'TRUE' || e.es_cierre === 'true' || e.es_cierre === true));
   if (!cierre) return false;
-  const discKey = `${grupoId}::${disciplina}`;
-  const eventos = log
-    .filter(e => e.disciplina_id === discKey && e.tipo_entry === 'evento')
-    .sort((a, b) => {
-      const ta = a.timestamp ? new Date(a.timestamp) : new Date(a.fecha_real + 'T12:00:00Z');
-      const tb = b.timestamp ? new Date(b.timestamp) : new Date(b.fecha_real + 'T12:00:00Z');
-      return ta - tb;
-    });
+  const eventos = eventosDisc.sort((a, b) => {
+    const ta = a.timestamp ? new Date(a.timestamp) : new Date(a.fecha_real + 'T12:00:00Z');
+    const tb = b.timestamp ? new Date(b.timestamp) : new Date(b.fecha_real + 'T12:00:00Z');
+    return ta - tb;
+  });
   if (eventos.length === 0) return false;
-  const ultimo = eventos[eventos.length - 1];
-  return ultimo.hito_id === cierre.evento_nombre;
+  return eventos[eventos.length - 1].hito_id === cierre.evento_nombre;
 }
 
 // ── ESTADO DE PANELES ──
@@ -2958,6 +3178,134 @@ function restaurarEstadoPaneles(estado) {
 // ── UI ──
 function openModal(id) { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+async function guardarSnapshotEntrega(proyectoId, entryId, seleccionManual) {
+  const logP = state.logEventos.filter(e => e.proyecto_id === proyectoId);
+  const activasSet = new Set(
+    state.disciplinasProyecto.filter(d => d.proyecto_id === proyectoId && d.aplica === 'TRUE').map(d => d.disciplina_id)
+  );
+  const snapshot = {};
+  for (const dk of activasSet) {
+    const [gid, dNombre] = dk.split('::');
+    const completa = isDisciplinaCompleta(dNombre, gid, logP);
+    const evs = logP.filter(e => e.disciplina_id === dk && e.tipo_entry === 'evento')
+      .sort((a,b) => new Date(a.timestamp||a.fecha_real+'T12:00:00Z') - new Date(b.timestamp||b.fecha_real+'T12:00:00Z'));
+    const ultimo = evs.length > 0 ? evs[evs.length-1].hito_id : null;
+    snapshot[dk] = { completa, ultimo_evento: ultimo, total_eventos: evs.length };
+  }
+  try {
+    await api('guardarSnapshot', { proyecto_id: proyectoId, entry_id: entryId, snapshot_data: snapshot, seleccion_manual: seleccionManual });
+  } catch(e) { console.warn('Snapshot no guardado:', e.message); }
+}
+
+async function confirmarEntregaParcial() {
+  if (!_pendingEntregaParcialData) return;
+  const { fecha, grupo, disciplina, proyectoId } = _pendingEntregaParcialData;
+  const checkboxes = document.querySelectorAll('#ep-disciplinas-list input[type=checkbox]:checked');
+  const seleccion = [...checkboxes].map(cb => cb.value);
+  closeModal('modal-entrega-parcial');
+  const estadoPaneles = capturarEstadoPaneles();
+  const btn = document.getElementById('btn-guardar-entry');
+  btn.disabled = true; btn.textContent = 'Guardando…';
+  try {
+    const res = await api('appendLogEvento', {
+      proyecto_id: proyectoId, fecha_real: fecha,
+      disciplina_id: `${grupo}::${disciplina}`, hito_id: 'Entrega Parcial',
+      tipo_entry: 'evento', nota: document.getElementById('e-nota').value, version_timeline_activa: '1'
+    });
+    await guardarSnapshotEntrega(proyectoId, res.entry_id, seleccion);
+    closeModal('modal-entry');
+    showToast('Entrega Parcial registrada', 'success');
+    const logFresco = await api('getLogEventos', { proyecto_id: proyectoId });
+    state.logEventos = [...state.logEventos.filter(e => e.proyecto_id !== proyectoId), ...(logFresco || [])];
+    await evaluarHitos(proyectoId, state.logEventos);
+    await loadAllData();
+    if (state.currentProyecto) { await openProyecto(proyectoId); restaurarEstadoPaneles(estadoPaneles); }
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+  finally { btn.disabled = false; btn.textContent = 'Guardar Evento'; _pendingEntregaParcialData = null; }
+}
+
+function abrirSnapshot(entryId) {
+  const snap = (state.snapshotsEntrega || []).find(s => s.entry_id === entryId);
+  if (!snap || !snap.snapshot_data) { showToast('Sin snapshot para esta entrega', 'error'); return; }
+  const data = snap.snapshot_data;
+  const seleccion = snap.seleccion_manual;
+
+  // Agrupar disciplinas por grupo
+  const grupos = {};
+  for (const [dk, info] of Object.entries(data)) {
+    const [gid, dNombre] = dk.split('::');
+    if (!grupos[gid]) grupos[gid] = { nombre: '', disciplinas: [] };
+    grupos[gid].disciplinas.push({ dk, dNombre, info });
+  }
+
+  // Obtener nombre del grupo desde eventosCatalogo
+  for (const gid of Object.keys(grupos)) {
+    const ev = state.eventosCatalogo.find(e => e.grupo_id === gid);
+    grupos[gid].nombre = ev ? ev.grupo_nombre : gid;
+  }
+
+  // Métricas resumen
+  const total = Object.keys(data).length;
+  const completadas = Object.values(data).filter(i => i.completa).length;
+  const enProceso = Object.values(data).filter(i => !i.completa && i.ultimo_evento).length;
+  const pendientes = total - completadas - enProceso;
+
+  const metricas = `
+    <div style="display:flex;gap:10px;margin-bottom:16px">
+      <div style="flex:1;background:var(--surface2);border-radius:6px;padding:10px 12px">
+        <div style="font-size:10px;color:var(--text3);margin-bottom:2px">Completadas</div>
+        <div style="font-size:20px;font-weight:500">${completadas}<span style="font-size:12px;color:var(--text3);font-weight:400"> / ${total}</span></div>
+      </div>
+      <div style="flex:1;background:var(--surface2);border-radius:6px;padding:10px 12px">
+        <div style="font-size:10px;color:var(--text3);margin-bottom:2px">En proceso</div>
+        <div styl
+
+function openNuevaEntrega() {
+  const proyecto = state.currentProyecto;
+  if (!proyecto) return;
+  // Sugerir número autoincremental
+  const entregas = (state.disciplinasProyecto || [])
+    .filter(d => d.proyecto_id === proyecto.proyecto_id && d.disciplina_id.startsWith('G14::Arquitectónico Entrega '));
+  const siguiente = entregas.length + 1;
+  document.getElementById('ne-numero').value = siguiente;
+  // Listar cambios del proyecto como opciones
+  const cambios = (state.cambiosDetalle || []).filter(cd => {
+    return (state.logEventos || []).some(e => e.entry_id === cd.entry_id && e.proyecto_id === proyecto.proyecto_id);
+  });
+  const lista = document.getElementById('ne-cambios-list');
+  lista.innerHTML = cambios.length === 0
+    ? '<span style="font-size:12px;color:var(--text3)">Sin cambios registrados</span>'
+    : cambios.map(cd => `
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+          <input type="checkbox" value="${cd.entry_id}" style="accent-color:var(--accent)">
+          <span style="font-family:var(--mono);font-size:11px;color:var(--accent)">${cd.clave_cambio}</span>
+          <span>${cd.titulo || '—'}</span>
+        </label>`).join('');
+  document.getElementById('modal-nueva-entrega').classList.add('open');
+}
+
+async function confirmarNuevaEntrega() {
+  const proyecto = state.currentProyecto;
+  if (!proyecto) return;
+  const numero = parseInt(document.getElementById('ne-numero').value);
+  if (!numero || numero < 1) { showToast('Número de entrega inválido', 'error'); return; }
+  const checkboxes = document.querySelectorAll('#ne-cambios-list input[type=checkbox]:checked');
+  const cambiosCausa = [...checkboxes].map(cb => cb.value);
+  try {
+    await api('crearNuevaEntrega', { proyecto_id: proyecto.proyecto_id, numero_entrega: numero, cambios_causa: cambiosCausa });
+    closeModal('modal-nueva-entrega');
+    showToast(`Entrega ${numero} creada`, 'success');
+    await loadAllData();
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+}
+
+function catalogoNDebeHabilitarse(proyectoId, numeroEntrega) {
+  const discKey = `G14::Arquitectónico Entrega ${numeroEntrega}`;
+  const evs = (state.logEventos || []).filter(e => e.proyecto_id === proyectoId && e.disciplina_id === discKey && e.tipo_entry === 'evento');
+  const nombres = new Set(evs.map(e => e.hito_id));
+  return nombres.has('Envío de Listado de Planos') && nombres.has('Envío de Layout') && nombres.has('Solicitud de Entrega');
+}
 function parseISODate(d) {
   // Maneja YYYY-MM-DD, Date objects, y strings largos tipo "Tue May 05 2026..."
   if (!d) return null;
