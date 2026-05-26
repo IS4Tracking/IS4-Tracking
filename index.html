@@ -148,6 +148,7 @@
   .semaforo.yellow { background:var(--yellow); box-shadow:0 0 6px var(--yellow); }
   .semaforo.green { background:var(--green); box-shadow:0 0 6px var(--green); }
   .semaforo.gray { background:var(--text3); }
+  .semaforo.orange { background:#ff9500; box-shadow:0 0 6px rgba(255,149,0,0.6); }
   .desvio-badge { font-family:var(--mono); font-size:11px; padding:2px 6px; border-radius:3px; }
   .desvio-badge.red { background:rgba(255,68,68,0.15); color:var(--red); }
   .desvio-badge.yellow { background:rgba(255,170,0,0.15); color:var(--yellow); }
@@ -225,7 +226,7 @@
   .disciplina-estado.en-proceso { background:rgba(68,136,255,0.15); color:var(--blue); }
   .disciplina-estado.completado { background:rgba(68,204,136,0.15); color:var(--green); }
   .disciplina-estado.afectado { background:rgba(255,170,0,0.15); color:var(--yellow); }
-  .disciplina-estado.bloqueada { background:rgba(255,107,107,0.15); color:var(--red); }
+  .disciplina-estado.bloqueada { background:rgba(255,149,0,0.15); color:#ff9500; }
   .vobo-badge { font-family:var(--mono); font-size:10px; padding:2px 6px; border-radius:3px; white-space:nowrap; }
   .vobo-badge.v1 { background:var(--surface2); color:var(--text3); }
   .vobo-badge.v2 { background:rgba(120,120,120,0.2); color:#aaa; }
@@ -1269,8 +1270,15 @@ function renderGroups(proyecto) {
   document.getElementById('groups-container').innerHTML = grupos.map(g => {
     const disciplinas = getDisciplinasGrupo(g.grupo_id).filter(d => activasSet.has(`${g.grupo_id}::${d}`) && tareaOpcionalAplica(g.grupo_id, d));
     const completadas = disciplinas.filter(d => isDisciplinaCompleta(d, g.grupo_id, log)).length;
+    const EVENTOS_BLOQUEANTES_GRP = new Set(['Solicitud Enviada','Ajustes Solicitados SP','Vobo Solicitado','Revisión Enviada']);
+    const bloqueadas = disciplinas.filter(d => {
+      if (isDisciplinaCompleta(d, g.grupo_id, log)) return false;
+      const evs = log.filter(e => e.disciplina_id === `${g.grupo_id}::${d}` && e.tipo_entry === 'evento').sort((a,b) => new Date(a.timestamp||a.fecha_real) - new Date(b.timestamp||b.fecha_real));
+      const ult = evs[evs.length - 1];
+      return ult && EVENTOS_BLOQUEANTES_GRP.has(ult.hito_id);
+    }).length;
     const enProceso = disciplinas.filter(d => !isDisciplinaCompleta(d, g.grupo_id, log) && log.some(e => e.disciplina_id === `${g.grupo_id}::${d}`)).length;
-    const nivel = completadas === disciplinas.length && disciplinas.length > 0 ? 'green' : enProceso > 0 ? 'yellow' : 'gray';
+    const nivel = completadas === disciplinas.length && disciplinas.length > 0 ? 'green' : bloqueadas > 0 ? 'orange' : enProceso > 0 ? 'yellow' : 'gray';
     return `
     <div class="group-row" id="group-${g.grupo_id}" data-grupo="${g.grupo_id}">
       <div class="group-header" onclick="toggleGroup('${g.grupo_id}')">
@@ -1785,7 +1793,9 @@ function renderInsHitos(p, log, base) {
 
 function buildInsChart(p, log, base) {
   const CONTAINER_W = document.getElementById('ins-chart-scroller').parentElement.offsetWidth || 640;
-  const W = Math.max(CONTAINER_W, Math.round(640 * INS_ZOOM_STEPS[insZoomIdx]));
+  const zoomFactor = INS_ZOOM_STEPS[insZoomIdx];
+  const W = Math.max(CONTAINER_W, Math.round(640 * zoomFactor));
+  const visibleDays = Math.round(MAX_D / zoomFactor);
   const inner = document.getElementById('ins-chart-inner');
   const canvas = document.getElementById('ins-canvas');
   inner.style.width = W + 'px';
@@ -1883,7 +1893,7 @@ function buildInsChart(p, log, base) {
       responsive:false,animation:false,
       plugins:{legend:{display:false},tooltip:{enabled:false}},
       scales:{
-        x:{type:'linear',min:0,max:MAX_D,grid:{color:'rgba(48,54,61,0.8)'},ticks:{color:'#6e7681',font:{size:9,family:'DM Mono, monospace'},maxRotation:0,autoSkip:false,callback(val){const w=weekLabels.find(wl=>wl.value===Math.round(val));return w?w.label:'';},values:weekLabels.map(wl=>wl.value)}},
+        x:{type:'linear',min:0,max:visibleDays,grid:{color:'rgba(48,54,61,0.8)'},ticks:{color:'#6e7681',font:{size:9,family:'DM Mono, monospace'},maxRotation:0,autoSkip:false,callback(val){const w=weekLabels.find(wl=>wl.value===Math.round(val));return w?w.label:'';},values:weekLabels.map(wl=>wl.value)}},
         y:{min:0,max:100,grid:{color:'rgba(48,54,61,0.8)'},ticks:{color:'#6e7681',font:{size:10},callback:v=>v+'%'}}
       },
       onHover:(evt,els)=>{
