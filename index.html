@@ -1114,7 +1114,9 @@ function renderDashboard() {
         (e.es_cierre === 'TRUE' || e.es_cierre === 'true' || e.es_cierre === true)
       );
       if (!cierreEvento) return;
-      const hitoTimeline = HITOS_TIMELINE.find(h => h.id === cierreEvento.evento_nombre);
+      const hitosDisciplina = DISCIPLINA_HITOS[discKey];
+      if (!hitosDisciplina || hitosDisciplina.length === 0) return;
+      const hitoTimeline = HITOS_TIMELINE.find(h => h.id === hitosDisciplina[0]);
       if (!hitoTimeline || hitoTimeline.offset === null) return;
       const fechaTarea = addBusinessDays(parseISODate(p.fecha_aprobacion), hitoTimeline.offset + offsetPausa);
       const entry = { proyecto: p.nombre, tarea: dNombre, grupoId: gid, fecha: fechaTarea.toISOString().split('T')[0], proyectoId: p.proyecto_id };
