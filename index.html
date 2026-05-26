@@ -838,7 +838,7 @@
 
 <!-- MODAL: NUEVA TAREA AD-HOC -->
 <div class="modal-overlay" id="modal-tarea-adhoc">
-  <div class="modal" style="max-width:500px">
+  <div class="modal" style="max-width:500px" autocomplete="off">
     <div class="modal-header">
       <div class="modal-title" id="modal-tarea-title">Nueva tarea</div>
       <button class="modal-close" onclick="closeModal('modal-tarea-adhoc')">×</button>
@@ -860,7 +860,7 @@
 
 <!-- MODAL: EVENTO DE TAREA AD-HOC -->
 <div class="modal-overlay" id="modal-tarea-evento">
-  <div class="modal" style="max-width:500px">
+  <div class="modal" style="max-width:500px" autocomplete="off">
     <div class="modal-header">
       <div class="modal-title">Registrar evento</div>
       <button class="modal-close" onclick="closeModal('modal-tarea-evento')">×</button>
@@ -876,7 +876,7 @@
             <option value="en-proceso">En proceso</option>
             <option value="bloqueada">Bloqueada</option>
             <option value="pausada">Pausada</option>
-            <option value="completada-vobo">Completada (propuesta)</option>
+            <option value="completada-vobo">Completada</option>
             <option value="cancelada">Cancelada</option>
           </select>
         </div>
@@ -3103,7 +3103,7 @@ function renderNotas(proyecto) {
     <div class="notas-header" id="notas-toggle" onclick="toggleNotas()" >
       <div style="display:flex;align-items:center;gap:10px">
         <span style="font-size:10px;color:var(--text3);transition:transform 0.15s" id="notas-chevron">▶</span>
-        <span class="section-title" style="margin:0">Notas del proyecto</span>
+        <span class="section-title" style="margin:0">Registro del proyecto</span>
         <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${notas.length}</span>
       </div>
       <button class="btn-ghost" style="font-size:11px" onclick="event.stopPropagation();openNotaCambio()">+ Nota / Cambio</button>
@@ -3969,7 +3969,7 @@ function renderTareasAdhoc(proyecto) {
       }).join('');
 
   return `
-  <div style="margin-top:28px;margin-bottom:4px">
+  <div style="margin-top:28px;margin-bottom:28px">
     <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:10px 16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);transition:background 0.15s;user-select:none" onclick="toggleTareasSection()" id="tareas-toggle">
       <div style="display:flex;align-items:center;gap:10px">
         <span style="font-size:10px;color:var(--text3);transition:transform 0.15s" id="tareas-chevron">▶</span>
@@ -4006,7 +4006,8 @@ function openNuevaTarea() {
   document.getElementById('ta-notas').value = '';
   const sel = document.getElementById('ta-asignado');
   sel.innerHTML = '';
-  state.usuarios.filter(u => u.rol === 'Arquitecto' || u.rol === 'PM').forEach(u => {
+  const arqProyecto = state.currentProyecto?.arquitecto_id;
+  state.usuarios.filter(u => u.rol === 'PM' || u.rol === 'Validador' || u.email === arqProyecto).forEach(u => {
     sel.innerHTML += `<option value="${u.email}">${u.nombre} (${u.rol})</option>`;
   });
   openModal('modal-tarea-adhoc');
@@ -4023,7 +4024,8 @@ function openEditarTarea(tareaId) {
   document.getElementById('ta-notas').value = t.notas || '';
   const sel = document.getElementById('ta-asignado');
   sel.innerHTML = '';
-  state.usuarios.filter(u => u.rol === 'Arquitecto' || u.rol === 'PM').forEach(u => {
+  const arqProyecto2 = state.currentProyecto?.arquitecto_id;
+  state.usuarios.filter(u => u.rol === 'PM' || u.rol === 'Validador' || u.email === arqProyecto2).forEach(u => {
     sel.innerHTML += `<option value="${u.email}"${u.email===t.asignado_a?' selected':''}>${u.nombre} (${u.rol})</option>`;
   });
   openModal('modal-tarea-adhoc');
