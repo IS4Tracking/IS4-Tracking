@@ -149,6 +149,7 @@
   .semaforo.green { background:var(--green); box-shadow:0 0 6px var(--green); }
   .semaforo.gray { background:var(--text3); }
   .semaforo.orange { background:#ff9500; box-shadow:0 0 6px rgba(255,149,0,0.6); }
+  .semaforo.blue { background:var(--blue); box-shadow:0 0 6px rgba(88,166,255,0.5); }
   .semaforo.red { background:var(--red); box-shadow:0 0 6px var(--red); }
   .desvio-badge { font-family:var(--mono); font-size:11px; padding:2px 6px; border-radius:3px; }
   .desvio-badge.red { background:rgba(255,68,68,0.15); color:var(--red); }
@@ -1112,10 +1113,10 @@ function renderDashboard() {
         e.grupo_id === gid && e.disciplina_nombre === dNombre &&
         (e.es_cierre === 'TRUE' || e.es_cierre === 'true' || e.es_cierre === true)
       );
-      if (!cierreEvento || !cierreEvento.offset_dias) return;
-      const offsetTarea = parseInt(cierreEvento.offset_dias, 10);
-      if (isNaN(offsetTarea)) return;
-      const fechaTarea = addBusinessDays(parseISODate(p.fecha_aprobacion), offsetTarea + offsetPausa);
+      if (!cierreEvento) return;
+      const hitoTimeline = HITOS_TIMELINE.find(h => h.id === cierreEvento.evento_nombre);
+      if (!hitoTimeline || hitoTimeline.offset === null) return;
+      const fechaTarea = addBusinessDays(parseISODate(p.fecha_aprobacion), hitoTimeline.offset + offsetPausa);
       const entry = { proyecto: p.nombre, tarea: dNombre, grupoId: gid, fecha: fechaTarea.toISOString().split('T')[0], proyectoId: p.proyecto_id };
       if (fechaTarea < hoy) tareasVencidas.push(entry);
       else if (fechaTarea <= limiteTareas) tareasProximas.push(entry);
@@ -1127,7 +1128,7 @@ function renderDashboard() {
 
   const hitosContainer = document.getElementById('hitos-proximos');
   const vencidosHTML = vencidos.length === 0 ? '' : `
-    <div style="font-family:var(--mono);font-size:10px;color:#ff5050;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;margin-top:4px">⚠ Hitos vencidos — ${vencidos.length}</div>
+    <div style="font-family:var(--mono);font-size:10px;color:#ff5050;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;margin-top:4px">⚠ HITOS VENCIDOS — ${vencidos.length}</div>
     ${vencidos.map(h => `<div class="hito-row retrasado">
       <div class="hito-fecha" style="color:#ff5050">${formatDate(h.fecha)}</div>
       <div class="hito-link" onclick="openProyectoEnHito('${h.proyectoId}','${h.hitoId}')">${h.hitoId} — ${h.hito}</div>
@@ -1137,7 +1138,7 @@ function renderDashboard() {
 
   const proximosHTML = proximos.length === 0
     ? `<div style="color:var(--text3);font-family:var(--mono);font-size:12px;padding:8px 0">Sin hitos en los próximos 7 días</div>`
-    : `<div style="font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;margin-top:${vencidos.length > 0 ? '16px' : '4px'}">Próximos 7 días</div>
+    : `<div style="font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;margin-top:${vencidos.length > 0 ? '16px' : '4px'}">HITOS PRÓX. 7 DÍAS — ${proximos.length}</div>
     ${proximos.map(h => `<div class="hito-row">
       <div class="hito-fecha">${formatDate(h.fecha)}</div>
       <div class="hito-link" onclick="openProyectoEnHito('${h.proyectoId}','${h.hitoId}')">${h.hitoId} — ${h.hito}</div>
@@ -1152,7 +1153,7 @@ function renderDashboard() {
 
   const tareasContainer = document.getElementById('tareas-dashboard');
   const tareasVencHTML = tareasVencidas.length === 0 ? '' : `
-    <div style="font-family:var(--mono);font-size:10px;color:#ff5050;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;margin-top:4px">⚠ Tareas vencidas — ${tareasVencidas.length}</div>
+    <div style="font-family:var(--mono);font-size:10px;color:#ff5050;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;margin-top:4px">⚠ TAREAS VENCIDAS — ${tareasVencidas.length}</div>
     ${tareasVencidas.map(t => `<div class="hito-row tarea-vencida" onclick="openProyectoEnTarea('${t.proyectoId}','${t.grupoId}','${t.tarea.replace(/'/g,"\\'")}')">
       <div class="hito-fecha" style="color:#ff5050">${formatDate(t.fecha)}</div>
       <div class="hito-link">${t.tarea}</div>
@@ -1161,7 +1162,7 @@ function renderDashboard() {
     </div>`).join('')}`;
 
   const tareasProxHTML = tareasProximas.length === 0 ? '' : `
-    <div style="font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;margin-top:${tareasVencidas.length > 0 ? '16px' : '4px'}">Tareas — próximos 3 días</div>
+    <div style="font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;margin-top:${tareasVencidas.length > 0 ? '16px' : '4px'}">TAREAS PRÓX. 3 DÍAS — ${tareasProximas.length}</div>
     ${tareasProximas.map(t => `<div class="hito-row tarea-proxima" onclick="openProyectoEnTarea('${t.proyectoId}','${t.grupoId}','${t.tarea.replace(/'/g,"\\'")}')">
       <div class="hito-fecha">${formatDate(t.fecha)}</div>
       <div class="hito-link">${t.tarea}</div>
@@ -1906,7 +1907,7 @@ function buildInsChart(p, log, base) {
       responsive:false,animation:false,
       plugins:{legend:{display:false},tooltip:{enabled:false}},
       scales:{
-        x:{type:'linear',min:0,max:Math.round(MAX_D / zoomFactor),grid:{color:'rgba(48,54,61,0.8)'},ticks:{color:'#6e7681',font:{size:9,family:'DM Mono, monospace'},maxRotation:0,autoSkip:false,callback(val){const w=weekLabels.find(wl=>wl.value===Math.round(val));return w?w.label:'';},values:weekLabels.map(wl=>wl.value)}},
+        x:{type:'linear',min:0,max:MAX_D,grid:{color:'rgba(48,54,61,0.8)'},ticks:{color:'#6e7681',font:{size:9,family:'DM Mono, monospace'},maxRotation:0,autoSkip:false,callback(val){const w=weekLabels.find(wl=>wl.value===Math.round(val));return w?w.label:'';},values:weekLabels.map(wl=>wl.value)}},
         y:{min:0,max:100,grid:{color:'rgba(48,54,61,0.8)'},ticks:{color:'#6e7681',font:{size:10},callback:v=>v+'%'}}
       },
       onHover:(evt,els)=>{
