@@ -932,7 +932,7 @@ function initGoogleAPI() {
         return;
       }
       state.accessToken = tokenResponse.access_token;
-      sessionStorage.setItem('is4_token', tokenResponse.access_token);
+      localStorage.setItem('is4_token', tokenResponse.access_token);
       // Programar renovación automática antes de que expire (55 min)
       scheduleTokenRenewal();
       // Si ya estamos en la app, no re-inicializar — solo actualizar el token
@@ -950,8 +950,8 @@ function initGoogleAPI() {
   });
 
   // Auto-restore: usar token guardado directamente
-  const savedToken = sessionStorage.getItem('is4_token');
-  const savedUser = sessionStorage.getItem('is4_user');
+  const savedToken = localStorage.getItem('is4_token');
+  const savedUser = localStorage.getItem('is4_user');
   if (savedToken && savedUser) {
     state.accessToken = savedToken;
     state.user = JSON.parse(savedUser);
@@ -969,8 +969,8 @@ function scheduleTokenRenewal() {
 }
 
 function showLoginScreen() {
-  sessionStorage.removeItem('is4_token');
-  sessionStorage.removeItem('is4_user');
+  localStorage.removeItem('is4_token');
+  localStorage.removeItem('is4_user');
   state.accessToken = null; state.user = null; state.rol = null;
   if (tokenRenewalTimer) clearTimeout(tokenRenewalTimer);
   const ls = document.getElementById('login-screen');
@@ -1010,7 +1010,7 @@ async function completeSignIn() {
   loginEl.style.display = 'none';
   document.getElementById('app').style.display = 'flex';
   document.getElementById('dashboard-date').textContent = new Date().toLocaleDateString('es-MX', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
-  sessionStorage.setItem('is4_user', JSON.stringify(state.user));
+  localStorage.setItem('is4_user', JSON.stringify(state.user));
   await loadAllData();
 }
 
