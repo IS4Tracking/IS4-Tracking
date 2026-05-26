@@ -844,12 +844,12 @@
       <button class="modal-close" onclick="closeModal('modal-tarea-adhoc')">×</button>
     </div>
     <div class="modal-body">
-      <div class="form-group"><label class="form-label">Título <span style="color:var(--accent)">*</span></label><input class="form-input" id="ta-titulo" placeholder="Describe la tarea…"></div>
+      <div class="form-group"><label class="form-label">Título <span style="color:var(--accent)">*</span></label><input class="form-input" id="ta-titulo" placeholder="Describe la tarea…" autocomplete="off"></div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">Asignado a <span style="color:var(--accent)">*</span></label><select class="form-select" id="ta-asignado"></select></div>
-        <div class="form-group"><label class="form-label">Fecha esperada <span style="color:var(--text3)">opcional</span></label><input class="form-input" id="ta-fecha" type="date"></div>
+        <div class="form-group"><label class="form-label">Fecha esperada <span style="color:var(--text3)">opcional</span></label><input class="form-input" id="ta-fecha" type="date" autocomplete="off"></div>
       </div>
-      <div class="form-group"><label class="form-label">Notas <span style="color:var(--text3)">opcional</span></label><textarea class="form-textarea" id="ta-notas" placeholder="Contexto o instrucciones…" style="min-height:60px"></textarea></div>
+      <div class="form-group"><label class="form-label">Notas <span style="color:var(--text3)">opcional</span></label><textarea class="form-textarea" id="ta-notas" placeholder="Contexto o instrucciones…" style="min-height:60px" autocomplete="off"></textarea></div>
     </div>
     <div class="modal-footer">
       <button class="btn-secondary" onclick="closeModal('modal-tarea-adhoc')">Cancelar</button>
@@ -866,8 +866,8 @@
       <button class="modal-close" onclick="closeModal('modal-tarea-evento')">×</button>
     </div>
     <div class="modal-body">
-      <div class="form-group"><label class="form-label">Título <span style="color:var(--accent)">*</span></label><input class="form-input" id="te-titulo" placeholder="Ej. Revisión de diseño preliminar…"></div>
-      <div class="form-group"><label class="form-label">Descripción <span style="color:var(--text3)">opcional</span></label><textarea class="form-textarea" id="te-descripcion" placeholder="Detalla qué ocurrió, qué se decidió, qué sigue…" style="min-height:72px"></textarea></div>
+      <div class="form-group"><label class="form-label">Título <span style="color:var(--accent)">*</span></label><input class="form-input" id="te-titulo" placeholder="Ej. Revisión de diseño preliminar…" autocomplete="off"></div>
+      <div class="form-group"><label class="form-label">Descripción <span style="color:var(--text3)">opcional</span></label><textarea class="form-textarea" id="te-descripcion" placeholder="Detalla qué ocurrió, qué se decidió, qué sigue…" style="min-height:72px" autocomplete="off"></textarea></div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">Cambio de estatus <span style="color:var(--text3)">opcional</span></label>
           <select class="form-select" id="te-estatus">
