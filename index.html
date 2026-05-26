@@ -250,9 +250,9 @@
   .log-entry-wrap { position:relative; }
   .log-entry-wrap:hover .btn-borrar-entry,
   .log-entry-wrap:hover .btn-editar-entry { opacity:1; }
-  .btn-borrar-entry { opacity:0; position:absolute; right:0; top:50%; transform:translateY(-50%); background:none; border:none; color:var(--text3); font-size:11px; cursor:pointer; padding:2px 6px; transition:all 0.15s; font-family:var(--mono); }
+  .btn-borrar-entry { opacity:0; position:absolute; right:0; top:4px; background:none; border:none; color:var(--text3); font-size:11px; cursor:pointer; padding:2px 6px; transition:all 0.15s; font-family:var(--mono); }
   .btn-borrar-entry:hover { color:var(--red); }
-  .btn-editar-entry { opacity:0; position:absolute; right:20px; top:50%; transform:translateY(-50%); background:none; border:none; color:var(--text3); font-size:11px; cursor:pointer; padding:2px 6px; transition:all 0.15s; font-family:var(--mono); }
+  .btn-editar-entry { opacity:0; position:absolute; right:20px; top:4px; background:none; border:none; color:var(--text3); font-size:11px; cursor:pointer; padding:2px 6px; transition:all 0.15s; font-family:var(--mono); }
   .btn-editar-entry:hover { color:var(--accent); }
 
   /* TIMELINE EN DETALLE */
@@ -984,6 +984,7 @@ function handleLogin() {
 }
 
 async function completeSignIn() {
+  console.log('[B3-diag] completeSignIn iniciado, token:', state.accessToken ? 'presente' : 'ausente');
   try {
     const usuarios = await api('getUsuarios');
     const u = usuarios.find(x => x.email.toLowerCase() === state.user.email.toLowerCase());
@@ -995,6 +996,7 @@ async function completeSignIn() {
     state.rol = u.rol;
     state.usuarios = usuarios;
   } catch(e) {
+    console.error('[B3-diag] Error en getUsuarios:', e.message);
     showToast('Error verificando acceso: ' + e.message, 'error');
     showLoginScreen();
     return;
@@ -1050,7 +1052,7 @@ async function loadAllData() {
     state.cambiosBorrados = cambiosBorrados || [];
     state.historialArquitecto = historialArq || [];
     state.snapshotsEntrega = snapshots || [];
-    try { state.tareasAdhoc = (await api('getTareasAdhoc', {})) || []; } catch(_) { state.tareasAdhoc = []; }
+    try { state.tareasAdhoc = (await api('getTareasAdhoc', {})) || []; } catch(err) { console.warn('[B3-diag] getTareasAdhoc falló:', err.message); state.tareasAdhoc = []; }
     renderDashboard();
     renderCriteriosBanner();
   } catch(e) { showToast('Error cargando datos: ' + e.message, 'error'); console.error(e); }
@@ -3948,7 +3950,7 @@ function renderTareasAdhoc(proyecto) {
                     ${evData.estatus_nuevo?`<span class="disciplina-estado ${getEstatusClass(evData.estatus_nuevo)}" style="font-size:10px;margin-left:4px">${getEstatusLabel(evData.estatus_nuevo)}</span>`:''}
                   </div>
                   ${evData.descripcion?`<div class="log-nota">${evData.descripcion} <span style="color:var(--text3);font-size:10px">· ${autorNombre}</span></div>`:`<div class="log-nota" style="color:var(--text3)">${autorNombre}</div>`}
-                  ${esPM&&estatus==='completada-vobo'&&evData.estatus_nuevo==='completada-vobo'?`<button class="btn-ghost" style="font-size:11px;margin-top:4px" onclick="confirmarCierreTarea('${t.tarea_id}')">✓ Confirmar cierre</button>`:''}
+                  ${esPM&&estatus==='completada-vobo'&&evData.estatus_nuevo==='completada-vobo'&&e.arquitecto_id!==state.user?.email?`<button class="btn-ghost" style="font-size:11px;margin-top:4px" onclick="confirmarCierreTarea('${t.tarea_id}')">✓ Confirmar cierre</button>`:''}
                 </div>
                 ${puedeEditarEvento?`
                 <button class="btn-editar-entry" onclick="abrirEditarTareaEvento('${e.entry_id}','${t.tarea_id}')" title="Editar">✎</button>
