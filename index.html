@@ -1034,12 +1034,12 @@ async function api(action, body = {}) {
 // ── DATA ──
 async function loadAllData() {
   try {
-    const [proyectos, eventos, log, criterios, disciplinas, cambiosDetalle, cambiosBorrados, historialArq, snapshots, tareasAdhoc] = await Promise.all([
+    const [proyectos, eventos, log, criterios, disciplinas, cambiosDetalle, cambiosBorrados, historialArq, snapshots] = await Promise.all([
       api('getProyectos'), api('getEventosCatalogo'),
       api('getLogEventos'), api('getCriteriosPrograma'),
       api('getDisciplinasProyecto'), api('getCambiosDetalle'),
       api('getCambiosBorrados', {}), api('getHistorialArquitecto', {}),
-      api('getSnapshotsEntrega', {}), api('getTareasAdhoc', {})
+      api('getSnapshotsEntrega', {})
     ]);
     state.proyectos = proyectos || [];
     state.eventosCatalogo = eventos || [];
@@ -1050,7 +1050,7 @@ async function loadAllData() {
     state.cambiosBorrados = cambiosBorrados || [];
     state.historialArquitecto = historialArq || [];
     state.snapshotsEntrega = snapshots || [];
-    state.tareasAdhoc = tareasAdhoc || [];
+    try { state.tareasAdhoc = (await api('getTareasAdhoc', {})) || []; } catch(_) { state.tareasAdhoc = []; }
     renderDashboard();
     renderCriteriosBanner();
   } catch(e) { showToast('Error cargando datos: ' + e.message, 'error'); console.error(e); }
@@ -3939,14 +3939,20 @@ function renderTareasAdhoc(proyecto) {
           : eventos.map(e => {
               let evData = {}; try { evData = JSON.parse(e.nota||'{}'); } catch(x) {}
               const autorNombre = (state.usuarios.find(u => u.email === e.arquitecto_id)?.nombre) || e.arquitecto_id;
-              return `<div class="log-entry">
-                <div class="log-entry-top">
-                  <div class="log-fecha">${formatDate(e.fecha_real)}${formatHora(e.timestamp)?'<span style="color:var(--text3);font-size:9px;margin-left:3px">'+formatHora(e.timestamp)+'</span>':''}</div>
-                  <div class="log-evento">${evData.titulo||e.hito_id||'—'}</div>
-                  ${evData.estatus_nuevo?`<span class="disciplina-estado ${getEstatusClass(evData.estatus_nuevo)}" style="font-size:10px;margin-left:4px">${getEstatusLabel(evData.estatus_nuevo)}</span>`:''}
+              const puedeEditarEvento = esPM || state.user?.email === e.arquitecto_id;
+              return `<div class="log-entry-wrap">
+                <div class="log-entry">
+                  <div class="log-entry-top">
+                    <div class="log-fecha">${formatDate(e.fecha_real)}${formatHora(e.timestamp)?'<span style="color:var(--text3);font-size:9px;margin-left:3px">'+formatHora(e.timestamp)+'</span>':''}</div>
+                    <div class="log-evento">${evData.titulo||e.hito_id||'—'}</div>
+                    ${evData.estatus_nuevo?`<span class="disciplina-estado ${getEstatusClass(evData.estatus_nuevo)}" style="font-size:10px;margin-left:4px">${getEstatusLabel(evData.estatus_nuevo)}</span>`:''}
+                  </div>
+                  ${evData.descripcion?`<div class="log-nota">${evData.descripcion} <span style="color:var(--text3);font-size:10px">· ${autorNombre}</span></div>`:`<div class="log-nota" style="color:var(--text3)">${autorNombre}</div>`}
+                  ${esPM&&estatus==='completada-vobo'&&evData.estatus_nuevo==='completada-vobo'?`<button class="btn-ghost" style="font-size:11px;margin-top:4px" onclick="confirmarCierreTarea('${t.tarea_id}')">✓ Confirmar cierre</button>`:''}
                 </div>
-                ${evData.descripcion?`<div class="log-nota">${evData.descripcion} <span style="color:var(--text3);font-size:10px">· ${autorNombre}</span></div>`:`<div class="log-nota" style="color:var(--text3)">${autorNombre}</div>`}
-                ${esPM&&estatus==='completada-vobo'&&evData.estatus_nuevo==='completada-vobo'?`<button class="btn-ghost" style="font-size:11px;margin-top:4px" onclick="confirmarCierreTarea('${t.tarea_id}')">✓ Confirmar cierre</button>`:''}
+                ${puedeEditarEvento?`
+                <button class="btn-editar-entry" onclick="abrirEditarTareaEvento('${e.entry_id}','${t.tarea_id}')" title="Editar">✎</button>
+                <button class="btn-borrar-entry" onclick="borrarTareaEvento('${e.entry_id}','${t.tarea_id}')" title="Borrar">✕</button>`:''}
               </div>`;
             }).join('');
 
@@ -4065,11 +4071,13 @@ async function guardarTareaAdhoc() {
 
 function openTareaEvento(tareaId) {
   state._tareaEventoId = tareaId;
+  state._editandoTareaEventoId = null;
   const ahora = new Date();
   document.getElementById('te-titulo').value = '';
   document.getElementById('te-descripcion').value = '';
   document.getElementById('te-estatus').value = '';
   document.getElementById('te-fecha').value = `${ahora.getFullYear()}-${String(ahora.getMonth()+1).padStart(2,'0')}-${String(ahora.getDate()).padStart(2,'0')}`;
+  document.getElementById('btn-guardar-tarea-evento').textContent = 'Guardar evento';
   openModal('modal-tarea-evento');
 }
 
@@ -4085,6 +4093,22 @@ async function guardarTareaEvento() {
   const btn = document.getElementById('btn-guardar-tarea-evento');
   btn.disabled = true; btn.textContent = 'Guardando…';
   const estadoPaneles = capturarEstadoPaneles();
+  if (state._editandoTareaEventoId) {
+    try {
+      await api('editarLogEvento', {
+        entry_id: state._editandoTareaEventoId,
+        fecha_real: fecha,
+        nota: JSON.stringify({ titulo, descripcion, estatus_nuevo: estatusNuevo || null })
+      });
+      if (estatusNuevo) await api('actualizarTareaAdhoc', { tarea_id: tareaId, estatus: estatusNuevo });
+      closeModal('modal-tarea-evento');
+      showToast('Evento actualizado', 'success');
+      await loadAllData();
+      if (state.currentProyecto) { await openProyecto(state.currentProyecto.proyecto_id); restaurarEstadoPaneles(estadoPaneles); }
+    } catch(e) { showToast('Error: ' + e.message, 'error'); }
+    finally { btn.disabled = false; btn.textContent = 'Guardar evento'; state._editandoTareaEventoId = null; }
+    return;
+  }
   try {
     await api('appendLogEvento', {
       proyecto_id: state.currentProyecto.proyecto_id,
@@ -4139,6 +4163,38 @@ function borrarTareaAdhoc(tareaId) {
       try {
         await api('borrarTareaAdhoc', { tarea_id: tareaId });
         showToast('Tarea eliminada', 'success');
+        await loadAllData();
+        if (state.currentProyecto) { await openProyecto(state.currentProyecto.proyecto_id); restaurarEstadoPaneles(estadoPaneles); }
+      } catch(e) { showToast('Error: ' + e.message, 'error'); }
+    }
+  });
+}
+
+function abrirEditarTareaEvento(entryId, tareaId) {
+  const e = state.logEventos.find(x => x.entry_id === entryId);
+  if (!e) return;
+  let evData = {}; try { evData = JSON.parse(e.nota||'{}'); } catch(x) {}
+  state._tareaEventoId = tareaId;
+  state._editandoTareaEventoId = entryId;
+  document.getElementById('te-titulo').value = evData.titulo || e.hito_id || '';
+  document.getElementById('te-descripcion').value = evData.descripcion || '';
+  document.getElementById('te-estatus').value = evData.estatus_nuevo || '';
+  document.getElementById('te-fecha').value = normalizarFechaParaInput(e.fecha_real);
+  document.getElementById('btn-guardar-tarea-evento').textContent = 'Guardar cambios';
+  openModal('modal-tarea-evento');
+}
+
+function borrarTareaEvento(entryId, tareaId) {
+  confirmarBorrado({
+    titulo: 'Eliminar evento',
+    mensaje: 'Vas a eliminar este evento del log. Esta acción no se puede deshacer.',
+    labelBoton: 'Eliminar evento',
+    onConfirm: async () => {
+      const estadoPaneles = capturarEstadoPaneles();
+      try {
+        await api('borrarLogEvento', { entry_id: entryId });
+        state.logEventos = state.logEventos.filter(x => x.entry_id !== entryId);
+        showToast('Evento eliminado', 'success');
         await loadAllData();
         if (state.currentProyecto) { await openProyecto(state.currentProyecto.proyecto_id); restaurarEstadoPaneles(estadoPaneles); }
       } catch(e) { showToast('Error: ' + e.message, 'error'); }
