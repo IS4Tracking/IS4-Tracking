@@ -149,6 +149,7 @@
   .semaforo.green { background:var(--green); box-shadow:0 0 6px var(--green); }
   .semaforo.gray { background:var(--text3); }
   .semaforo.orange { background:#ff9500; box-shadow:0 0 6px rgba(255,149,0,0.6); }
+  .semaforo.red { background:var(--red); box-shadow:0 0 6px var(--red); }
   .desvio-badge { font-family:var(--mono); font-size:11px; padding:2px 6px; border-radius:3px; }
   .desvio-badge.red { background:rgba(255,68,68,0.15); color:var(--red); }
   .desvio-badge.yellow { background:rgba(255,170,0,0.15); color:var(--yellow); }
@@ -1277,8 +1278,21 @@ function renderGroups(proyecto) {
       const ult = evs[evs.length - 1];
       return ult && EVENTOS_BLOQUEANTES_GRP.has(ult.hito_id);
     }).length;
+    const hoy = new Date(); hoy.setHours(0,0,0,0);
+    const hitosGrupo = new Set(
+      state.eventosCatalogo.filter(e => e.grupo_id === g.grupo_id && (e.es_cierre === 'TRUE' || e.es_cierre === 'true' || e.es_cierre === true)).map(e => e.disciplina_nombre + '::' + e.evento_nombre)
+    );
+    const retrasadas = HITOS_TIMELINE.filter(h => {
+      if (!h.offset || h.offset === null) return false;
+      const fechaEsperada = addBusinessDays(proyecto.fecha_aprobacion ? new Date(proyecto.fecha_aprobacion + 'T12:00:00') : new Date(), h.offset);
+      if (fechaEsperada > hoy) return false;
+      const alcanzado = log.some(e => e.hito_id === h.id && e.tipo_entry === 'hito_alcanzado' && e.proyecto_id === proyecto.proyecto_id);
+      if (alcanzado) return false;
+      // ¿pertenece a este grupo?
+      return state.eventosCatalogo.some(e => e.grupo_id === g.grupo_id && e.evento_nombre === h.id);
+    }).length;
     const enProceso = disciplinas.filter(d => !isDisciplinaCompleta(d, g.grupo_id, log) && log.some(e => e.disciplina_id === `${g.grupo_id}::${d}`)).length;
-    const nivel = completadas === disciplinas.length && disciplinas.length > 0 ? 'green' : bloqueadas > 0 ? 'orange' : enProceso > 0 ? 'yellow' : 'gray';
+    const nivel = completadas === disciplinas.length && disciplinas.length > 0 ? 'green' : retrasadas > 0 ? 'red' : bloqueadas > 0 ? 'orange' : enProceso > 0 ? 'blue' : 'gray';
     return `
     <div class="group-row" id="group-${g.grupo_id}" data-grupo="${g.grupo_id}">
       <div class="group-header" onclick="toggleGroup('${g.grupo_id}')">
@@ -1795,7 +1809,6 @@ function buildInsChart(p, log, base) {
   const CONTAINER_W = document.getElementById('ins-chart-scroller').parentElement.offsetWidth || 640;
   const zoomFactor = INS_ZOOM_STEPS[insZoomIdx];
   const W = Math.max(CONTAINER_W, Math.round(640 * zoomFactor));
-  const visibleDays = Math.round(MAX_D / zoomFactor);
   const inner = document.getElementById('ins-chart-inner');
   const canvas = document.getElementById('ins-canvas');
   inner.style.width = W + 'px';
@@ -1893,7 +1906,7 @@ function buildInsChart(p, log, base) {
       responsive:false,animation:false,
       plugins:{legend:{display:false},tooltip:{enabled:false}},
       scales:{
-        x:{type:'linear',min:0,max:visibleDays,grid:{color:'rgba(48,54,61,0.8)'},ticks:{color:'#6e7681',font:{size:9,family:'DM Mono, monospace'},maxRotation:0,autoSkip:false,callback(val){const w=weekLabels.find(wl=>wl.value===Math.round(val));return w?w.label:'';},values:weekLabels.map(wl=>wl.value)}},
+        x:{type:'linear',min:0,max:Math.round(MAX_D / zoomFactor),grid:{color:'rgba(48,54,61,0.8)'},ticks:{color:'#6e7681',font:{size:9,family:'DM Mono, monospace'},maxRotation:0,autoSkip:false,callback(val){const w=weekLabels.find(wl=>wl.value===Math.round(val));return w?w.label:'';},values:weekLabels.map(wl=>wl.value)}},
         y:{min:0,max:100,grid:{color:'rgba(48,54,61,0.8)'},ticks:{color:'#6e7681',font:{size:10},callback:v=>v+'%'}}
       },
       onHover:(evt,els)=>{
