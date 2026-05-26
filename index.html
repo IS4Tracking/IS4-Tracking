@@ -506,6 +506,7 @@
       </div>
       <div id="detail-timeline"></div>
       <div id="detail-notas"></div>
+      <div id="detail-tareas"></div>
       <div class="groups-container" id="groups-container"></div>
     </div>
 
@@ -835,6 +836,60 @@
   </div>
 </div>
 
+<!-- MODAL: NUEVA TAREA AD-HOC -->
+<div class="modal-overlay" id="modal-tarea-adhoc">
+  <div class="modal" style="max-width:500px">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-tarea-title">Nueva tarea</div>
+      <button class="modal-close" onclick="closeModal('modal-tarea-adhoc')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Título <span style="color:var(--accent)">*</span></label><input class="form-input" id="ta-titulo" placeholder="Describe la tarea…"></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Asignado a <span style="color:var(--accent)">*</span></label><select class="form-select" id="ta-asignado"></select></div>
+        <div class="form-group"><label class="form-label">Fecha esperada <span style="color:var(--text3)">opcional</span></label><input class="form-input" id="ta-fecha" type="date"></div>
+      </div>
+      <div class="form-group"><label class="form-label">Notas <span style="color:var(--text3)">opcional</span></label><textarea class="form-textarea" id="ta-notas" placeholder="Contexto o instrucciones…" style="min-height:60px"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('modal-tarea-adhoc')">Cancelar</button>
+      <button class="btn-primary" id="btn-guardar-tarea" onclick="guardarTareaAdhoc()">Crear tarea</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: EVENTO DE TAREA AD-HOC -->
+<div class="modal-overlay" id="modal-tarea-evento">
+  <div class="modal" style="max-width:500px">
+    <div class="modal-header">
+      <div class="modal-title">Registrar evento</div>
+      <button class="modal-close" onclick="closeModal('modal-tarea-evento')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Título <span style="color:var(--accent)">*</span></label><input class="form-input" id="te-titulo" placeholder="Ej. Revisión de diseño preliminar…"></div>
+      <div class="form-group"><label class="form-label">Descripción <span style="color:var(--text3)">opcional</span></label><textarea class="form-textarea" id="te-descripcion" placeholder="Detalla qué ocurrió, qué se decidió, qué sigue…" style="min-height:72px"></textarea></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Cambio de estatus <span style="color:var(--text3)">opcional</span></label>
+          <select class="form-select" id="te-estatus">
+            <option value="">Sin cambio de estatus</option>
+            <option value="pendiente">Pendiente</option>
+            <option value="en-proceso">En proceso</option>
+            <option value="bloqueada">Bloqueada</option>
+            <option value="pausada">Pausada</option>
+            <option value="completada-vobo">Completada (propuesta)</option>
+            <option value="cancelada">Cancelada</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">Fecha</label><input class="form-input" id="te-fecha" type="date"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('modal-tarea-evento')">Cancelar</button>
+      <button class="btn-primary" id="btn-guardar-tarea-evento" onclick="guardarTareaEvento()">Guardar evento</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
@@ -852,6 +907,7 @@ let state = {
   bubblePlan: false, disciplinasSeleccionadas: new Set(),
   cambioDiscsSeleccionadas: new Set(), editandoCambioId: null,
   cambiosBorrados: [], cambiosEliminados: [], borrandoCambioId: null,
+  tareasAdhoc: [],
   diasPausaAcumulados: {},
   _editandoEntryId: null, editandoNotaId: null,
   _confirmarBorradoFn: null
@@ -978,12 +1034,12 @@ async function api(action, body = {}) {
 // ── DATA ──
 async function loadAllData() {
   try {
-    const [proyectos, eventos, log, criterios, disciplinas, cambiosDetalle, cambiosBorrados, historialArq, snapshots] = await Promise.all([
+    const [proyectos, eventos, log, criterios, disciplinas, cambiosDetalle, cambiosBorrados, historialArq, snapshots, tareasAdhoc] = await Promise.all([
       api('getProyectos'), api('getEventosCatalogo'),
       api('getLogEventos'), api('getCriteriosPrograma'),
       api('getDisciplinasProyecto'), api('getCambiosDetalle'),
       api('getCambiosBorrados', {}), api('getHistorialArquitecto', {}),
-      api('getSnapshotsEntrega', {})
+      api('getSnapshotsEntrega', {}), api('getTareasAdhoc', {})
     ]);
     state.proyectos = proyectos || [];
     state.eventosCatalogo = eventos || [];
@@ -994,6 +1050,7 @@ async function loadAllData() {
     state.cambiosBorrados = cambiosBorrados || [];
     state.historialArquitecto = historialArq || [];
     state.snapshotsEntrega = snapshots || [];
+    state.tareasAdhoc = tareasAdhoc || [];
     renderDashboard();
     renderCriteriosBanner();
   } catch(e) { showToast('Error cargando datos: ' + e.message, 'error'); console.error(e); }
@@ -1242,6 +1299,7 @@ async function openProyecto(proyectoId) {
   renderGroups(p);
   document.getElementById('detail-timeline').innerHTML = renderTimeline(p);
   document.getElementById('detail-notas').innerHTML = renderNotas(p);
+  document.getElementById('detail-tareas').innerHTML = renderTareasAdhoc(p);
   showView('proyecto-detail');
   await evaluarHitos(proyectoId);
 }
@@ -3843,6 +3901,248 @@ function showToast(msg, type = 'success') {
   setTimeout(() => el.className = '', 3500);
 }
 document.querySelectorAll('.modal-overlay').forEach(o => o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); }));
+
+// ── MÓDULO A — TAREAS AD-HOC ──
+
+function getEstatusLabel(estatus) {
+  const MAP = { 'pendiente':'pendiente', 'en-proceso':'en proceso', 'bloqueada':'bloqueada', 'pausada':'pausada', 'completada-vobo':'vobo pendiente', 'completada':'completada', 'cancelada':'cancelada' };
+  return MAP[estatus] || estatus || 'pendiente';
+}
+
+function getEstatusClass(estatus) {
+  const MAP = { 'pendiente':'pendiente', 'en-proceso':'en-proceso', 'bloqueada':'bloqueada', 'pausada':'afectado', 'completada-vobo':'bloqueada', 'completada':'completado', 'cancelada':'pendiente' };
+  return MAP[estatus] || 'pendiente';
+}
+
+function renderTareasAdhoc(proyecto) {
+  const tareas = state.tareasAdhoc.filter(t => t.proyecto_id === proyecto.proyecto_id);
+  const logTareas = state.logEventos.filter(e => e.proyecto_id === proyecto.proyecto_id && e.tipo_entry === 'tarea_evento');
+  const esPM = state.rol === 'PM';
+
+  const tareasHTML = tareas.length === 0
+    ? '<div style="color:var(--text3);font-family:var(--mono);font-size:12px;padding:10px 16px">Sin tareas registradas.</div>'
+    : tareas.map(t => {
+        const safeId = t.tarea_id.replace(/[^a-zA-Z0-9_]/g,'_');
+        const eventos = logTareas.filter(e => e.disciplina_id === `ADHOC::${t.tarea_id}`)
+          .sort((a,b) => new Date(a.timestamp||a.fecha_real+'T12:00:00Z') - new Date(b.timestamp||b.fecha_real+'T12:00:00Z'));
+        const estatus = t.estatus || 'pendiente';
+        const asignadoNombre = (state.usuarios.find(u => u.email === t.asignado_a)?.nombre) || t.asignado_a;
+        const esAsignado = state.user?.email === t.asignado_a;
+        const puedeAgregarEvento = esPM || esAsignado;
+        const hoy = new Date(); hoy.setHours(0,0,0,0);
+        const fechaEsperada = t.fecha_esperada ? parseISODate(t.fecha_esperada) : null;
+        const vencida = fechaEsperada && fechaEsperada < hoy && estatus !== 'completada' && estatus !== 'cancelada';
+        const estatusEfectivo = vencida ? 'vencida' : estatus;
+
+        const logHTML = eventos.length === 0
+          ? '<div class="log-empty">Sin eventos registrados</div>'
+          : eventos.map(e => {
+              let evData = {}; try { evData = JSON.parse(e.nota||'{}'); } catch(x) {}
+              const autorNombre = (state.usuarios.find(u => u.email === e.arquitecto_id)?.nombre) || e.arquitecto_id;
+              return `<div class="log-entry">
+                <div class="log-entry-top">
+                  <div class="log-fecha">${formatDate(e.fecha_real)}${formatHora(e.timestamp)?'<span style="color:var(--text3);font-size:9px;margin-left:3px">'+formatHora(e.timestamp)+'</span>':''}</div>
+                  <div class="log-evento">${evData.titulo||e.hito_id||'—'}</div>
+                  ${evData.estatus_nuevo?`<span class="disciplina-estado ${getEstatusClass(evData.estatus_nuevo)}" style="font-size:10px;margin-left:4px">${getEstatusLabel(evData.estatus_nuevo)}</span>`:''}
+                </div>
+                ${evData.descripcion?`<div class="log-nota">${evData.descripcion} <span style="color:var(--text3);font-size:10px">· ${autorNombre}</span></div>`:`<div class="log-nota" style="color:var(--text3)">${autorNombre}</div>`}
+                ${esPM&&estatus==='completada-vobo'&&evData.estatus_nuevo==='completada-vobo'?`<button class="btn-ghost" style="font-size:11px;margin-top:4px" onclick="confirmarCierreTarea('${t.tarea_id}')">✓ Confirmar cierre</button>`:''}
+              </div>`;
+            }).join('');
+
+        return `<div>
+          <div class="disciplina-row" onclick="toggleLogPanel('tarealog_${safeId}')">
+            <div style="font-size:13px;font-weight:500">${t.titulo}</div>
+            <div class="disciplina-estado ${getEstatusClass(estatusEfectivo)}">${getEstatusLabel(estatusEfectivo)}</div>
+            <div style="font-size:11px;color:var(--text3);font-family:var(--mono)">${asignadoNombre}</div>
+            <div style="font-size:11px;color:${vencida?'var(--red)':'var(--text3)'};font-family:var(--mono)">${t.fecha_esperada?formatDate(t.fecha_esperada):'—'}</div>
+            ${puedeAgregarEvento?`<button class="btn-ghost" onclick="event.stopPropagation();openTareaEvento('${t.tarea_id}')">+ Evento</button>`:'<div></div>'}
+          </div>
+          <div class="log-panel" id="tarealog_${safeId}">
+            ${logHTML}
+            ${esPM?`<div style="display:flex;gap:8px;margin-top:8px">
+              <button class="btn-secondary" style="font-size:11px;padding:4px 10px" onclick="openEditarTarea('${t.tarea_id}')">✎ Editar</button>
+              <button class="btn-danger" style="font-size:11px;padding:4px 10px" onclick="borrarTareaAdhoc('${t.tarea_id}')">Borrar tarea</button>
+            </div>`:''}
+          </div>
+        </div>`;
+      }).join('');
+
+  return `
+  <div style="margin-top:28px;margin-bottom:4px">
+    <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:10px 16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);transition:background 0.15s;user-select:none" onclick="toggleTareasSection()" id="tareas-toggle">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:10px;color:var(--text3);transition:transform 0.15s" id="tareas-chevron">▶</span>
+        <span class="section-title" style="margin:0">Tareas del proyecto</span>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${tareas.length}</span>
+      </div>
+      ${esPM?`<button class="btn-ghost" style="font-size:11px" onclick="event.stopPropagation();openNuevaTarea()">+ Tarea</button>`:''}
+    </div>
+    <div style="display:none" id="tareas-body">
+      <div style="background:var(--surface);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--radius) var(--radius)">
+        ${tareasHTML}
+      </div>
+    </div>
+  </div>`;
+}
+
+function toggleTareasSection() {
+  const body = document.getElementById('tareas-body');
+  const chevron = document.getElementById('tareas-chevron');
+  const toggle = document.getElementById('tareas-toggle');
+  if (!body) return;
+  const open = body.style.display === 'block';
+  body.style.display = open ? 'none' : 'block';
+  if (chevron) chevron.style.transform = open ? '' : 'rotate(90deg)';
+  if (toggle) toggle.style.borderRadius = open ? 'var(--radius)' : 'var(--radius) var(--radius) 0 0';
+}
+
+function openNuevaTarea() {
+  state._editandoTareaId = null;
+  document.getElementById('modal-tarea-title').textContent = 'Nueva tarea';
+  document.getElementById('btn-guardar-tarea').textContent = 'Crear tarea';
+  document.getElementById('ta-titulo').value = '';
+  document.getElementById('ta-fecha').value = '';
+  document.getElementById('ta-notas').value = '';
+  const sel = document.getElementById('ta-asignado');
+  sel.innerHTML = '';
+  state.usuarios.filter(u => u.rol === 'Arquitecto' || u.rol === 'PM').forEach(u => {
+    sel.innerHTML += `<option value="${u.email}">${u.nombre} (${u.rol})</option>`;
+  });
+  openModal('modal-tarea-adhoc');
+}
+
+function openEditarTarea(tareaId) {
+  const t = state.tareasAdhoc.find(x => x.tarea_id === tareaId);
+  if (!t) return;
+  state._editandoTareaId = tareaId;
+  document.getElementById('modal-tarea-title').textContent = 'Editar tarea';
+  document.getElementById('btn-guardar-tarea').textContent = 'Guardar cambios';
+  document.getElementById('ta-titulo').value = t.titulo || '';
+  document.getElementById('ta-fecha').value = normalizarFechaParaInput(t.fecha_esperada);
+  document.getElementById('ta-notas').value = t.notas || '';
+  const sel = document.getElementById('ta-asignado');
+  sel.innerHTML = '';
+  state.usuarios.filter(u => u.rol === 'Arquitecto' || u.rol === 'PM').forEach(u => {
+    sel.innerHTML += `<option value="${u.email}"${u.email===t.asignado_a?' selected':''}>${u.nombre} (${u.rol})</option>`;
+  });
+  openModal('modal-tarea-adhoc');
+}
+
+async function guardarTareaAdhoc() {
+  const titulo = document.getElementById('ta-titulo').value.trim();
+  const asignado = document.getElementById('ta-asignado').value;
+  if (!titulo || !asignado) { showToast('Título y asignado son requeridos', 'error'); return; }
+  const btn = document.getElementById('btn-guardar-tarea');
+  btn.disabled = true; btn.textContent = 'Guardando…';
+  const estadoPaneles = capturarEstadoPaneles();
+  try {
+    if (state._editandoTareaId) {
+      await api('actualizarTareaAdhoc', {
+        tarea_id: state._editandoTareaId,
+        titulo, asignado_a: asignado,
+        fecha_esperada: document.getElementById('ta-fecha').value || '',
+        notas: document.getElementById('ta-notas').value
+      });
+      showToast('Tarea actualizada', 'success');
+    } else {
+      await api('crearTareaAdhoc', {
+        proyecto_id: state.currentProyecto.proyecto_id,
+        titulo, asignado_a: asignado,
+        fecha_esperada: document.getElementById('ta-fecha').value || '',
+        notas: document.getElementById('ta-notas').value
+      });
+      showToast('Tarea creada', 'success');
+    }
+    closeModal('modal-tarea-adhoc');
+    await loadAllData();
+    if (state.currentProyecto) { await openProyecto(state.currentProyecto.proyecto_id); restaurarEstadoPaneles(estadoPaneles); }
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+  finally { btn.disabled = false; btn.textContent = state._editandoTareaId ? 'Guardar cambios' : 'Crear tarea'; }
+}
+
+function openTareaEvento(tareaId) {
+  state._tareaEventoId = tareaId;
+  const ahora = new Date();
+  document.getElementById('te-titulo').value = '';
+  document.getElementById('te-descripcion').value = '';
+  document.getElementById('te-estatus').value = '';
+  document.getElementById('te-fecha').value = `${ahora.getFullYear()}-${String(ahora.getMonth()+1).padStart(2,'0')}-${String(ahora.getDate()).padStart(2,'0')}`;
+  openModal('modal-tarea-evento');
+}
+
+async function guardarTareaEvento() {
+  const titulo = document.getElementById('te-titulo').value.trim();
+  if (!titulo) { showToast('El título es requerido', 'error'); return; }
+  const fecha = document.getElementById('te-fecha').value;
+  if (!fecha) { showToast('La fecha es requerida', 'error'); return; }
+  const estatusNuevo = document.getElementById('te-estatus').value;
+  const descripcion = document.getElementById('te-descripcion').value.trim();
+  const tareaId = state._tareaEventoId;
+  if (!tareaId || !state.currentProyecto) return;
+  const btn = document.getElementById('btn-guardar-tarea-evento');
+  btn.disabled = true; btn.textContent = 'Guardando…';
+  const estadoPaneles = capturarEstadoPaneles();
+  try {
+    await api('appendLogEvento', {
+      proyecto_id: state.currentProyecto.proyecto_id,
+      fecha_real: fecha,
+      disciplina_id: `ADHOC::${tareaId}`,
+      hito_id: titulo,
+      tipo_entry: 'tarea_evento',
+      nota: JSON.stringify({ titulo, descripcion, estatus_nuevo: estatusNuevo || null }),
+      version_timeline_activa: '1'
+    });
+    // Si hay cambio de estatus, actualizar campo en tareas_adhoc
+    if (estatusNuevo) {
+      const estatusFinal = estatusNuevo === 'completada-vobo' ? 'completada-vobo' : estatusNuevo;
+      await api('actualizarTareaAdhoc', { tarea_id: tareaId, estatus: estatusFinal });
+    }
+    closeModal('modal-tarea-evento');
+    showToast('Evento registrado', 'success');
+    await loadAllData();
+    if (state.currentProyecto) { await openProyecto(state.currentProyecto.proyecto_id); restaurarEstadoPaneles(estadoPaneles); }
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+  finally { btn.disabled = false; btn.textContent = 'Guardar evento'; }
+}
+
+async function confirmarCierreTarea(tareaId) {
+  if (state.rol !== 'PM') { showToast('Solo el PM puede confirmar el cierre', 'error'); return; }
+  const estadoPaneles = capturarEstadoPaneles();
+  try {
+    await api('actualizarTareaAdhoc', { tarea_id: tareaId, estatus: 'completada' });
+    await api('appendLogEvento', {
+      proyecto_id: state.currentProyecto.proyecto_id,
+      fecha_real: new Date().toISOString().split('T')[0],
+      disciplina_id: `ADHOC::${tareaId}`,
+      hito_id: 'Cierre confirmado',
+      tipo_entry: 'tarea_evento',
+      nota: JSON.stringify({ titulo: 'Cierre confirmado', descripcion: '', estatus_nuevo: 'completada' }),
+      version_timeline_activa: '1'
+    });
+    showToast('Tarea cerrada', 'success');
+    await loadAllData();
+    if (state.currentProyecto) { await openProyecto(state.currentProyecto.proyecto_id); restaurarEstadoPaneles(estadoPaneles); }
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+}
+
+function borrarTareaAdhoc(tareaId) {
+  const t = state.tareasAdhoc.find(x => x.tarea_id === tareaId);
+  confirmarBorrado({
+    titulo: 'Eliminar tarea',
+    mensaje: `Vas a eliminar la tarea <strong>${t?.titulo || tareaId}</strong> y todos sus eventos del log.<br><br>Esta acción no se puede deshacer.`,
+    labelBoton: 'Eliminar tarea',
+    onConfirm: async () => {
+      const estadoPaneles = capturarEstadoPaneles();
+      try {
+        await api('borrarTareaAdhoc', { tarea_id: tareaId });
+        showToast('Tarea eliminada', 'success');
+        await loadAllData();
+        if (state.currentProyecto) { await openProyecto(state.currentProyecto.proyecto_id); restaurarEstadoPaneles(estadoPaneles); }
+      } catch(e) { showToast('Error: ' + e.message, 'error'); }
+    }
+  });
+}
 
 // ── FAB BÚSQUEDA + COLAPSAR ──
 let fabClickTimer = null;
