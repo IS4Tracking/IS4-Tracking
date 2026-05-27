@@ -482,11 +482,12 @@
         </div>
         <button class="btn-primary" onclick="openNuevoProyecto()" id="btn-nuevo-proyecto">+ Nuevo Proyecto</button>
       </div>
+      <div id="evergreen-cards" style="margin-bottom:16px"></div>
       <div id="proyectos-list"><div class="loading"><div class="spinner"></div>Cargando proyectos…</div></div>
       <div class="hitos-section">
         <div id="hitos-proximos"><div class="loading"><div class="spinner"></div>Calculando…</div></div>
         <div id="tareas-dashboard" style="margin-top:24px"></div>
-        <div id="evergreen-dashboard" style="margin-top:24px"></div>
+        <div id="evergreen-dashboard"></div>
       </div>
     </div>
 
@@ -509,6 +510,21 @@
       <div id="detail-notas"></div>
       <div id="detail-tareas"></div>
       <div class="groups-container" id="groups-container"></div>
+    </div>
+
+    <!-- EVERGREEN DETAIL -->
+    <div class="view" id="view-evergreen-detail">
+      <button class="back-btn" onclick="showView('dashboard')">← Volver</button>
+      <div class="project-detail-header">
+        <div>
+          <div class="project-detail-title" id="ev-detail-title"></div>
+          <div class="project-detail-meta" id="ev-detail-meta"></div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn-primary" id="ev-btn-nueva-tarea" onclick="openNuevaEvergreenTarea()">+ Tarea</button>
+        </div>
+      </div>
+      <div id="ev-detail-body"></div>
     </div>
 
     <!-- INSIGHTS / DASHBOARDS -->
@@ -4340,42 +4356,116 @@ function borrarTareaEvento(entryId, tareaId) {
 // ── H11-03 EVERGREEN ──
 
 function renderEvergreenHome() {
-  if (state.rol !== 'PM' && state.rol !== 'Validador' && state.rol !== 'Arquitecto') return '';
-  const tareas = state.rol === 'Arquitecto'
-    ? state.evergreenTareas.filter(t => t.asignado_a === state.user?.email)
-    : state.evergreenTareas;
-  if (tareas.length === 0 && state.rol !== 'PM') return '';
+  if (state.rol !== 'PM' && state.rol !== 'Validador' && state.rol !== 'Dirección' && state.rol !== 'Arquitecto') return '';
 
-  // Agrupar por asignado
-  const porAsignado = {};
-  tareas.forEach(t => {
-    if (!porAsignado[t.asignado_a]) porAsignado[t.asignado_a] = [];
-    porAsignado[t.asignado_a].push(t);
-  });
+  let arquitectos = [];
+  if (state.rol === 'Arquitecto') {
+    const u = state.usuarios.find(x => x.email === state.user?.email);
+    if (u) arquitectos = [u];
+  } else {
+    arquitectos = state.usuarios.filter(u => u.rol === 'Arquitecto');
+  }
+  if (arquitectos.length === 0) return '';
 
-  const esPMoVal = state.rol === 'PM' || state.rol === 'Validador';
-  const logEv = state.logEventos.filter(e => e.disciplina_id && e.disciplina_id.startsWith('EV::'));
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  const cards = arquitectos.map(arq => {
+    const tareas = state.evergreenTareas.filter(t => t.asignado_a === arq.email);
+    const abiertas = tareas.filter(t => t.estatus !== 'completada' && t.estatus !== 'cancelada').length;
+    const vencidas = tareas.filter(t => {
+      if (!t.fecha_esperada || t.estatus === 'completada' || t.estatus === 'cancelada') return false;
+      const f = parseISODate(t.fecha_esperada); return f && f < hoy;
+    }).length;
+    const nivel = vencidas > 0 ? 'red' : abiertas > 0 ? 'green' : 'gray';
+    const label = vencidas > 0 ? `${vencidas}d vencida${vencidas>1?'s':''}` : abiertas > 0 ? 'Al día' : 'Sin tareas';
+    return `<div class="project-card risk-${nivel}" onclick="openEvergreen('${arq.email}')" style="cursor:pointer">
+      <div>
+        <div class="project-name">Evergreen — ${arq.nombre}</div>
+        <div class="progress-bar-wrap">
+          <div class="progress-bar-track"><div class="progress-bar-fill" style="width:0%;background:var(--accent)"></div></div>
+          <div class="progress-label">
+            <span class="progress-text">${abiertas} abierta${abiertas!==1?'s':''} · ${tareas.length} total</span>
+          </div>
+        </div>
+        <div class="project-meta">
+          <div class="meta-item"><span class="label">Arq.&nbsp;</span>${arq.nombre}</div>
+          ${vencidas>0?`<div class="meta-item" style="color:var(--red)"><span class="label">Vencidas&nbsp;</span>${vencidas}</div>`:''}
+        </div>
+      </div>
+      <div class="project-right">
+        <div class="semaforo ${nivel}"></div>
+        <div class="desvio-badge ${nivel}">${label}</div>
+      </div>
+    </div>`;
+  }).join('');
 
-  const seccionesHTML = Object.entries(porAsignado).map(([email, tList]) => {
-    const nombre = (state.usuarios.find(u => u.email === email)?.nombre) || email;
-    const puedeCrear = state.rol === 'PM' || email === state.user?.email;
-    const initials = tList[0]?.tarea_id?.split('-')[1] || '';
-    const tareasHTML = tList.map(t => {
+  const container = document.getElementById('evergreen-cards');
+  if (container) container.innerHTML = `<div class="project-grid">${cards}</div>`;
+  return '';
+}
+
+function openEvergreen(arquitectoEmail) {
+  const arq = state.usuarios.find(u => u.email === arquitectoEmail);
+  if (!arq) return;
+  state.currentEvergreenArq = arquitectoEmail;
+  document.getElementById('ev-detail-title').textContent = `Evergreen — ${arq.nombre}`;
+  const tareas = state.evergreenTareas.filter(t => t.asignado_a === arquitectoEmail);
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  const abiertas = tareas.filter(t => t.estatus !== 'completada' && t.estatus !== 'cancelada').length;
+  const vencidas = tareas.filter(t => {
+    if (!t.fecha_esperada || t.estatus === 'completada' || t.estatus === 'cancelada') return false;
+    const f = parseISODate(t.fecha_esperada); return f && f < hoy;
+  }).length;
+  document.getElementById('ev-detail-meta').textContent =
+    `${abiertas} abierta${abiertas!==1?'s':''} · ${vencidas>0?vencidas+' vencida'+(vencidas>1?'s':'')+' · ':''}${tareas.length} total`;
+  const btnNueva = document.getElementById('ev-btn-nueva-tarea');
+  if (btnNueva) btnNueva.style.display = (state.rol==='PM'||state.user?.email===arquitectoEmail) ? '' : 'none';
+  document.getElementById('ev-detail-body').innerHTML = renderEvergreenDetail(arquitectoEmail);
+  showView('evergreen-detail');
+}
+
+function renderEvergreenDetail(arquitectoEmail) {
+  const log = state.logEventos.filter(e => e.proyecto_id === 'EVERGREEN');
+  const tareas = state.evergreenTareas.filter(t => t.asignado_a === arquitectoEmail);
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  const esPM = state.rol === 'PM';
+  const puedeEvento = esPM || state.user?.email === arquitectoEmail;
+
+  const GRUPOS = [
+    { key:'vencida',    label:'Vencida',    colapsar:false },
+    { key:'en-proceso', label:'En proceso', colapsar:false },
+    { key:'pausada',    label:'Pausada',    colapsar:false },
+    { key:'pendiente',  label:'Por iniciar',colapsar:false },
+    { key:'completada', label:'Completada', colapsar:true  },
+    { key:'cancelada',  label:'Cancelada',  colapsar:true  },
+  ];
+
+  const clasificar = t => {
+    if (t.estatus === 'completada' || t.estatus === 'cancelada') return t.estatus;
+    if (t.fecha_esperada) { const f = parseISODate(t.fecha_esperada); if (f && f < hoy) return 'vencida'; }
+    return t.estatus || 'pendiente';
+  };
+
+  const grupos = {}; GRUPOS.forEach(g => grupos[g.key] = []);
+  tareas.forEach(t => { const k = clasificar(t); if (grupos[k]!==undefined) grupos[k].push(t); else grupos['pendiente'].push(t); });
+
+  const COLOR_BORDE = { 'vencida':'var(--red)', 'en-proceso':'var(--accent)', 'pausada':'var(--yellow)', 'pendiente':'var(--border2)', 'completada':'var(--green)', 'cancelada':'var(--border2)' };
+
+  return GRUPOS.map(g => {
+    const lista = grupos[g.key];
+    if (lista.length === 0) return '';
+    const panelId = `ev-grupo-${g.key}`;
+    const filas = lista.map(t => {
       const safeId = t.tarea_id.replace(/[^a-zA-Z0-9_]/g,'_');
-      const eventos = logEv.filter(e => e.disciplina_id === `EV::${t.tarea_id}`)
+      const logTarea = log.filter(e => e.disciplina_id === `EV::${t.tarea_id}`)
         .sort((a,b) => new Date(a.timestamp||a.fecha_real+'T12:00:00Z') - new Date(b.timestamp||b.fecha_real+'T12:00:00Z'));
-      const hoyT = new Date(); hoyT.setHours(0,0,0,0);
-      const fechaEsp = t.fecha_esperada ? parseISODate(t.fecha_esperada) : null;
-      const vencida = fechaEsp && fechaEsp < hoyT && t.estatus !== 'completada' && t.estatus !== 'cancelada';
-      const estatusEfectivo = vencida ? 'vencida' : t.estatus;
-      const puedeEvento = state.rol === 'PM' || email === state.user?.email;
+      const esTerminada = t.estatus === 'completada' || t.estatus === 'cancelada';
 
-      const logHTML = eventos.length === 0
+      const logHTML = logTarea.length === 0
         ? '<div class="log-empty">Sin eventos registrados</div>'
-        : eventos.map(e => {
+        : logTarea.map(e => {
             let evData = {}; try { evData = JSON.parse(e.nota||'{}'); } catch(x) {}
             const autorNombre = (state.usuarios.find(u => u.email === e.arquitecto_id)?.nombre) || e.arquitecto_id;
-            const puedeEditarEv = state.rol === 'PM' || state.user?.email === e.arquitecto_id;
+            const puedeEditarEv = esPM || state.user?.email === e.arquitecto_id;
             return `<div class="log-entry-wrap">
               <div class="log-entry">
                 <div class="log-entry-top">
@@ -4384,25 +4474,24 @@ function renderEvergreenHome() {
                   ${evData.estatus_nuevo?`<span class="disciplina-estado ${getEstatusClass(evData.estatus_nuevo)}" style="font-size:10px;margin-left:4px">${getEstatusLabel(evData.estatus_nuevo)}</span>`:''}
                 </div>
                 ${evData.descripcion?`<div class="log-nota">${evData.descripcion} <span style="color:var(--text3);font-size:10px">· ${autorNombre}</span></div>`:`<div class="log-nota" style="color:var(--text3)">${autorNombre}</div>`}
-                ${state.rol==='PM'&&t.estatus==='completada-vobo'&&evData.estatus_nuevo==='completada-vobo'&&e.arquitecto_id!==state.user?.email?`<button class="btn-ghost" style="font-size:11px;margin-top:4px" onclick="confirmarCierreEvergreen('${t.tarea_id}')">✓ Confirmar cierre</button>`:''}
+                ${esPM&&t.estatus==='completada-vobo'&&evData.estatus_nuevo==='completada-vobo'&&e.arquitecto_id!==state.user?.email?`<button class="btn-ghost" style="font-size:11px;margin-top:4px" onclick="confirmarCierreEvergreen('${t.tarea_id}')">✓ Confirmar cierre</button>`:''}
               </div>
-              ${puedeEditarEv?`
-              <button class="btn-editar-entry" onclick="abrirEditarEvergreenEvento('${e.entry_id}','${t.tarea_id}')" title="Editar">✎</button>
+              ${puedeEditarEv?`<button class="btn-editar-entry" onclick="abrirEditarEvergreenEvento('${e.entry_id}','${t.tarea_id}')" title="Editar">✎</button>
               <button class="btn-borrar-entry" onclick="borrarEvergreenEvento('${e.entry_id}','${t.tarea_id}')" title="Borrar">✕</button>`:''}
             </div>`;
           }).join('');
 
-      return `<div>
+      return `<div style="${esTerminada?'opacity:0.6':''}">
         <div class="disciplina-row" onclick="toggleLogPanel('evlog_${safeId}')">
           <div style="font-size:13px;font-weight:500">${t.tarea_id} — ${t.titulo}</div>
-          <div class="disciplina-estado ${getEstatusClass(estatusEfectivo)}">${getEstatusLabel(estatusEfectivo)}</div>
-          <div style="font-size:11px;color:${vencida?'var(--red)':'var(--text3)'};font-family:var(--mono)">${t.fecha_esperada?formatDate(t.fecha_esperada):'—'}</div>
+          <div class="disciplina-estado ${getEstatusClass(clasificar(t))}">${getEstatusLabel(clasificar(t))}</div>
+          <div style="font-size:11px;color:${clasificar(t)==='vencida'?'var(--red)':'var(--text3)'};font-family:var(--mono)">${t.fecha_esperada?formatDate(t.fecha_esperada):'—'}</div>
           <div></div>
-          ${puedeEvento?`<button class="btn-ghost" onclick="event.stopPropagation();openEvergreenEvento('${t.tarea_id}')">+ Evento</button>`:'<div></div>'}
+          ${puedeEvento&&!esTerminada?`<button class="btn-ghost" onclick="event.stopPropagation();openEvergreenEvento('${t.tarea_id}')">+ Evento</button>`:'<div></div>'}
         </div>
         <div class="log-panel" id="evlog_${safeId}">
           ${logHTML}
-          ${state.rol==='PM'?`<div style="display:flex;gap:8px;margin-top:8px">
+          ${esPM?`<div style="display:flex;gap:8px;margin-top:8px">
             <button class="btn-secondary" style="font-size:11px;padding:4px 10px" onclick="openEditarEvergreenTarea('${t.tarea_id}')">✎ Editar</button>
             <button class="btn-danger" style="font-size:11px;padding:4px 10px" onclick="borrarEvergreenTarea('${t.tarea_id}')">Borrar tarea</button>
           </div>`:''}
@@ -4410,41 +4499,32 @@ function renderEvergreenHome() {
       </div>`;
     }).join('');
 
-    return `<div style="margin-bottom:12px">
-      ${esPMoVal?`<div style="font-size:11px;font-weight:500;color:var(--text2);font-family:var(--mono);padding:6px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius) var(--radius) 0 0">${nombre}</div>`:''}
-      <div style="background:var(--surface);border:1px solid var(--border);${esPMoVal?'border-top:none;':''}border-radius:${esPMoVal?'0 0':'var(--radius) var(--radius)'} var(--radius) var(--radius)">
-        ${tareasHTML}
+    const isColapsado = g.colapsar;
+    return `<div style="margin-bottom:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:8px 16px;background:var(--surface);border:1px solid var(--border);border-radius:${isColapsado?'var(--radius)':'var(--radius) var(--radius) 0 0'}" id="ev-toggle-${g.key}" onclick="toggleEvGrupo('${g.key}')">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:10px;color:${COLOR_BORDE[g.key]};transition:transform 0.15s" id="ev-chev-${g.key}">${isColapsado?'▶':'▼'}</span>
+          <span style="font-family:var(--mono);font-size:10px;font-weight:500;color:${COLOR_BORDE[g.key]};text-transform:uppercase;letter-spacing:.06em">${g.label} — ${lista.length}</span>
+        </div>
+      </div>
+      <div id="${panelId}" style="display:${isColapsado?'none':'block'};background:var(--surface);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--radius) var(--radius)">
+        ${filas}
       </div>
     </div>`;
   }).join('');
-
-  return `<div style="margin-top:28px;margin-bottom:28px">
-    <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:10px 16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);user-select:none" onclick="toggleEvergreenSection()" id="evergreen-toggle">
-      <div style="display:flex;align-items:center;gap:10px">
-        <span style="font-size:10px;color:var(--text3);transition:transform 0.15s" id="evergreen-chevron">▶</span>
-        <span class="section-title" style="margin:0">Evergreen</span>
-        <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${tareas.length}</span>
-      </div>
-      ${state.rol==='PM'?`<button class="btn-ghost" style="font-size:11px" onclick="event.stopPropagation();openNuevaEvergreenTarea()">+ Tarea</button>`:''}
-      ${state.rol==='Arquitecto'?`<button class="btn-ghost" style="font-size:11px" onclick="event.stopPropagation();openNuevaEvergreenTarea()">+ Tarea</button>`:''}
-    </div>
-    <div style="display:none" id="evergreen-body">
-      ${seccionesHTML || '<div style="color:var(--text3);font-family:var(--mono);font-size:12px;padding:10px 16px">Sin tareas registradas.</div>'}
-    </div>
-  </div>`;
 }
 
-function toggleEvergreenSection() {
-  const body = document.getElementById('evergreen-body');
-  const chevron = document.getElementById('evergreen-chevron');
-  const toggle = document.getElementById('evergreen-toggle');
-  if (!body) return;
-  const open = body.style.display === 'block';
-  body.style.display = open ? 'none' : 'block';
-  if (chevron) chevron.style.transform = open ? '' : 'rotate(90deg)';
+function toggleEvGrupo(key) {
+  const panel = document.getElementById(`ev-grupo-${key}`);
+  const chev = document.getElementById(`ev-chev-${key}`);
+  const toggle = document.getElementById(`ev-toggle-${key}`);
+  if (!panel) return;
+  const open = panel.style.display === 'block';
+  panel.style.display = open ? 'none' : 'block';
+  if (chev) chev.textContent = open ? '▶' : '▼';
   if (toggle) toggle.style.borderRadius = open ? 'var(--radius)' : 'var(--radius) var(--radius) 0 0';
 }
-
+ 
 function openNuevaEvergreenTarea() {
   state._editandoEvergreenId = null;
   state._modoEvergreen = true;
