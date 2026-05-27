@@ -239,7 +239,7 @@
   /* LOG PANEL */
   .log-panel { display:none; background:var(--bg); border-top:1px solid var(--border); padding:16px 16px 16px 52px; }
   .log-panel.open { display:block; }
-  .log-entry { display:flex; flex-direction:column; gap:2px; padding:5px 0; border-bottom:1px solid var(--border); font-size:12px; min-width:0; }
+  .log-entry { display:flex; flex-direction:column; gap:2px; padding:5px 44px 5px 0; border-bottom:1px solid var(--border); font-size:12px; min-width:0; }
   .log-entry:last-child { border-bottom:none; }
   .log-entry-top { display:flex; gap:8px; align-items:baseline; min-width:0; overflow:hidden; }
   .log-fecha { font-family:var(--mono); color:var(--text3); flex-shrink:0; font-size:11px; white-space:nowrap; }
@@ -353,6 +353,13 @@
   /* LOADING / EMPTY */
   .loading { display:flex; align-items:center; justify-content:center; padding:48px; color:var(--text3); font-family:var(--mono); font-size:12px; gap:10px; }
   .spinner { width:16px; height:16px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.8s linear infinite; }
+  .top-save-bar { position:fixed; top:0; left:0; right:0; height:2px; z-index:9999; pointer-events:none; overflow:hidden; }
+  .top-save-bar::after { content:''; display:block; height:100%; width:0; background:var(--accent); border-radius:1px; }
+  .top-save-bar.running::after { animation:tsb-run 1.8s ease-in-out forwards; }
+  .top-save-bar.done::after { width:100%; animation:tsb-done 0.3s ease-out forwards; }
+  @keyframes tsb-run { 0%{width:0} 60%{width:72%} 85%{width:88%} 100%{width:92%} }
+  @keyframes tsb-done { 0%{opacity:1;width:100%} 100%{opacity:0;width:100%} }
+  .btn-confirmed { background:var(--green) !important; color:#fff !important; border-color:var(--green) !important; opacity:1 !important; }
   @keyframes spin { to { transform:rotate(360deg); } }
   .empty-state { text-align:center; padding:48px; color:var(--text3); font-family:var(--mono); font-size:12px; }
   .empty-state-icon { font-size:32px; margin-bottom:12px; }
@@ -466,6 +473,7 @@
     </div>
     <div class="topbar-user">
       <span class="user-name" id="user-name-display"></span>
+  <div class="top-save-bar" id="top-save-bar"></div>
       <span class="user-role" id="user-role-display"></span>
       <button class="btn-logout" onclick="handleLogout()">Salir</button>
     </div>
@@ -872,7 +880,7 @@
     <div class="modal-body">
       <div class="form-group"><label class="form-label">Título <span style="color:var(--accent)">*</span></label><input class="form-input" id="ta-titulo" placeholder="Describe la tarea…" autocomplete="off"></div>
       <div class="form-row">
-        <div class="form-group"><label class="form-label">Asignado a <span style="color:var(--accent)">*</span></label><select class="form-select" id="ta-asignado"></select></div>
+        <div class="form-group" id="row-ta-asignado"><label class="form-label">Asignado a <span style="color:var(--accent)">*</span></label><select class="form-select" id="ta-asignado"></select></div>
         <div class="form-group"><label class="form-label">Fecha esperada <span style="color:var(--text3)">opcional</span></label><input class="form-input" id="ta-fecha" type="date" autocomplete="off"></div>
       </div>
       <div class="form-group"><label class="form-label">Notas <span style="color:var(--text3)">opcional</span></label><textarea class="form-textarea" id="ta-notas" placeholder="Contexto o instrucciones…" style="min-height:60px" autocomplete="off"></textarea></div>
@@ -1058,6 +1066,7 @@ async function completeSignIn() {
   document.getElementById('app').style.display = 'flex';
   document.getElementById('dashboard-date').textContent = new Date().toLocaleDateString('es-MX', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
   localStorage.setItem('is4_user', JSON.stringify(state.user));
+  await loadStaticData();
   await loadAllData();
 }
 
@@ -1081,30 +1090,211 @@ async function api(action, body = {}) {
 }
 
 // ── DATA ──
-async function loadAllData() {
+// ── IX-8: SAVING FEEDBACK ─────────────────────────────────────────────────────
+
+function startSaving() {
+  const bar = document.getElementById('top-save-bar');
+  if (!bar) return;
+  bar.classList.remove('running','done');
+  void bar.offsetWidth;
+  bar.classList.add('running');
+}
+
+function stopSaving(success) {
+  const bar = document.getElementById('top-save-bar');
+  if (!bar) return;
+  bar.classList.remove('running');
+  if (success) {
+    bar.classList.add('done');
+    setTimeout(() => bar.classList.remove('done'), 350);
+  }
+}
+
+function confirmBtn(btn, originalLabel) {
+  return new Promise(resolve => {
+    btn.textContent = '✓ Guardado';
+    btn.classList.add('btn-confirmed');
+    btn.disabled = true;
+    setTimeout(() => {
+      btn.classList.remove('btn-confirmed');
+      btn.textContent = originalLabel;
+      btn.disabled = false;
+      resolve();
+    }, 600);
+  });
+}
+
+function saveModalSnapshot(modalId, fieldIds) {
+  const data = {};
+  fieldIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) data[id] = el.value;
+  });
+  state._modalSnapshot = { modalId, data };
+}
+
+async function restoreModalSnapshot() {
+  const snap = state._modalSnapshot;
+  if (!snap) return;
+  state._modalSnapshot = null;
+  openModal(snap.modalId);
+  await new Promise(r => setTimeout(r, 50));
+  if (snap.modalId === 'modal-entry') {
+    const g = document.getElementById('e-grupo');
+    if (g && snap.data['e-grupo']) {
+      g.value = snap.data['e-grupo'];
+      updateDisciplinas();
+      await new Promise(r => setTimeout(r, 30));
+      const d = document.getElementById('e-disciplina');
+      if (d && snap.data['e-disciplina']) {
+        d.value = snap.data['e-disciplina'];
+        updateEventos();
+        await new Promise(r => setTimeout(r, 30));
+      }
+    }
+    ['e-fecha','e-hora','e-nota'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el && snap.data[id] !== undefined) el.value = snap.data[id];
+    });
+    const ev = document.getElementById('e-evento');
+    if (ev && snap.data['e-evento']) ev.value = snap.data['e-evento'];
+  } else {
+    Object.entries(snap.data).forEach(([id, val]) => {
+      const el = document.getElementById(id);
+      if (el) el.value = val;
+    });
+  }
+}
+
+// ── LOADERS POR CONTEXTO ──────────────────────────────────────────────────────
+// loadStaticData   — una sola vez al login: catálogos que no cambian
+// loadHomeData     — Home y post-acciones en Home: datos cross-proyecto
+// loadProyectoData — al abrir un proyecto y post-acciones dentro de él
+// loadEvergreenData— al abrir Evergreen y post-acciones dentro de él
+// loadCriteriosData— vista Criterios y post-acciones dentro de ella
+// loadAllData      — compatibilidad: carga estática + home completo
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function loadStaticData() {
+  console.time('[PERF] loadStaticData');
   try {
-    const [proyectos, eventos, log, criterios, disciplinas, cambiosDetalle, cambiosBorrados, historialArq, snapshots] = await Promise.all([
-      api('getProyectos'), api('getEventosCatalogo'),
-      api('getLogEventos'), api('getCriteriosPrograma'),
-      api('getDisciplinasProyecto'), api('getCambiosDetalle'),
-      api('getCambiosBorrados', {}), api('getHistorialArquitecto', {}),
-      api('getSnapshotsEntrega', {})
-    ]);
-    state.proyectos = proyectos || [];
+    console.time('[PERF] api::getUsuarios');
+    const usuarios = await api('getUsuarios');
+    console.timeEnd('[PERF] api::getUsuarios');
+    console.time('[PERF] api::getEventosCatalogo');
+    const eventos = await api('getEventosCatalogo');
+    console.timeEnd('[PERF] api::getEventosCatalogo');
+    state.usuarios = usuarios || [];
     state.eventosCatalogo = eventos || [];
-    state.logEventos = log || [];
-    state.criterios = criterios || [];
+  } catch(e) { console.error('[PERF] loadStaticData error:', e.message); }
+  console.timeEnd('[PERF] loadStaticData');
+}
+
+async function loadHomeData() {
+  console.time('[PERF] loadHomeData total');
+  try {
+    console.time('[PERF] loadHomeData Promise.all');
+    const [proyectos, log, disciplinas, criterios, cambiosBorrados, historialArq] = await Promise.all([
+      api('getProyectos'),
+      api('getLogEventos'),
+      api('getDisciplinasProyecto'),
+      api('getCriteriosPrograma'),
+      api('getCambiosBorrados', {}),
+      api('getHistorialArquitecto', {})
+    ]);
+    console.timeEnd('[PERF] loadHomeData Promise.all');
+    state.proyectos       = proyectos     || [];
+    state.logEventos      = log           || [];
     state.disciplinasProyecto = disciplinas || [];
-    state.cambiosDetalle = cambiosDetalle || [];
+    state.criterios       = criterios     || [];
     state.cambiosBorrados = cambiosBorrados || [];
     state.historialArquitecto = historialArq || [];
-    state.snapshotsEntrega = snapshots || [];
-    try { state.tareasAdhoc = (await api('getTareasAdhoc', {})) || []; } catch(err) { console.warn('[B3-diag] getTareasAdhoc falló:', err.message); state.tareasAdhoc = []; }
-    try { state.evergreenTareas = (await api('getEvergreen', {})) || []; } catch(_) { state.evergreenTareas = []; }
-    try { state.dudasDetalle = (await api('getDudasDetalle', {})) || []; } catch(_) { state.dudasDetalle = []; }
-    renderDashboard();
-    renderCriteriosBanner();
+
+    // Módulos adicionales en paralelo (IX-1: antes eran secuenciales)
+    console.time('[PERF] loadHomeData modulos');
+    const [tareas, evergreen] = await Promise.all([
+      api('getTareasAdhoc', {}).catch(e => { console.warn('[PERF] getTareasAdhoc error:', e.message); return []; }),
+      api('getEvergreen', {}).catch(e => { console.warn('[PERF] getEvergreen error:', e.message); return []; })
+    ]);
+    console.timeEnd('[PERF] loadHomeData modulos');
+    state.tareasAdhoc     = tareas    || [];
+    state.evergreenTareas = evergreen || [];
   } catch(e) { showToast('Error cargando datos: ' + e.message, 'error'); console.error(e); }
+  console.timeEnd('[PERF] loadHomeData total');
+}
+
+async function loadProyectoData(proyectoId) {
+  if (!proyectoId) return;
+  console.time('[PERF] loadProyectoData total · ' + proyectoId);
+  try {
+    console.time('[PERF] loadProyectoData Promise.all');
+    const [proyectos, log, disciplinas, cambiosDetalle, snapshots, tareas, dudas] = await Promise.all([
+      api('getProyectos'),
+      api('getLogEventos',          { proyecto_id: proyectoId }),
+      api('getDisciplinasProyecto', { proyecto_id: proyectoId }),
+      api('getCambiosDetalle',      { proyecto_id: proyectoId }),
+      api('getSnapshotsEntrega',    { proyecto_id: proyectoId }),
+      api('getTareasAdhoc',         { proyecto_id: proyectoId }).catch(() => []),
+      api('getDudasDetalle',        { proyecto_id: proyectoId }).catch(() => [])
+    ]);
+    console.timeEnd('[PERF] loadProyectoData Promise.all');
+
+    state.proyectos           = proyectos    || [];
+    // IX-2: merge log filtrado en state.logEventos sin sobreescribir otros proyectos
+    const otrosLogs = (state.logEventos || []).filter(e => e.proyecto_id !== proyectoId);
+    state.logEventos          = [...otrosLogs, ...(log || [])];
+    // merge disciplinas filtradas
+    const otrasDiscs = (state.disciplinasProyecto || []).filter(d => d.proyecto_id !== proyectoId);
+    state.disciplinasProyecto = [...otrasDiscs, ...(disciplinas || [])];
+    // merge cambiosDetalle filtrados
+    const entryIdsProyecto = new Set((log || []).map(e => e.entry_id));
+    const otrosCambios = (state.cambiosDetalle || []).filter(c => !entryIdsProyecto.has(c.entry_id));
+    state.cambiosDetalle      = [...otrosCambios, ...(cambiosDetalle || [])];
+    // merge snapshots filtrados
+    const otrosSnaps = (state.snapshotsEntrega || []).filter(s => s.proyecto_id !== proyectoId);
+    state.snapshotsEntrega    = [...otrosSnaps, ...(snapshots || [])];
+    // merge tareas filtradas
+    const otrasTareas = (state.tareasAdhoc || []).filter(t => t.proyecto_id !== proyectoId);
+    state.tareasAdhoc         = [...otrasTareas, ...(tareas || [])];
+    // merge dudas
+    const entryIdsSet = new Set((log || []).map(e => e.entry_id));
+    const otrasDudas = (state.dudasDetalle || []).filter(d => !entryIdsSet.has(d.entry_id));
+    state.dudasDetalle        = [...otrasDudas, ...(dudas || [])];
+  } catch(e) { showToast('Error cargando proyecto: ' + e.message, 'error'); console.error(e); }
+  console.timeEnd('[PERF] loadProyectoData total · ' + proyectoId);
+}
+
+async function loadEvergreenData() {
+  console.time('[PERF] loadEvergreenData');
+  try {
+    const [evergreen, log] = await Promise.all([
+      api('getEvergreen', {}).catch(() => []),
+      api('getLogEventos').catch(() => [])
+    ]);
+    state.evergreenTareas = evergreen || [];
+    state.logEventos      = log       || [];
+  } catch(e) { console.error('[PERF] loadEvergreenData error:', e.message); }
+  console.timeEnd('[PERF] loadEvergreenData');
+}
+
+async function loadCriteriosData() {
+  console.time('[PERF] loadCriteriosData');
+  try {
+    const [criterios, proyectos] = await Promise.all([
+      api('getCriteriosPrograma'),
+      api('getProyectos')
+    ]);
+    state.criterios = criterios || [];
+    state.proyectos = proyectos || [];
+  } catch(e) { console.error('[PERF] loadCriteriosData error:', e.message); }
+  console.timeEnd('[PERF] loadCriteriosData');
+}
+
+// Compatibilidad: carga estática + home completo (reemplaza el loadAllData monolítico)
+async function loadAllData() {
+  await loadHomeData();
+  renderDashboard();
+  renderCriteriosBanner();
 }
 
 // ── PAUSA — calcular días hábiles entre dos timestamps ──
@@ -1617,7 +1807,10 @@ async function confirmarEditarEntry() {
   const fecha = document.getElementById('ee-fecha').value;
   const nota = document.getElementById('ee-nota').value;
   const btn = document.getElementById('btn-guardar-editar-entry');
+  saveModalSnapshot('modal-editar-entry', ['ee-fecha','ee-nota']);
+  closeModal('modal-editar-entry');
   btn.disabled = true; btn.textContent = 'Guardando…';
+  startSaving();
   const estadoPaneles = capturarEstadoPaneles();
   try {
     await api('editarLogEvento', { entry_id: entryId, fecha_real: fecha, nota });
@@ -1630,7 +1823,7 @@ async function confirmarEditarEntry() {
       await openProyecto(state.currentProyecto.proyecto_id);
       restaurarEstadoPaneles(estadoPaneles);
     }
-  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+  } catch(e) { stopSaving(false); showToast('Error: ' + e.message, 'error'); await restoreModalSnapshot(); }
   finally { btn.disabled = false; btn.textContent = 'Guardar cambios'; }
 }
 
@@ -2281,6 +2474,7 @@ async function guardarProyecto() {
   if (!nombre || !fecha) { showToast('Nombre y fecha son requeridos', 'error'); return; }
   const btn = document.getElementById('btn-guardar-proyecto');
   btn.disabled = true; btn.textContent = 'Guardando…';
+  startSaving();
   try {
     await api('crearProyecto', {
       nombre, clave_innovasport: document.getElementById('p-clave').value,
@@ -2289,10 +2483,11 @@ async function guardarProyecto() {
       bubble_plan_aplica: state.bubblePlan, notas: document.getElementById('p-notas').value,
       disciplinas: [...state.disciplinasSeleccionadas].map(k => { const [g,d] = k.split('::'); return { disciplina_id: k, grupo_id: g }; })
     });
+    await confirmBtn(btn, 'Crear Proyecto'); stopSaving(true);
     closeModal('modal-proyecto');
     showToast(`Proyecto "${nombre}" creado`, 'success');
-    await loadAllData();
-  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+    await loadHomeData(); renderDashboard(); renderCriteriosBanner();
+  } catch(e) { stopSaving(false); showToast('Error: ' + e.message, 'error'); }
   finally { btn.disabled = false; btn.textContent = 'Crear Proyecto'; }
 }
 
@@ -2516,6 +2711,7 @@ async function guardarNotaCambio() {
   const estadoPaneles = capturarEstadoPaneles();
   const btn = document.getElementById('btn-guardar-nc');
   btn.disabled = true; btn.textContent = 'Guardando…';
+  startSaving();
 
   // Referencia a disciplina (F3)
   const notaGrupo = esNota ? document.getElementById('nc-nota-grupo').value : '';
@@ -2573,9 +2769,10 @@ async function guardarNotaCambio() {
           fecha_real: fecha,
           tarea_ref_id: tareaRef
         });
+        await confirmBtn(btn, 'Guardar'); stopSaving(true);
         closeModal('modal-nota-cambio');
         showToast('Duda registrada', 'success');
-        await loadAllData();
+        await loadProyectoData(state.currentProyecto.proyecto_id);
         if (state.currentProyecto) { await openProyecto(state.currentProyecto.proyecto_id); restaurarEstadoPaneles(estadoPaneles); }
         btn.disabled=false; btn.textContent='Guardar';
         return;
@@ -2605,6 +2802,7 @@ async function guardarNotaCambio() {
             version_timeline_activa: '1'
           });
         }
+        await confirmBtn(btn, 'Guardar'); stopSaving(true);
         closeModal('modal-nota-cambio');
         showToast('Nota guardada', 'success');
       } else {
@@ -2674,12 +2872,13 @@ async function guardarNotaCambio() {
           });
         }
 
+        await confirmBtn(btn, 'Guardar'); stopSaving(true);
         closeModal('modal-nota-cambio');
         showToast(`Cambio ${claveCambio} registrado`, 'success');
       }
     }
 
-    await loadAllData();
+    await loadProyectoData(state.currentProyecto.proyecto_id);
     if (state.currentProyecto) {
       await openProyecto(state.currentProyecto.proyecto_id);
       restaurarEstadoPaneles(estadoPaneles);
@@ -2740,7 +2939,10 @@ async function guardarEntry() {
 
   const estadoPaneles = capturarEstadoPaneles();
   const btn = document.getElementById('btn-guardar-entry');
+  saveModalSnapshot('modal-entry', ['e-fecha','e-hora','e-grupo','e-disciplina','e-evento','e-nota']);
+  closeModal('modal-entry');
   btn.disabled = true; btn.textContent = 'Guardando…';
+  startSaving();
   try {
     const res = await api('appendLogEvento', {
       proyecto_id: proyectoId, fecha_real: fecha, fecha_hora: fechaTimestamp,
@@ -2768,15 +2970,13 @@ async function guardarEntry() {
     }
     closeModal('modal-entry');
     showToast('Evento registrado', 'success');
-    const logFresco = await api('getLogEventos', { proyecto_id: state.currentProyecto.proyecto_id });
-    state.logEventos = [...state.logEventos.filter(e => e.proyecto_id !== state.currentProyecto.proyecto_id), ...(logFresco || [])];
     await evaluarHitos(state.currentProyecto.proyecto_id, state.logEventos);
-    await loadAllData();
+    await loadProyectoData(state.currentProyecto.proyecto_id);
     if (state.currentProyecto) {
       await openProyecto(state.currentProyecto.proyecto_id);
       restaurarEstadoPaneles(estadoPaneles);
     }
-  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+  } catch(e) { stopSaving(false); showToast('Error: ' + e.message, 'error'); await restoreModalSnapshot(); }
   finally { btn.disabled = false; btn.textContent = 'Guardar Evento'; }
 }
 
@@ -3054,7 +3254,7 @@ async function guardarSettings() {
     closeModal('modal-settings');
     const msgPausa = estadoNuevo === 'En pausa' ? ' · Proyecto en pausa' : estadoAnterior === 'En pausa' ? ' · Proyecto reactivado' : '';
     showToast('Proyecto actualizado' + msgPausa, 'success');
-    await loadAllData();
+    await loadHomeData();
     const updated = state.proyectos.find(p => p.proyecto_id === state.currentProyecto.proyecto_id);
     if (updated) { state.currentProyecto = updated; openProyecto(updated.proyecto_id); }
   } catch(e) { showToast('Error: ' + e.message, 'error'); }
@@ -3074,7 +3274,7 @@ function borrarProyecto() {
         closeModal('modal-settings');
         showToast('Proyecto eliminado', 'success');
         state.currentProyecto = null;
-        await loadAllData();
+        await loadHomeData(); renderDashboard(); renderCriteriosBanner();
         showView('dashboard');
       } catch(e) { showToast('Error: ' + e.message, 'error'); }
     }
@@ -3494,23 +3694,28 @@ async function guardarCriterio() {
   const desc = document.getElementById('c-descripcion').value.trim();
   if (!desc) { showToast('La descripción es requerida', 'error'); return; }
   const btn = document.getElementById('btn-guardar-criterio');
+  saveModalSnapshot('modal-criterio', ['c-concepto','c-descripcion','c-proyecto']);
+  closeModal('modal-criterio');
   btn.disabled = true; btn.textContent = 'Guardando…';
+  startSaving();
   try {
     await api('crearCriterio', { concepto: document.getElementById('c-concepto').value, descripcion: desc, proyecto_detonador: document.getElementById('c-proyecto').value });
-    closeModal('modal-criterio');
+    stopSaving(true);
     showToast('Criterio propuesto — pendiente VoBo PM', 'success');
-    await loadAllData(); renderCriteriosList();
-  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+    await loadCriteriosData(); renderCriteriosList();
+  } catch(e) { stopSaving(false); showToast('Error: ' + e.message, 'error'); await restoreModalSnapshot(); }
   finally { btn.disabled = false; btn.textContent = 'Proponer Criterio'; }
 }
 
 async function aprobarCriterio(id) {
-  try { await api('aprobarCriterio', { criterio_id: id }); showToast('Criterio aprobado', 'success'); await loadAllData(); renderCriteriosList(); renderCriteriosBanner(); }
-  catch(e) { showToast('Error: ' + e.message, 'error'); }
+  startSaving();
+  try { await api('aprobarCriterio', { criterio_id: id }); stopSaving(true); showToast('Criterio aprobado', 'success'); await loadCriteriosData(); renderCriteriosList(); renderCriteriosBanner(); }
+  catch(e) { stopSaving(false); showToast('Error: ' + e.message, 'error'); }
 }
 async function confirmarLectura(id) {
-  try { await api('confirmarLecturaCriterio', { criterio_id: id }); showToast('Lectura confirmada', 'success'); await loadAllData(); renderCriteriosList(); renderCriteriosBanner(); }
-  catch(e) { showToast('Error: ' + e.message, 'error'); }
+  startSaving();
+  try { await api('confirmarLecturaCriterio', { criterio_id: id }); stopSaving(true); showToast('Lectura confirmada', 'success'); await loadCriteriosData(); renderCriteriosList(); renderCriteriosBanner(); }
+  catch(e) { stopSaving(false); showToast('Error: ' + e.message, 'error'); }
 }
 function rechazarCriterio(id) {
   confirmarBorrado({
@@ -3518,12 +3723,13 @@ function rechazarCriterio(id) {
     mensaje: 'Vas a rechazar este criterio. Se marcará como obsoleto y dejará de ser visible para el equipo.',
     labelBoton: 'Rechazar criterio',
     onConfirm: async () => {
+  startSaving();
   try {
         await api('obsoletarCriterio', { criterio_id: id });
-        showToast('Criterio rechazado', 'success');
-        await loadAllData();
+        stopSaving(true); showToast('Criterio rechazado', 'success');
+        await loadCriteriosData();
         renderCriteriosList();
-      } catch(e) { showToast('Error: ' + e.message, 'error'); }
+      } catch(e) { stopSaving(false); showToast('Error: ' + e.message, 'error'); }
     }
   });
 }
@@ -3534,8 +3740,8 @@ function obsoletarCriterio(id) {
     mensaje: 'Vas a marcar este criterio como obsoleto. Dejará de aparecer en la lista activa del equipo.',
     labelBoton: 'Obsoletizar',
     onConfirm: async () => {
-  try { await api('obsoletarCriterio', { criterio_id: id }); showToast('Criterio obsoletado', 'success'); await loadAllData(); renderCriteriosList(); }
-      catch(e) { showToast('Error: ' + e.message, 'error'); }
+  startSaving(); try { await api('obsoletarCriterio', { criterio_id: id }); stopSaving(true); showToast('Criterio obsoletado', 'success'); await loadCriteriosData(); renderCriteriosList(); }
+      catch(e) { stopSaving(false); showToast('Error: ' + e.message, 'error'); }
     }
   });
 }
@@ -3923,10 +4129,8 @@ async function confirmarEntregaParcial() {
     await guardarSnapshotEntrega(proyectoId, res.entry_id, seleccion);
     closeModal('modal-entry');
     showToast('Entrega Parcial registrada', 'success');
-    const logFresco = await api('getLogEventos', { proyecto_id: proyectoId });
-    state.logEventos = [...state.logEventos.filter(e => e.proyecto_id !== proyectoId), ...(logFresco || [])];
     await evaluarHitos(proyectoId, state.logEventos);
-    await loadAllData();
+    await loadProyectoData(proyectoId);
     if (state.currentProyecto) { await openProyecto(proyectoId); restaurarEstadoPaneles(estadoPaneles); }
   } catch(e) { showToast('Error: ' + e.message, 'error'); }
   finally { btn.disabled = false; btn.textContent = 'Guardar Evento'; _pendingEntregaParcialData = null; }
@@ -4031,7 +4235,7 @@ async function confirmarNuevaEntrega() {
     await api('crearNuevaEntrega', { proyecto_id: proyecto.proyecto_id, numero_entrega: numero, cambios_causa: cambiosCausa });
     closeModal('modal-nueva-entrega');
     showToast(`Entrega ${numero} creada`, 'success');
-    await loadAllData();
+    await loadProyectoData(proyecto.proyecto_id);
   } catch(e) { showToast('Error: ' + e.message, 'error'); }
 }
 
@@ -4174,6 +4378,8 @@ function openNuevaTarea() {
   document.getElementById('ta-titulo').value = '';
   document.getElementById('ta-fecha').value = '';
   document.getElementById('ta-notas').value = '';
+  // FIX-P1 guard: restaurar visibilidad si venía de modal Evergreen
+  document.getElementById('row-ta-asignado').style.display = '';
   const sel = document.getElementById('ta-asignado');
   sel.innerHTML = '';
   const arqProyecto = state.currentProyecto?.arquitecto_id;
@@ -4207,7 +4413,10 @@ async function guardarTareaAdhoc() {
   const asignado = document.getElementById('ta-asignado').value;
   if (!titulo || !asignado) { showToast('Título y asignado son requeridos', 'error'); return; }
   const btn = document.getElementById('btn-guardar-tarea');
+  saveModalSnapshot('modal-tarea-adhoc', ['ta-titulo','ta-asignado','ta-fecha','ta-notas']);
+  closeModal('modal-tarea-adhoc');
   btn.disabled = true; btn.textContent = 'Guardando…';
+  startSaving();
   const estadoPaneles = capturarEstadoPaneles();
   try {
     if (state._editandoTareaId) {
@@ -4228,9 +4437,9 @@ async function guardarTareaAdhoc() {
       showToast('Tarea creada', 'success');
     }
     closeModal('modal-tarea-adhoc');
-    await loadAllData();
+    await loadProyectoData(state.currentProyecto.proyecto_id);
     if (state.currentProyecto) { await openProyecto(state.currentProyecto.proyecto_id); restaurarEstadoPaneles(estadoPaneles); }
-  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+  } catch(e) { stopSaving(false); showToast('Error: ' + e.message, 'error'); await restoreModalSnapshot(); }
   finally { btn.disabled = false; btn.textContent = state._editandoTareaId ? 'Guardar cambios' : 'Crear tarea'; }
 }
 
@@ -4257,7 +4466,10 @@ async function guardarTareaEvento() {
   if (!tareaId) return;
   if (!state._modoEvergreen && !state.currentProyecto) return;
   const btn = document.getElementById('btn-guardar-tarea-evento');
+  saveModalSnapshot('modal-tarea-evento', ['te-titulo','te-descripcion','te-estatus','te-fecha']);
+  closeModal('modal-tarea-evento');
   btn.disabled = true; btn.textContent = 'Guardando…';
+  startSaving();
   const estadoPaneles = capturarEstadoPaneles();
   if (state._editandoTareaEventoId) {
     try {
@@ -4272,7 +4484,7 @@ async function guardarTareaEvento() {
       }
       closeModal('modal-tarea-evento');
       showToast('Evento actualizado', 'success');
-      await loadAllData();
+      await loadProyectoData(state.currentProyecto.proyecto_id);
       if (state._modoEvergreen) {
         const arqEmail = state.currentEvergreenArq;
         state._modoEvergreen = false;
@@ -4282,7 +4494,7 @@ async function guardarTareaEvento() {
         restaurarEstadoPaneles(estadoPaneles);
       }
     } catch(e) { showToast('Error: ' + e.message, 'error'); }
-    finally { btn.disabled = false; btn.textContent = 'Guardar evento'; state._editandoTareaEventoId = null; }
+    finally { stopSaving(false); btn.disabled = false; btn.textContent = 'Guardar evento'; state._editandoTareaEventoId = null; }
     return;
   }
   try {
@@ -4305,22 +4517,24 @@ async function guardarTareaEvento() {
     }
     closeModal('modal-tarea-evento');
     showToast('Evento registrado', 'success');
-    await loadAllData();
     if (state._modoEvergreen) {
+      await loadEvergreenData();
       const arqEmail = state.currentEvergreenArq;
       state._modoEvergreen = false;
       if (arqEmail) openEvergreen(arqEmail);
     } else if (state.currentProyecto) {
+      await loadProyectoData(state.currentProyecto.proyecto_id);
       await openProyecto(state.currentProyecto.proyecto_id);
       restaurarEstadoPaneles(estadoPaneles);
     }
-  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+  } catch(e) { stopSaving(false); showToast('Error: ' + e.message, 'error'); await restoreModalSnapshot(); }
   finally { btn.disabled = false; btn.textContent = 'Guardar evento'; state._modoEvergreen = false; }
 }
 
 async function confirmarCierreTarea(tareaId) {
   if (state.rol !== 'PM') { showToast('Solo el PM puede confirmar el cierre', 'error'); return; }
   const estadoPaneles = capturarEstadoPaneles();
+  startSaving();
   try {
     await api('actualizarTareaAdhoc', { tarea_id: tareaId, estatus: 'completada' });
     await api('appendLogEvento', {
@@ -4332,10 +4546,10 @@ async function confirmarCierreTarea(tareaId) {
       nota: JSON.stringify({ titulo: 'Cierre confirmado', descripcion: '', estatus_nuevo: 'completada' }),
       version_timeline_activa: '1'
     });
-    showToast('Tarea cerrada', 'success');
-    await loadAllData();
+    stopSaving(true); showToast('Tarea cerrada', 'success');
+    await loadProyectoData(state.currentProyecto.proyecto_id);
     if (state.currentProyecto) { await openProyecto(state.currentProyecto.proyecto_id); restaurarEstadoPaneles(estadoPaneles); }
-  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+  } catch(e) { stopSaving(false); showToast('Error: ' + e.message, 'error'); }
 }
 
 function borrarTareaAdhoc(tareaId) {
@@ -4349,7 +4563,7 @@ function borrarTareaAdhoc(tareaId) {
       try {
         await api('borrarTareaAdhoc', { tarea_id: tareaId });
         showToast('Tarea eliminada', 'success');
-        await loadAllData();
+        await loadProyectoData(state.currentProyecto.proyecto_id);
         if (state.currentProyecto) { await openProyecto(state.currentProyecto.proyecto_id); restaurarEstadoPaneles(estadoPaneles); }
       } catch(e) { showToast('Error: ' + e.message, 'error'); }
     }
@@ -4381,7 +4595,7 @@ function borrarTareaEvento(entryId, tareaId) {
         await api('borrarLogEvento', { entry_id: entryId });
         state.logEventos = state.logEventos.filter(x => x.entry_id !== entryId);
         showToast('Evento eliminado', 'success');
-        await loadAllData();
+        await loadProyectoData(state.currentProyecto.proyecto_id);
         if (state.currentProyecto) { await openProyecto(state.currentProyecto.proyecto_id); restaurarEstadoPaneles(estadoPaneles); }
       } catch(e) { showToast('Error: ' + e.message, 'error'); }
     }
@@ -4449,16 +4663,20 @@ function openEvergreen(arquitectoEmail) {
   document.getElementById('ev-detail-title').textContent = `Evergreen — ${arq.nombre}`;
   const tareas = state.evergreenTareas.filter(t => t.asignado_a === arquitectoEmail);
   const hoy = new Date(); hoy.setHours(0,0,0,0);
-  const abiertas = tareas.filter(t => t.estatus !== 'completada' && t.estatus !== 'cancelada').length;
-  const vencidas = tareas.filter(t => {
+  const abiertas   = tareas.filter(t => t.estatus !== 'completada' && t.estatus !== 'cancelada').length;
+  const bloqueadas = tareas.filter(t => t.estatus === 'bloqueada').length;
+  const pausadas   = tareas.filter(t => t.estatus === 'pausada').length;
+  const vencidas   = tareas.filter(t => {
     if (!t.fecha_esperada || t.estatus === 'completada' || t.estatus === 'cancelada') return false;
     const f = parseISODate(t.fecha_esperada); return f && f < hoy;
   }).length;
   const completadas = tareas.filter(t => t.estatus === 'completada').length;
   document.getElementById('ev-detail-meta').innerHTML = `
-    <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:12px">
-      <div class="ins-kpi"><div class="ins-kpi-label">Total tareas</div><div class="ins-kpi-value">${tareas.length}</div></div>
+    <div style="display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin-top:12px">
+      <div class="ins-kpi"><div class="ins-kpi-label">Total</div><div class="ins-kpi-value">${tareas.length}</div></div>
       <div class="ins-kpi"><div class="ins-kpi-label">Abiertas</div><div class="ins-kpi-value">${abiertas}</div></div>
+      <div class="ins-kpi"><div class="ins-kpi-label">Bloqueadas</div><div class="ins-kpi-value" style="color:${bloqueadas>0?'var(--red)':'var(--text)'}">${bloqueadas}</div></div>
+      <div class="ins-kpi"><div class="ins-kpi-label">Pausadas</div><div class="ins-kpi-value" style="color:${pausadas>0?'var(--yellow, #f59e0b)':'var(--text)'}">${pausadas}</div></div>
       <div class="ins-kpi"><div class="ins-kpi-label">Vencidas</div><div class="ins-kpi-value" style="color:${vencidas>0?'var(--red)':'var(--text)'}">${vencidas}</div></div>
       <div class="ins-kpi"><div class="ins-kpi-label">Completadas</div><div class="ins-kpi-value" style="color:var(--green)">${completadas}</div></div>
     </div>`;
@@ -4583,6 +4801,8 @@ function openNuevaEvergreenTarea() {
   document.getElementById('ta-titulo').value = '';
   document.getElementById('ta-fecha').value = '';
   document.getElementById('ta-notas').value = '';
+  // FIX-P1: ocultar selector — asignación automática al dueño del Evergreen
+  document.getElementById('row-ta-asignado').style.display = 'none';
   const sel = document.getElementById('ta-asignado');
   sel.innerHTML = '';
   const asignadoEmail = state.currentEvergreenArq || state.user?.email;
@@ -4614,7 +4834,10 @@ async function guardarEvergreenTarea() {
   const asignado = document.getElementById('ta-asignado').value;
   if (!titulo || !asignado) { showToast('Título y asignado son requeridos', 'error'); return; }
   const btn = document.getElementById('btn-guardar-tarea');
+  saveModalSnapshot('modal-tarea-adhoc', ['ta-titulo','ta-fecha','ta-notas']);
+  closeModal('modal-tarea-adhoc');
   btn.disabled = true; btn.textContent = 'Guardando…';
+  startSaving();
   try {
     if (state._editandoEvergreenId) {
       await api('actualizarEvergreenTarea', {
@@ -4632,9 +4855,8 @@ async function guardarEvergreenTarea() {
       });
       showToast('Tarea Evergreen creada', 'success');
     }
-    closeModal('modal-tarea-adhoc');
-    await loadAllData();
-  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+    await loadEvergreenData();
+  } catch(e) { stopSaving(false); showToast('Error: ' + e.message, 'error'); await restoreModalSnapshot(); }
   finally { btn.disabled = false; state._modoEvergreen = false; }
 }
 
@@ -4676,7 +4898,7 @@ function borrarEvergreenEvento(entryId, tareaId) {
         await api('borrarLogEvento', { entry_id: entryId });
         state.logEventos = state.logEventos.filter(x => x.entry_id !== entryId);
         showToast('Evento eliminado', 'success');
-        await loadAllData();
+        await loadEvergreenData();
       } catch(e) { showToast('Error: ' + e.message, 'error'); }
     }
   });
@@ -4684,6 +4906,7 @@ function borrarEvergreenEvento(entryId, tareaId) {
 
 async function confirmarCierreEvergreen(tareaId) {
   if (state.rol !== 'PM') { showToast('Solo el PM puede confirmar el cierre', 'error'); return; }
+  startSaving();
   try {
     await api('actualizarEvergreenTarea', { tarea_id: tareaId, estatus: 'completada' });
     await api('appendLogEvento', {
@@ -4695,9 +4918,9 @@ async function confirmarCierreEvergreen(tareaId) {
       nota: JSON.stringify({ titulo: 'Cierre confirmado', descripcion: '', estatus_nuevo: 'completada' }),
       version_timeline_activa: '1'
     });
-    showToast('Tarea Evergreen cerrada', 'success');
-    await loadAllData();
-  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+    stopSaving(true); showToast('Tarea Evergreen cerrada', 'success');
+    await loadEvergreenData();
+  } catch(e) { stopSaving(false); showToast('Error: ' + e.message, 'error'); }
 }
 
 function borrarEvergreenTarea(tareaId) {
@@ -4710,7 +4933,7 @@ function borrarEvergreenTarea(tareaId) {
       try {
         await api('borrarEvergreenTarea', { tarea_id: tareaId });
         showToast('Tarea eliminada', 'success');
-        await loadAllData();
+        await loadEvergreenData();
       } catch(e) { showToast('Error: ' + e.message, 'error'); }
     }
   });
@@ -4771,7 +4994,10 @@ async function guardarRespuestaDuda() {
   const entryIdDuda = state._respondiendo_duda_id;
   if (!entryIdDuda || !state.currentProyecto) return;
   const btn = document.getElementById('btn-guardar-respuesta');
+  saveModalSnapshot('modal-respuesta-duda', ['rd-fecha','rd-texto']);
+  closeModal('modal-respuesta-duda');
   btn.disabled = true; btn.textContent = 'Guardando…';
+  startSaving();
   const estadoPaneles = capturarEstadoPaneles();
   try {
     await api('responderDuda', {
@@ -4782,9 +5008,9 @@ async function guardarRespuestaDuda() {
     });
     closeModal('modal-respuesta-duda');
     showToast('Respuesta guardada', 'success');
-    await loadAllData();
+    await loadProyectoData(state.currentProyecto.proyecto_id);
     if (state.currentProyecto) { await openProyecto(state.currentProyecto.proyecto_id); restaurarEstadoPaneles(estadoPaneles); }
-  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+  } catch(e) { stopSaving(false); showToast('Error: ' + e.message, 'error'); await restoreModalSnapshot(); }
   finally { btn.disabled = false; btn.textContent = 'Guardar respuesta'; }
 }
 
@@ -4793,7 +5019,7 @@ async function obsoletarDuda(entryId) {
   try {
     await api('actualizarEstatusDuda', { entry_id: entryId, estatus: 'obsoleta' });
     showToast('Duda marcada como obsoleta', 'success');
-    await loadAllData();
+    await loadProyectoData(state.currentProyecto.proyecto_id);
     if (state.currentProyecto) { await openProyecto(state.currentProyecto.proyecto_id); restaurarEstadoPaneles(estadoPaneles); }
   } catch(e) { showToast('Error: ' + e.message, 'error'); }
 }
