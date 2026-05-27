@@ -9,16 +9,16 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg: #0b0e14;
-  --surface: #161b22;
-  --surface2: #21262d;
+  --bg: #111210;
+  --surface: #1c1c1a;
+  --surface2: #242422;
   
-  --border: #30363d;
-  --border2: #3d444d;
+  --border: #2e2e2b;
+  --border2: #3a3a37;
   
-  --text: #e6edf3;   /* Off-white azulado */
-  --text2: #8b949e;  /* Gris medio */
-  --text3: #6e7681;  /* Gris oscuro para deshabilitados */
+  --text: #e8e6e1;   /* Off-white cálido */
+  --text2: #8a8880;  /* Gris medio cálido */
+  --text3: #6a6862;  /* Gris oscuro cálido */
   
   --accent: #58a6ff;  /* Azul brillante */
   --accent2: #1f6feb; /* Azul profundo */
@@ -4454,8 +4454,14 @@ function openEvergreen(arquitectoEmail) {
     if (!t.fecha_esperada || t.estatus === 'completada' || t.estatus === 'cancelada') return false;
     const f = parseISODate(t.fecha_esperada); return f && f < hoy;
   }).length;
-  document.getElementById('ev-detail-meta').textContent =
-    `${abiertas} abierta${abiertas!==1?'s':''} · ${vencidas>0?vencidas+' vencida'+(vencidas>1?'s':'')+' · ':''}${tareas.length} total`;
+  const completadas = tareas.filter(t => t.estatus === 'completada').length;
+  document.getElementById('ev-detail-meta').innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:12px">
+      <div class="ins-kpi"><div class="ins-kpi-label">Total tareas</div><div class="ins-kpi-value">${tareas.length}</div></div>
+      <div class="ins-kpi"><div class="ins-kpi-label">Abiertas</div><div class="ins-kpi-value">${abiertas}</div></div>
+      <div class="ins-kpi"><div class="ins-kpi-label">Vencidas</div><div class="ins-kpi-value" style="color:${vencidas>0?'var(--red)':'var(--text)'}">${vencidas}</div></div>
+      <div class="ins-kpi"><div class="ins-kpi-label">Completadas</div><div class="ins-kpi-value" style="color:var(--green)">${completadas}</div></div>
+    </div>`;
   const btnNueva = document.getElementById('ev-btn-nueva-tarea');
   if (btnNueva) btnNueva.style.display = (state.rol==='PM'||state.user?.email===arquitectoEmail) ? '' : 'none';
   document.getElementById('ev-detail-body').innerHTML = renderEvergreenDetail(arquitectoEmail);
@@ -4520,11 +4526,15 @@ function renderEvergreenDetail(arquitectoEmail) {
             </div>`;
           }).join('');
 
-      return `<div style="${esTerminada?'opacity:0.6':''}">
+      const claveEstatus = clasificar(t);
+      const fechaLabel = !t.fecha_esperada ? 'Sin fecha esperada'
+        : claveEstatus === 'vencida' ? `Venció ${formatDate(t.fecha_esperada)}`
+        : `Esperada ${formatDate(t.fecha_esperada)}`;
+      return `<div style="${esTerminada?'opacity:0.6':''}border-left:3px solid ${COLOR_BORDE[claveEstatus]};margin-bottom:1px">
         <div class="disciplina-row" onclick="toggleLogPanel('evlog_${safeId}')">
-          <div style="font-size:13px;font-weight:500">${t.tarea_id} — ${t.titulo}</div>
-          <div class="disciplina-estado ${getEstatusClass(clasificar(t))}">${getEstatusLabel(clasificar(t))}</div>
-          <div style="font-size:11px;color:${clasificar(t)==='vencida'?'var(--red)':'var(--text3)'};font-family:var(--mono)">${t.fecha_esperada?formatDate(t.fecha_esperada):'—'}</div>
+          <div style="font-size:13px;font-weight:500">${t.titulo}</div>
+          <div class="disciplina-estado ${getEstatusClass(claveEstatus)}">${getEstatusLabel(claveEstatus)}</div>
+          <div style="font-size:11px;color:${claveEstatus==='vencida'?'var(--red)':'var(--text3)'};font-family:var(--mono)">${fechaLabel}</div>
           <div></div>
           ${puedeEvento&&!esTerminada?`<button class="btn-ghost" onclick="event.stopPropagation();openEvergreenEvento('${t.tarea_id}')">+ Evento</button>`:'<div></div>'}
         </div>
