@@ -1236,51 +1236,62 @@ function renderDashboard() {
   proximos.sort((a,b) => new Date(a.fecha) - new Date(b.fecha));
   vencidos.sort((a,b) => new Date(a.fecha) - new Date(b.fecha));
 
+  function makeToggleHeader(id, labelHTML, defaultOpen) {
+    const chevron = defaultOpen ? '▼' : '▶';
+    return `<div style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:6px 0;user-select:none" onclick="toggleAlertSection('${id}')">
+      <span style="font-size:10px;color:var(--text3)" id="chev-${id}">${chevron}</span>
+      <span style="font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.06em">${labelHTML}</span>
+    </div>`;
+  }
+
   const hitosContainer = document.getElementById('hitos-proximos');
-  const vencidosHTML = vencidos.length === 0 ? '' : `
-    <div style="font-family:var(--mono);font-size:10px;color:#ff5050;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;margin-top:4px">⚠ HITOS VENCIDOS — ${vencidos.length}</div>
-    ${vencidos.map(h => `<div class="hito-row retrasado">
-      <div class="hito-fecha" style="color:#ff5050">${formatDate(h.fecha)}</div>
-      <div class="hito-link" onclick="openProyectoEnHito('${h.proyectoId}','${h.hitoId}')">${h.hitoId} — ${h.hito}</div>
-      <div class="hito-link secondary" onclick="openProyecto('${h.proyectoId}')">${h.proyecto}</div>
-      <div></div>
-    </div>`).join('')}`;
-
+  const vencidosHTML = vencidos.length === 0
+    ? `<div style="color:var(--text3);font-family:var(--mono);font-size:12px;padding:4px 0 8px">Sin hitos vencidos</div>`
+    : vencidos.map(h => `<div class="hito-row retrasado">
+        <div class="hito-fecha" style="color:#ff5050">${formatDate(h.fecha)}</div>
+        <div class="hito-link" onclick="openProyectoEnHito('${h.proyectoId}','${h.hitoId}')">${h.hitoId} — ${h.hito}</div>
+        <div class="hito-link secondary" onclick="openProyecto('${h.proyectoId}')">${h.proyecto}</div>
+        <div></div>
+      </div>`).join('');
   const proximosHTML = proximos.length === 0
-    ? `<div style="color:var(--text3);font-family:var(--mono);font-size:12px;padding:8px 0">Sin hitos en los próximos 7 días</div>`
-    : `<div style="font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;margin-top:${vencidos.length > 0 ? '16px' : '4px'}">HITOS PRÓX. 7 DÍAS — ${proximos.length}</div>
-    ${proximos.map(h => `<div class="hito-row">
-      <div class="hito-fecha">${formatDate(h.fecha)}</div>
-      <div class="hito-link" onclick="openProyectoEnHito('${h.proyectoId}','${h.hitoId}')">${h.hitoId} — ${h.hito}</div>
-      <div class="hito-link secondary" onclick="openProyecto('${h.proyectoId}')">${h.proyecto}</div>
-      <div></div>
-    </div>`).join('')}`;
-
-  hitosContainer.innerHTML = vencidosHTML + proximosHTML;
+    ? `<div style="color:var(--text3);font-family:var(--mono);font-size:12px;padding:4px 0 8px">Sin hitos en los próximos 7 días</div>`
+    : proximos.map(h => `<div class="hito-row">
+        <div class="hito-fecha">${formatDate(h.fecha)}</div>
+        <div class="hito-link" onclick="openProyectoEnHito('${h.proyectoId}','${h.hitoId}')">${h.hitoId} — ${h.hito}</div>
+        <div class="hito-link secondary" onclick="openProyecto('${h.proyectoId}')">${h.proyecto}</div>
+        <div></div>
+      </div>`).join('');
+  hitosContainer.innerHTML =
+    makeToggleHeader('hitos-alert', `<span style="color:#ff5050">⚠ HITOS VENCIDOS — ${vencidos.length}</span>`, true) +
+    `<div id="hitos-alert">${vencidosHTML}</div>` +
+    makeToggleHeader('hitos-prox-alert', `HITOS PRÓX. 7 DÍAS — ${proximos.length}`, true) +
+    `<div id="hitos-prox-alert">${proximosHTML}</div>`;
 
   tareasVencidas.sort((a,b) => new Date(a.fecha) - new Date(b.fecha));
   tareasProximas.sort((a,b) => new Date(a.fecha) - new Date(b.fecha));
 
   const tareasContainer = document.getElementById('tareas-dashboard');
-  const tareasVencHTML = tareasVencidas.length === 0 ? '' : `
-    <div style="font-family:var(--mono);font-size:10px;color:#ff5050;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;margin-top:4px">⚠ TAREAS VENCIDAS — ${tareasVencidas.length}</div>
-    ${tareasVencidas.map(t => `<div class="hito-row tarea-vencida" onclick="openProyectoEnTarea('${t.proyectoId}','${t.grupoId}','${t.tarea.replace(/'/g,"\\'")}')">
-      <div class="hito-fecha" style="color:#ff5050">${formatDate(t.fecha)}</div>
-      <div class="hito-link">${t.tarea}</div>
-      <div class="hito-link secondary">${t.proyecto}</div>
-      <div></div>
-    </div>`).join('')}`;
-
-  const tareasProxHTML = tareasProximas.length === 0 ? '' : `
-    <div style="font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;margin-top:${tareasVencidas.length > 0 ? '16px' : '4px'}">TAREAS PRÓX. 3 DÍAS — ${tareasProximas.length}</div>
-    ${tareasProximas.map(t => `<div class="hito-row tarea-proxima" onclick="openProyectoEnTarea('${t.proyectoId}','${t.grupoId}','${t.tarea.replace(/'/g,"\\'")}')">
-      <div class="hito-fecha">${formatDate(t.fecha)}</div>
-      <div class="hito-link">${t.tarea}</div>
-      <div class="hito-link secondary">${t.proyecto}</div>
-      <div></div>
-    </div>`).join('')}`;
-
-  tareasContainer.innerHTML = tareasVencHTML + tareasProxHTML;
+  const tareasVencHTML = tareasVencidas.length === 0
+    ? `<div style="color:var(--text3);font-family:var(--mono);font-size:12px;padding:4px 0 8px">Sin tareas vencidas</div>`
+    : tareasVencidas.map(t => `<div class="hito-row tarea-vencida" onclick="openProyectoEnTarea('${t.proyectoId}','${t.grupoId}','${t.tarea.replace(/'/g,"\\'")}')">
+        <div class="hito-fecha" style="color:#ff5050">${formatDate(t.fecha)}</div>
+        <div class="hito-link">${t.tarea}</div>
+        <div class="hito-link secondary">${t.proyecto}</div>
+        <div></div>
+      </div>`).join('');
+  const tareasProxHTML = tareasProximas.length === 0
+    ? `<div style="color:var(--text3);font-family:var(--mono);font-size:12px;padding:4px 0 8px">Sin tareas en los próximos 3 días</div>`
+    : tareasProximas.map(t => `<div class="hito-row tarea-proxima" onclick="openProyectoEnTarea('${t.proyectoId}','${t.grupoId}','${t.tarea.replace(/'/g,"\\'")}')">
+        <div class="hito-fecha">${formatDate(t.fecha)}</div>
+        <div class="hito-link">${t.tarea}</div>
+        <div class="hito-link secondary">${t.proyecto}</div>
+        <div></div>
+      </div>`).join('');
+  tareasContainer.innerHTML =
+    makeToggleHeader('tareas-alert', `<span style="color:#ff5050">⚠ TAREAS VENCIDAS — ${tareasVencidas.length}</span>`, true) +
+    `<div id="tareas-alert">${tareasVencHTML}</div>` +
+    makeToggleHeader('tareas-prox-alert', `TAREAS PRÓX. 3 DÍAS — ${tareasProximas.length}`, true) +
+    `<div id="tareas-prox-alert">${tareasProxHTML}</div>`;
 
   // Evergreen alerts
   const evContainer = document.getElementById('evergreen-dashboard');
@@ -1301,23 +1312,27 @@ function renderDashboard() {
     });
     evVencidas.sort((a,b) => new Date(a.fecha) - new Date(b.fecha));
     evProximas.sort((a,b) => new Date(a.fecha) - new Date(b.fecha));
-    const evVencHTML = evVencidas.length === 0 ? '' : `
-      <div style="font-family:var(--mono);font-size:10px;color:#ff5050;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;margin-top:4px">⚠ EVERGREEN VENCIDO — ${evVencidas.length}</div>
-      ${evVencidas.map(e => `<div class="hito-row retrasado">
-        <div class="hito-fecha" style="color:#ff5050">${formatDate(e.fecha)}</div>
-        <div class="hito-link">${e.titulo}</div>
-        <div class="hito-link secondary">${e.asignado}</div>
-        <div></div>
-      </div>`).join('')}`;
-    const evProxHTML = evProximas.length === 0 ? '' : `
-      <div style="font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;margin-top:${evVencidas.length > 0 ? '16px' : '4px'}">EVERGREEN PRÓX. 7 DÍAS — ${evProximas.length}</div>
-      ${evProximas.map(e => `<div class="hito-row">
-        <div class="hito-fecha">${formatDate(e.fecha)}</div>
-        <div class="hito-link">${e.titulo}</div>
-        <div class="hito-link secondary">${e.asignado}</div>
-        <div></div>
-      </div>`).join('')}`;
-    evContainer.innerHTML = evVencHTML + evProxHTML;
+    const evVencHTML = evVencidas.length === 0
+      ? `<div style="color:var(--text3);font-family:var(--mono);font-size:12px;padding:4px 0 8px">Sin evergreen vencidos</div>`
+      : evVencidas.map(e => `<div class="hito-row retrasado">
+          <div class="hito-fecha" style="color:#ff5050">${formatDate(e.fecha)}</div>
+          <div class="hito-link">${e.titulo}</div>
+          <div class="hito-link secondary">${e.asignado}</div>
+          <div></div>
+        </div>`).join('');
+    const evProxHTML = evProximas.length === 0
+      ? `<div style="color:var(--text3);font-family:var(--mono);font-size:12px;padding:4px 0 8px">Sin evergreen en los próximos 7 días</div>`
+      : evProximas.map(e => `<div class="hito-row">
+          <div class="hito-fecha">${formatDate(e.fecha)}</div>
+          <div class="hito-link">${e.titulo}</div>
+          <div class="hito-link secondary">${e.asignado}</div>
+          <div></div>
+        </div>`).join('');
+    evContainer.innerHTML =
+      makeToggleHeader('ev-alert', `<span style="color:#ff5050">⚠ EVERGREEN VENCIDO — ${evVencidas.length}</span>`, true) +
+      `<div id="ev-alert">${evVencHTML}</div>` +
+      makeToggleHeader('ev-prox-alert', `EVERGREEN PRÓX. 7 DÍAS — ${evProximas.length}`, true) +
+      `<div id="ev-prox-alert">${evProxHTML}</div>`;
     let evSection = document.getElementById('evergreen-section-home');
     if (!evSection) {
       evSection = document.createElement('div');
@@ -1326,6 +1341,15 @@ function renderDashboard() {
     }
     evSection.innerHTML = renderEvergreenHome();
   }
+}
+
+function toggleAlertSection(id) {
+  const panel = document.getElementById(id);
+  const chev = document.getElementById('chev-' + id);
+  if (!panel) return;
+  const open = panel.style.display !== 'none';
+  panel.style.display = open ? 'none' : 'block';
+  if (chev) chev.textContent = open ? '▶' : '▼';
 }
 
 function renderCriteriosBanner() {
@@ -2483,9 +2507,10 @@ async function guardarNotaCambio() {
   if (!fecha) { showToast('La fecha es requerida', 'error'); return; }
   if (esNota && !titulo) { showToast('El título es requerido', 'error'); return; }
   if (esNota && !tipoNota) { showToast('La clasificación es requerida', 'error'); return; }
-  const tituloCambio = !esNota ? document.getElementById('nc-cambio-titulo').value.trim() : '';
-  if (!esNota && !tituloCambio) { showToast('El título del cambio es requerido', 'error'); return; }
-  if (!esNota && !texto) { showToast('La descripción es requerida', 'error'); return; }
+  const esCambio = state.entryTipo === 'cambio_registrado';
+  const tituloCambio = esCambio ? document.getElementById('nc-cambio-titulo').value.trim() : '';
+  if (esCambio && !tituloCambio) { showToast('El título del cambio es requerido', 'error'); return; }
+  if (esCambio && !texto) { showToast('La descripción es requerida', 'error'); return; }
   if (!state.currentProyecto) { showToast('Selecciona un proyecto primero', 'error'); return; }
 
   const estadoPaneles = capturarEstadoPaneles();
@@ -4229,7 +4254,8 @@ async function guardarTareaEvento() {
   const estatusNuevo = document.getElementById('te-estatus').value;
   const descripcion = document.getElementById('te-descripcion').value.trim();
   const tareaId = state._tareaEventoId;
-  if (!tareaId || !state.currentProyecto) return;
+  if (!tareaId) return;
+  if (!state._modoEvergreen && !state.currentProyecto) return;
   const btn = document.getElementById('btn-guardar-tarea-evento');
   btn.disabled = true; btn.textContent = 'Guardando…';
   const estadoPaneles = capturarEstadoPaneles();
@@ -4247,7 +4273,14 @@ async function guardarTareaEvento() {
       closeModal('modal-tarea-evento');
       showToast('Evento actualizado', 'success');
       await loadAllData();
-      if (state.currentProyecto) { await openProyecto(state.currentProyecto.proyecto_id); restaurarEstadoPaneles(estadoPaneles); }
+      if (state._modoEvergreen) {
+        const arqEmail = state.currentEvergreenArq;
+        state._modoEvergreen = false;
+        if (arqEmail) openEvergreen(arqEmail);
+      } else if (state.currentProyecto) {
+        await openProyecto(state.currentProyecto.proyecto_id);
+        restaurarEstadoPaneles(estadoPaneles);
+      }
     } catch(e) { showToast('Error: ' + e.message, 'error'); }
     finally { btn.disabled = false; btn.textContent = 'Guardar evento'; state._editandoTareaEventoId = null; }
     return;
@@ -4274,7 +4307,9 @@ async function guardarTareaEvento() {
     showToast('Evento registrado', 'success');
     await loadAllData();
     if (state._modoEvergreen) {
+      const arqEmail = state.currentEvergreenArq;
       state._modoEvergreen = false;
+      if (arqEmail) openEvergreen(arqEmail);
     } else if (state.currentProyecto) {
       await openProyecto(state.currentProyecto.proyecto_id);
       restaurarEstadoPaneles(estadoPaneles);
@@ -4356,52 +4391,23 @@ function borrarTareaEvento(entryId, tareaId) {
 // ── H11-03 EVERGREEN ──
 
 function renderEvergreenHome() {
-  if (state.rol !== 'PM' && state.rol !== 'Validador' && state.rol !== 'Dirección' && state.rol !== 'Arquitecto') return '';
+  if (state.rol !== 'PM' && state.rol !== 'Arquitecto') return '';
 
-  let arquitectos = [];
+  const usuarioActual = state.usuarios.find(u => u.email === state.user?.email);
+  let usuarios = [];
   if (state.rol === 'Arquitecto') {
-    const u = state.usuarios.find(x => x.email === state.user?.email);
-    if (u) arquitectos = [u];
+    if (usuarioActual) usuarios = [usuarioActual];
   } else {
-    arquitectos = state.usuarios.filter(u => u.rol === 'Arquitecto');
+    // PM ve: todos los arquitectos + el PM mismo
+    const arquitectos = state.usuarios.filter(u => u.rol === 'Arquitecto');
+    const pmUser = state.usuarios.find(u => u.email === state.user?.email);
+    usuarios = pmUser ? [...arquitectos, pmUser] : arquitectos;
   }
-  if (arquitectos.length === 0) return '';
+  if (usuarios.length === 0) return '';
 
   const hoy = new Date(); hoy.setHours(0,0,0,0);
-  const cards = arquitectos.map(arq => {
-    const tareas = state.evergreenTareas.filter(t => t.asignado_a === arq.email);
-    const abiertas = tareas.filter(t => t.estatus !== 'completada' && t.estatus !== 'cancelada').length;
-    const vencidas = tareas.filter(t => {
-      if (!t.fecha_esperada || t.estatus === 'completada' || t.estatus === 'cancelada') return false;
-      const f = parseISODate(t.fecha_esperada); return f && f < hoy;
-    }).length;
-    const nivel = vencidas > 0 ? 'red' : abiertas > 0 ? 'green' : 'gray';
-    const label = vencidas > 0 ? `${vencidas}d vencida${vencidas>1?'s':''}` : abiertas > 0 ? 'Al día' : 'Sin tareas';
-    return `<div class="project-card risk-${nivel}" onclick="openEvergreen('${arq.email}')" style="cursor:pointer">
-      <div>
-        <div class="project-name">Evergreen — ${arq.nombre}</div>
-        <div class="progress-bar-wrap">
-          <div class="progress-bar-track"><div class="progress-bar-fill" style="width:0%;background:var(--accent)"></div></div>
-          <div class="progress-label">
-            <span class="progress-text">${abiertas} abierta${abiertas!==1?'s':''} · ${tareas.length} total</span>
-          </div>
-        </div>
-        <div class="project-meta">
-          <div class="meta-item"><span class="label">Arq.&nbsp;</span>${arq.nombre}</div>
-          ${vencidas>0?`<div class="meta-item" style="color:var(--red)"><span class="label">Vencidas&nbsp;</span>${vencidas}</div>`:''}
-        </div>
-      </div>
-      <div class="project-right">
-        <div class="semaforo ${nivel}"></div>
-        <div class="desvio-badge ${nivel}">${label}</div>
-      </div>
-    </div>`;
-  }).join('');
-
-  const container = document.getElementById('evergreen-cards');
-  if (container) container.innerHTML = `<div class="project-grid">${cards}</div>`;
-  return '';
-}
+  const cards = usuarios.map(u => {
+    const colorBor
 
 function openEvergreen(arquitectoEmail) {
   const arq = state.usuarios.find(u => u.email === arquitectoEmail);
@@ -4452,7 +4458,7 @@ function renderEvergreenDetail(arquitectoEmail) {
 
   return GRUPOS.map(g => {
     const lista = grupos[g.key];
-    if (lista.length === 0) return '';
+    if (lista.length === 0 && g.colapsar) return '';
     const panelId = `ev-grupo-${g.key}`;
     const filas = lista.map(t => {
       const safeId = t.tarea_id.replace(/[^a-zA-Z0-9_]/g,'_');
@@ -4535,13 +4541,9 @@ function openNuevaEvergreenTarea() {
   document.getElementById('ta-notas').value = '';
   const sel = document.getElementById('ta-asignado');
   sel.innerHTML = '';
-  if (state.rol === 'PM') {
-    state.usuarios.filter(u => u.rol === 'Arquitecto' || u.rol === 'PM').forEach(u => {
-      sel.innerHTML += `<option value="${u.email}">${u.nombre} (${u.rol})</option>`;
-    });
-  } else {
-    sel.innerHTML = `<option value="${state.user.email}">${state.user.name} (${state.rol})</option>`;
-  }
+  const asignadoEmail = state.currentEvergreenArq || state.user?.email;
+  const asignadoNombre = (state.usuarios.find(u => u.email === asignadoEmail)?.nombre) || asignadoEmail;
+  sel.innerHTML = `<option value="${asignadoEmail}">${asignadoNombre}</option>`;
   openModal('modal-tarea-adhoc');
 }
 
@@ -4688,7 +4690,17 @@ function selectNotaCambioTipo(tipo) {
     const sel = document.getElementById('nc-duda-tarea-ref');
     if (sel && state.currentProyecto) {
       const tareas = state.tareasAdhoc.filter(t => t.proyecto_id === state.currentProyecto.proyecto_id);
-      sel.innerHTML = '<option value="">Sin referencia</option>' + tareas.map(t => `<option value="${t.tarea_id}">${t.tarea_id} — ${t.titulo}</option>`).join('');
+      const grupos = state.eventosCatalogo.reduce((acc, e) => {
+        if (!acc.find(g => g.grupo_id === e.grupo_id)) acc.push({ grupo_id: e.grupo_id, grupo_nombre: e.grupo_nombre });
+        return acc;
+      }, []);
+      const disciplinas = state.eventosCatalogo.map(e => ({
+        key: `${e.grupo_id}::${e.disciplina_nombre}`,
+        label: `${e.grupo_id} — ${e.disciplina_nombre}`
+      })).filter((d, i, arr) => arr.findIndex(x => x.key === d.key) === i);
+      const optsAdhoc = tareas.length ? `<optgroup label="Tareas del proyecto">${tareas.map(t => `<option value="${t.tarea_id}">${t.tarea_id} — ${t.titulo}</option>`).join('')}</optgroup>` : '';
+      const optsDisciplinas = `<optgroup label="Disciplinas estándar">${disciplinas.map(d => `<option value="${d.key}">${d.label}</option>`).join('')}</optgroup>`;
+      sel.innerHTML = '<option value="">Sin referencia</option>' + optsAdhoc + optsDisciplinas;
     }
   }
 }
