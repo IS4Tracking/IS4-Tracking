@@ -355,10 +355,10 @@
   .spinner { width:16px; height:16px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.8s linear infinite; }
   .top-save-bar { position:fixed; top:0; left:0; right:0; height:2px; z-index:9999; pointer-events:none; overflow:hidden; }
   .top-save-bar::after { content:''; display:block; height:100%; width:0; background:var(--accent); border-radius:1px; }
-  .top-save-bar.running::after { animation:tsb-run 1.8s ease-in-out forwards; }
-  .top-save-bar.done::after { width:100%; animation:tsb-done 0.3s ease-out forwards; }
-  @keyframes tsb-run { 0%{width:0} 60%{width:72%} 85%{width:88%} 100%{width:92%} }
-  @keyframes tsb-done { 0%{opacity:1;width:100%} 100%{opacity:0;width:100%} }
+  .top-save-bar.running::after { animation:tsb-run 2s ease-in-out forwards; }
+  .top-save-bar.done::after { animation:tsb-done 0.4s ease-out forwards; }
+  @keyframes tsb-run { 0%{width:0;opacity:1} 60%{width:72%} 85%{width:88%} 100%{width:92%;opacity:1} }
+  @keyframes tsb-done { 0%{width:100%;opacity:1} 80%{width:100%;opacity:1} 100%{width:100%;opacity:0} }
   .btn-confirmed { background:var(--green) !important; color:#fff !important; border-color:var(--green) !important; opacity:1 !important; }
   @keyframes spin { to { transform:rotate(360deg); } }
   .empty-state { text-align:center; padding:48px; color:var(--text3); font-family:var(--mono); font-size:12px; }
@@ -1035,7 +1035,12 @@ function showLoginScreen() {
 }
 
 function handleLogin() {
-  tokenClient.requestAccessToken({ prompt: 'select_account' });
+  const savedToken = localStorage.getItem('is4_token');
+  if (savedToken) {
+    tokenClient.requestAccessToken({ prompt: '' });
+  } else {
+    tokenClient.requestAccessToken({ prompt: 'select_account' });
+  }
 }
 
 async function completeSignIn() {
@@ -1178,12 +1183,10 @@ async function restoreModalSnapshot() {
 async function loadStaticData() {
   console.time('[PERF] loadStaticData');
   try {
-    console.time('[PERF] api::getUsuarios');
-    const usuarios = await api('getUsuarios');
-    console.timeEnd('[PERF] api::getUsuarios');
-    console.time('[PERF] api::getEventosCatalogo');
-    const eventos = await api('getEventosCatalogo');
-    console.timeEnd('[PERF] api::getEventosCatalogo');
+    const [usuarios, eventos] = await Promise.all([
+      api('getUsuarios'),
+      api('getEventosCatalogo')
+    ]);
     state.usuarios = usuarios || [];
     state.eventosCatalogo = eventos || [];
   } catch(e) { console.error('[PERF] loadStaticData error:', e.message); }
@@ -2769,9 +2772,9 @@ async function guardarNotaCambio() {
           fecha_real: fecha,
           tarea_ref_id: tareaRef
         });
-        await confirmBtn(btn, 'Guardar'); stopSaving(true);
         closeModal('modal-nota-cambio');
         showToast('Duda registrada', 'success');
+        await confirmBtn(btn, 'Guardar'); stopSaving(true);
         await loadProyectoData(state.currentProyecto.proyecto_id);
         if (state.currentProyecto) { await openProyecto(state.currentProyecto.proyecto_id); restaurarEstadoPaneles(estadoPaneles); }
         btn.disabled=false; btn.textContent='Guardar';
@@ -4591,13 +4594,14 @@ function borrarTareaEvento(entryId, tareaId) {
     labelBoton: 'Eliminar evento',
     onConfirm: async () => {
       const estadoPaneles = capturarEstadoPaneles();
+      startSaving();
       try {
         await api('borrarLogEvento', { entry_id: entryId });
         state.logEventos = state.logEventos.filter(x => x.entry_id !== entryId);
-        showToast('Evento eliminado', 'success');
+        stopSaving(true); showToast('Evento eliminado', 'success');
         await loadProyectoData(state.currentProyecto.proyecto_id);
         if (state.currentProyecto) { await openProyecto(state.currentProyecto.proyecto_id); restaurarEstadoPaneles(estadoPaneles); }
-      } catch(e) { showToast('Error: ' + e.message, 'error'); }
+      } catch(e) { stopSaving(false); showToast('Error: ' + e.message, 'error'); }
     }
   });
 }
@@ -4920,6 +4924,8 @@ async function confirmarCierreEvergreen(tareaId) {
     });
     stopSaving(true); showToast('Tarea Evergreen cerrada', 'success');
     await loadEvergreenData();
+    const arqEmail = state.currentEvergreenArq;
+    if (arqEmail) openEvergreen(arqEmail);
   } catch(e) { stopSaving(false); showToast('Error: ' + e.message, 'error'); }
 }
 
@@ -4930,11 +4936,14 @@ function borrarEvergreenTarea(tareaId) {
     mensaje: `Vas a eliminar <strong>${t?.titulo || tareaId}</strong>. Esta acción no se puede deshacer.`,
     labelBoton: 'Eliminar tarea',
     onConfirm: async () => {
+      startSaving();
       try {
         await api('borrarEvergreenTarea', { tarea_id: tareaId });
-        showToast('Tarea eliminada', 'success');
+        stopSaving(true); showToast('Tarea eliminada', 'success');
         await loadEvergreenData();
-      } catch(e) { showToast('Error: ' + e.message, 'error'); }
+        const arqEmail = state.currentEvergreenArq;
+        if (arqEmail) openEvergreen(arqEmail);
+      } catch(e) { stopSaving(false); showToast('Error: ' + e.message, 'error'); }
     }
   });
 }
