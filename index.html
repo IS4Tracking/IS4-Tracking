@@ -9,12 +9,12 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg: #111210;
-  --surface: #1c1c1a;
-  --surface2: #242422;
+  --bg: #1a1a18;
+  --surface: #242422;
+  --surface2: #2e2e2b;
   
-  --border: #2e2e2b;
-  --border2: #3a3a37;
+  --border: #3a3a37;
+  --border2: #484845;
   
   --text: #e8e6e1;   /* Off-white cálido */
   --text2: #8a8880;  /* Gris medio cálido */
@@ -4478,6 +4478,7 @@ function renderEvergreenDetail(arquitectoEmail) {
   const GRUPOS = [
     { key:'vencida',    label:'Vencida',    colapsar:false },
     { key:'en-proceso', label:'En proceso', colapsar:false },
+    { key:'bloqueada',  label:'Bloqueada',  colapsar:false },
     { key:'pausada',    label:'Pausada',    colapsar:false },
     { key:'pendiente',  label:'Por iniciar',colapsar:false },
     { key:'completada', label:'Completada', colapsar:true  },
@@ -4493,7 +4494,7 @@ function renderEvergreenDetail(arquitectoEmail) {
   const grupos = {}; GRUPOS.forEach(g => grupos[g.key] = []);
   tareas.forEach(t => { const k = clasificar(t); if (grupos[k]!==undefined) grupos[k].push(t); else grupos['pendiente'].push(t); });
 
-  const COLOR_BORDE = { 'vencida':'var(--red)', 'en-proceso':'var(--accent)', 'pausada':'var(--yellow)', 'pendiente':'var(--border2)', 'completada':'var(--green)', 'cancelada':'var(--border2)' };
+  const COLOR_BORDE = { 'vencida':'var(--red)', 'en-proceso':'var(--accent)', 'bloqueada':'var(--yellow)', 'pausada':'#a78bfa', 'pendiente':'var(--border2)', 'completada':'var(--green)', 'cancelada':'var(--border2)' };
 
   return GRUPOS.map(g => {
     const lista = grupos[g.key];
