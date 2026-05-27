@@ -4407,7 +4407,40 @@ function renderEvergreenHome() {
 
   const hoy = new Date(); hoy.setHours(0,0,0,0);
   const cards = usuarios.map(u => {
-    const colorBor
+    const colorBorde = u.color || '#888780';
+    const tareas = state.evergreenTareas.filter(t => t.asignado_a === u.email);
+    const abiertas = tareas.filter(t => t.estatus !== 'completada' && t.estatus !== 'cancelada').length;
+    const vencidas = tareas.filter(t => {
+      if (!t.fecha_esperada || t.estatus === 'completada' || t.estatus === 'cancelada') return false;
+      const f = parseISODate(t.fecha_esperada); return f && f < hoy;
+    }).length;
+    const nivel = vencidas > 0 ? 'red' : abiertas > 0 ? 'green' : 'gray';
+    const label = vencidas > 0 ? `${vencidas}d vencida${vencidas>1?'s':''}` : abiertas > 0 ? 'Al día' : 'Sin tareas';
+    return `<div class="project-card risk-${nivel}" onclick="openEvergreen('${u.email}')" style="cursor:pointer;border-left:3px solid ${colorBorde};border-radius:0 var(--radius) var(--radius) 0">
+      <div>
+        <div class="project-name">Evergreen — ${u.nombre}</div>
+        <div class="progress-bar-wrap">
+          <div class="progress-bar-track"><div class="progress-bar-fill" style="width:0%;background:${colorBorde}"></div></div>
+          <div class="progress-label">
+            <span class="progress-text">${abiertas} abierta${abiertas!==1?'s':''} · ${tareas.length} total</span>
+          </div>
+        </div>
+        <div class="project-meta">
+          <div class="meta-item"><span class="label">Arq.&nbsp;</span>${u.nombre}</div>
+          ${vencidas>0?`<div class="meta-item" style="color:var(--red)"><span class="label">Vencidas&nbsp;</span>${vencidas}</div>`:''}
+        </div>
+      </div>
+      <div class="project-right">
+        <div class="semaforo ${nivel}"></div>
+        <div class="desvio-badge ${nivel}">${label}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const container = document.getElementById('evergreen-cards');
+  if (container) container.innerHTML = `<div class="project-grid">${cards}</div>`;
+  return '';
+}
 
 function openEvergreen(arquitectoEmail) {
   const arq = state.usuarios.find(u => u.email === arquitectoEmail);
