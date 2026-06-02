@@ -350,7 +350,7 @@
   .disc-chip.selected .disc-chip-dot { background:var(--accent); }
 
   /* ENTRY TYPE */
-  .entry-tipo-selector { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:16px; }
+  .entry-tipo-selector { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin-bottom:16px; }
   .tipo-btn { background:var(--bg); border:1px solid var(--border); border-radius:var(--radius); padding:10px; text-align:center; cursor:pointer; transition:all 0.15s; }
   .tipo-btn.selected { border-color:var(--accent); background:rgba(200,240,60,0.08); }
   .tipo-btn-icon { font-size:16px; margin-bottom:4px; }
@@ -754,12 +754,12 @@
           </div>
         </div>
         <div class="form-group cambio-disc-section">
-          <div class="cambio-disc-label">Disciplinas impactadas <span>opcional — se puede editar después</span></div>
-          <div id="cambio-disc-container"></div>
-        </div>
-        <div class="form-group cambio-disc-section">
           <div class="cambio-disc-label">Riesgo cristalizado <span>opcional — si este cambio deriva de un riesgo</span></div>
           <select class="form-select" id="nc-cambio-riesgo-ref"><option value="">Sin referencia</option></select>
+        </div>
+        <div class="form-group cambio-disc-section">
+          <div class="cambio-disc-label">Disciplinas impactadas <span>opcional — se puede editar después</span></div>
+          <div id="cambio-disc-container"></div>
         </div>
       </div>
       <!-- Campos solo para RIESGO -->
@@ -768,11 +768,11 @@
           <div class="form-group"><label class="form-label">Título <span style="color:var(--accent)">*</span></label><input class="form-input" id="nc-riesgo-titulo" placeholder="Describe el riesgo brevemente…" maxlength="80" autocomplete="off"></div>
           <div class="form-row">
             <div class="form-group">
-              <label class="form-label" style="display:flex;align-items:center;gap:6px">Categoría <span style="color:var(--accent)">*</span>
-                <span id="riesgo-cat-tooltip-btn" style="cursor:pointer;font-size:11px;color:var(--text3);border:1px solid var(--border);border-radius:3px;padding:0 5px;line-height:18px" onclick="toggleRiesgoTooltip()">?</span>
-              </label>
-              <select class="form-select" id="nc-riesgo-categoria"><option value="">Seleccionar…</option><option value="Supuesto no validado">Supuesto no validado</option><option value="Dependencia externa">Dependencia externa</option><option value="Alcance reactivo">Alcance reactivo</option><option value="Técnico">Técnico</option><option value="Recurso">Recurso</option><option value="Regulatorio">Regulatorio</option><option value="Comunicación">Comunicación</option><option value="Otro">Otro</option></select>
-              <div id="riesgo-cat-tooltip" style="display:none;margin-top:8px;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);font-size:11px;color:var(--text2);line-height:1.6"></div>
+              <label class="form-label">Categoría <span style="color:var(--accent)">*</span></label>
+              <div style="display:flex;gap:10px;align-items:flex-start">
+                <select class="form-select" id="nc-riesgo-categoria" onchange="updateRiesgoCategoriaTip()" style="flex:1"><option value="">Seleccionar…</option><option value="Supuesto no validado">Supuesto no validado</option><option value="Dependencia externa">Dependencia externa</option><option value="Alcance reactivo">Alcance reactivo</option><option value="Técnico">Técnico</option><option value="Recurso">Recurso</option><option value="Regulatorio">Regulatorio</option><option value="Comunicación">Comunicación</option><option value="Otro">Otro</option></select>
+                <div id="riesgo-cat-desc" style="flex:1;font-size:11px;color:var(--text2);line-height:1.5;padding:6px 10px;background:var(--surface2);border-radius:var(--radius);min-height:36px;display:flex;align-items:center"><span style="color:var(--text3)">Selecciona una categoría</span></div>
+              </div>
             </div>
             <div class="form-group">
               <label class="form-label">Estatus inicial</label>
@@ -815,13 +815,11 @@
               <select class="form-select" id="nc-riesgo-disciplina" style="flex:1"><option value="">—</option></select>
             </div>
           </div>
-          <div class="form-group"><label class="form-label">Notas de mitigación <span style="color:var(--text3)">opcional</span></label><textarea class="form-textarea" id="nc-riesgo-mitigacion" placeholder="¿Qué se está haciendo para reducir este riesgo?" style="min-height:60px" autocomplete="off"></textarea></div>
-          <div class="form-group"><label class="form-label">Fecha de revisión <span style="color:var(--text3)">opcional</span></label><input class="form-input" id="nc-riesgo-fecha-revision" type="date"></div>
-        </div>
+          </div>
         <div id="riesgo-update-fields" style="display:none">
           <div class="form-group">
             <label class="form-label">Riesgo a actualizar <span style="color:var(--accent)">*</span></label>
-            <select class="form-select" id="nc-riesgo-update-ref"><option value="">Seleccionar riesgo…</option></select>
+            <select class="form-select" id="nc-riesgo-update-ref" onchange="precargarRiesgoUpdate(this.value)"><option value="">Seleccionar riesgo…</option></select>
           </div>
           <div id="riesgo-update-id-display" style="font-family:var(--mono);font-size:11px;color:var(--text3);margin-bottom:8px;display:none"></div>
           <div class="form-row">
@@ -868,6 +866,10 @@
       <!-- Campos comunes -->
       <div class="form-group"><label class="form-label">Fecha</label><input class="form-input" id="nc-fecha" type="date"></div>
       <div class="form-group"><label class="form-label" id="nc-texto-label">Descripción</label><textarea class="form-textarea" id="nc-texto" placeholder="Escribe la nota o descripción del cambio…" style="min-height:80px"></textarea></div>
+      <div id="riesgo-campos-extra" style="display:none">
+        <div class="form-group"><label class="form-label">Fecha de revisión <span style="color:var(--text3)">opcional</span></label><input class="form-input" id="nc-riesgo-fecha-revision" type="date"></div>
+        <div class="form-group"><label class="form-label">Notas de mitigación <span style="color:var(--text3)">opcional</span></label><textarea class="form-textarea" id="nc-riesgo-mitigacion" placeholder="¿Qué se está haciendo para reducir este riesgo?" style="min-height:60px" autocomplete="off"></textarea></div>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn-secondary" onclick="closeModal('modal-nota-cambio')">Cancelar</button>
@@ -1039,6 +1041,35 @@
     <div class="modal-footer">
       <button class="btn-secondary" onclick="closeModal('modal-tarea-evento')">Cancelar</button>
       <button class="btn-primary" id="btn-guardar-tarea-evento" onclick="guardarTareaEvento()">Guardar evento</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: HISTORIAL DE RIESGO -->
+<div class="modal-overlay" id="modal-historial-riesgo">
+  <div class="modal" style="max-width:580px">
+    <div class="modal-header">
+      <div class="modal-title" id="historial-riesgo-titulo">Historial del riesgo</div>
+      <button class="modal-close" onclick="closeModal('modal-historial-riesgo')">×</button>
+    </div>
+    <div class="modal-body" id="historial-riesgo-body" style="max-height:420px;overflow-y:auto"></div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('modal-historial-riesgo')">Cerrar</button>
+      <button class="btn-primary" id="btn-historial-update" onclick="abrirUpdateDesdeHistorial()">↻ Nuevo update</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: MATRIZ PMI -->
+<div class="modal-overlay" id="modal-matriz-riesgo">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <div class="modal-title" id="matriz-riesgo-titulo">Exposición al riesgo</div>
+      <button class="modal-close" onclick="closeModal('modal-matriz-riesgo')">×</button>
+    </div>
+    <div class="modal-body" id="matriz-riesgo-body"></div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('modal-matriz-riesgo')">Cerrar</button>
     </div>
   </div>
 </div>
@@ -1385,9 +1416,11 @@ async function loadProyectoData(proyectoId) {
     const entryIdsSet = new Set((log || []).map(e => e.entry_id));
     const otrasDudas = (state.dudasDetalle || []).filter(d => !entryIdsSet.has(d.entry_id));
     state.dudasDetalle        = [...otrasDudas, ...(dudas || [])];
-    // merge riesgos
+    // merge riesgos activos
     const otrosRiesgos = (state.riesgosDetalle || []).filter(r => r.proyecto_id !== proyectoId);
-    state.riesgosDetalle      = [...otrosRiesgos, ...(riesgos || [])];
+    state.riesgosDetalle = [...otrosRiesgos, ...(riesgos || [])];
+    // riesgos borrados — se leen desde getRiesgosDetalleBorrados si existe el endpoint, por ahora vacío
+    state.riesgosDetalleBorrados = state.riesgosDetalleBorrados || [];
   } catch(e) { showToast('Error cargando proyecto: ' + e.message, 'error'); console.error(e); }
   console.timeEnd('[PERF] loadProyectoData total · ' + proyectoId);
 }
@@ -1844,11 +1877,47 @@ function renderGroups(proyecto) {
         <div class="semaforo ${nivel}"></div>
       </div>
       <div class="group-body">
+        ${renderEntriesGrupo(proyecto, g.grupo_id)}
         ${disciplinas.filter(d => tareaOpcionalAplica(g.grupo_id, d)).map(d => renderDisciplina(proyecto, g, d, log)).join('')}
         ${g.grupo_id === 'G14' && state.currentUser?.rol === 'PM' ? `<div style="padding:10px 16px;border-top:1px solid var(--border)"><button class="btn-secondary" onclick="openNuevaEntrega()">+ Nueva Entrega</button></div>` : ''}
       </div>
     </div>`;
   }).join('');
+}
+
+function renderEntriesGrupo(proyecto, grupoId) {
+  const entries = state.logEventos.filter(e => {
+    if (e.proyecto_id !== proyecto.proyecto_id) return false;
+    if (!['nota','cambio_registrado','duda','riesgo','riesgo_update'].includes(e.tipo_entry)) return false;
+    let data = {};
+    try { data = JSON.parse(e.nota || '{}'); } catch(err) {}
+    if (e.tipo_entry === 'cambio_registrado') {
+      const cd = (state.cambiosDetalle || []).find(c => c.entry_id === e.entry_id);
+      if (!cd) return false;
+      const discs = cd.disciplinas_afectadas ? cd.disciplinas_afectadas.split(',').map(s => s.trim()) : [];
+      return discs.some(d => d.startsWith(grupoId + '::'));
+    }
+    const discRef = data.disc_ref || e.disciplina_id || '';
+    return discRef.startsWith(grupoId + '::') || discRef === grupoId;
+  });
+  if (entries.length === 0) return '';
+  const filas = entries.sort((a,b) => {
+    const ta = a.timestamp ? new Date(a.timestamp) : new Date((a.fecha_real||'')+'T12:00:00');
+    const tb = b.timestamp ? new Date(b.timestamp) : new Date((b.fecha_real||'')+'T12:00:00');
+    return ta - tb;
+  }).map(e => {
+    let data = {}; try { data = JSON.parse(e.nota||'{}'); } catch(err) {}
+    const cd = e.tipo_entry === 'cambio_registrado' ? (state.cambiosDetalle||[]).find(c => c.entry_id === e.entry_id) : null;
+    const titulo = cd?.titulo || data.titulo || e.hito_id || '—';
+    const iconMap = { 'nota': '📌', 'cambio_registrado': '⚡', 'duda': '❓', 'riesgo': '⚠️', 'riesgo_update': '⚠️' };
+    const colorMap = { 'nota': 'var(--text3)', 'cambio_registrado': 'var(--yellow)', 'duda': 'var(--yellow)', 'riesgo': 'var(--yellow)', 'riesgo_update': 'var(--accent)' };
+    return `<div style="padding:6px 16px 6px 52px;border-bottom:1px solid var(--border);font-size:12px;display:flex;align-items:center;gap:8px">
+      <span style="color:${colorMap[e.tipo_entry]};font-size:11px">${iconMap[e.tipo_entry]||''}</span>
+      <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${formatDate(e.fecha_real)}</span>
+      <span style="color:var(--text2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${titulo}</span>
+    </div>`;
+  }).join('');
+  return `<div style="border-bottom:1px solid var(--border)">${filas}</div>`;
 }
 
 function contarVoBos(disciplina, grupoId, log) {
@@ -2692,6 +2761,13 @@ function openNotaCambio(modoEdicion = false, cambioData = null) {
   document.getElementById('nc-nota-disciplina').innerHTML = '<option value="">—</option>';
   state.cambioDiscsSeleccionadas = new Set();
   state.editandoCambioId = modoEdicion ? cambioData?.entry_id : null;
+  state._riesgoProb = 0;
+  state._riesgoImp = 0;
+  state._riesgoUpdateProb = 0;
+  state._riesgoUpdateImp = 0;
+  state._riesgoModo = 'nuevo';
+  const scoreDisp = document.getElementById('nc-riesgo-score-display');
+  if (scoreDisp) { scoreDisp.style.display = 'none'; scoreDisp.innerHTML = ''; }
 
   const title = document.getElementById('nota-cambio-title');
   const btnGuardar = document.getElementById('btn-guardar-nc');
@@ -3002,16 +3078,21 @@ async function guardarNotaCambio() {
             if (state.currentProyecto) { await openProyecto(state.currentProyecto.proyecto_id); restaurarEstadoPaneles(estadoPaneles); }
             btn.disabled=false; btn.textContent='Guardar';
             setTimeout(() => {
-              if (confirm(`El riesgo ${riesgoId} se marcó como Cristalizado.\n¿Registrar un Cambio asociado a este riesgo?`)) {
-                openNotaCambio();
-                setTimeout(() => {
-                  selectNotaCambioTipo('cambio_registrado');
+              confirmarBorrado({
+                titulo: `Riesgo ${riesgoId} cristalizado`,
+                mensaje: `El riesgo <strong>${riesgoId}</strong> se marcó como Cristalizado.<br><br>¿Quieres registrar un Cambio asociado a este riesgo ahora?`,
+                labelBoton: 'Sí, registrar cambio',
+                onConfirm: () => {
+                  openNotaCambio();
                   setTimeout(() => {
-                    const selRef = document.getElementById('nc-cambio-riesgo-ref');
-                    if (selRef) selRef.value = riesgoId;
+                    selectNotaCambioTipo('cambio_registrado');
+                    setTimeout(() => {
+                      const selRef = document.getElementById('nc-cambio-riesgo-ref');
+                      if (selRef) selRef.value = riesgoId;
+                    }, 100);
                   }, 100);
-                }, 100);
-              }
+                }
+              });
             }, 300);
             return;
           }
@@ -3532,7 +3613,7 @@ function renderEntriesEliminados(proyecto) {
   const pid = proyecto.proyecto_id;
   const cambiosBorrados = (state.cambiosBorrados || []).filter(c => c.proyecto_id === pid);
   const notasBorradas = (state.notasBorradas || []).filter(n => n.proyecto_id === pid);
-  const riesgosBorrados = (state.riesgosBorrados || []).filter(r => r.proyecto_id === pid);
+  const riesgosBorrados = (state.riesgosDetalleBorrados || []).filter(r => r.proyecto_id === pid);
   const dudasBorradas = (state.dudasBorradas || []).filter(d => d.proyecto_id === pid);
   const total = cambiosBorrados.length + notasBorradas.length + riesgosBorrados.length + dudasBorradas.length;
   if (total === 0) return '';
@@ -3657,9 +3738,9 @@ function renderNotas(proyecto) {
           <div class="nota-entry" data-entry-id="${n.entry_id}">
             <div class="nota-meta" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
               ${formatDate(n.fecha_real)}${formatHora(n.timestamp)?`<span style="font-size:9px;color:var(--text3)">${formatHora(n.timestamp)}</span>`:''} · ${n.registrado_por||state.user?.name||'—'} ·
-              <span style="font-family:var(--mono);font-size:10px;cursor:pointer;color:${esRiesgoUpdate?'var(--accent)':'var(--yellow)'}">⚠️ ${esRiesgoUpdate?'→ ':''}<strong>${riesgoId}</strong></span>
+              <span style="font-family:var(--mono);font-size:10px;cursor:pointer;color:${esRiesgoUpdate?'var(--accent)':'var(--yellow)'}" onclick="abrirHistorialRiesgo('${riesgoId}')">⚠️ ${esRiesgoUpdate?'→ ':''}<strong>${riesgoId}</strong></span>
               ${rd?.categoria?`<span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${rd.categoria}</span>`:''}
-              ${score?`<span class="riesgo-score-badge ${scoreClass}">${score}</span>`:''}
+              ${score?`<span class="riesgo-score-badge ${scoreClass}" style="cursor:pointer;position:relative" onclick="abrirMatrizRiesgo(${rd?.probabilidad||0},${rd?.impacto||0},'${riesgoId}')" title="P:${rd?.probabilidad||0} × I:${rd?.impacto||0} = ${score} · Click para ver matriz PMI">${score}</span>`:''}
               <span style="font-family:var(--mono);font-size:10px;color:${colorEstatus}">${estatus}</span>
             </div>
             ${esRiesgo&&titulo?`<div style="font-weight:500;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%" title="${titulo}">${titulo}</div>`:''}
@@ -3703,8 +3784,9 @@ function renderNotas(proyecto) {
           return `
           <div class="nota-entry" data-entry-id="${n.entry_id}">
             <div class="nota-meta" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+              <span style="font-family:var(--mono);font-size:10px;padding:1px 6px;border-radius:3px;background:rgba(${estatusDuda==='respondida'?'68,204,136':estatusDuda==='obsoleta'?'96,96,96':'227,179,65'},0.12);color:${badgeColor}">❓ duda</span>
+              <span style="font-family:var(--mono);font-size:10px;color:${badgeColor}">${estatusDuda}</span> ·
               ${formatDate(n.fecha_real)} · ${n.registrado_por || state.user?.name || '—'} ·
-              <span style="font-family:var(--mono);font-size:10px;color:${badgeColor}">❓ duda · ${estatusDuda}</span>
               ${tiempoResp ? `· <span style="font-family:var(--mono);font-size:10px;color:var(--green)">respondida en ${tiempoResp}</span>` : ''}
             </div>
             <div style="font-weight:500;font-size:13px;margin-top:2px">${tituloDuda}</div>
@@ -3799,8 +3881,10 @@ function renderNotas(proyecto) {
           </div>`;
 
         const notaTipoAbrev = { 'Lección aprendida': 'LA', 'Decisión': 'DEC', 'Pendiente externo': 'PE', 'General': 'GEN' };
-        const tipoTag = notaData?.tipo ? `<span style="font-family:var(--mono);font-size:10px;color:var(--text3)">📌 ${notaTipoAbrev[notaData.tipo] || notaData.tipo}</span>` : (!esCambio ? `<span style="font-family:var(--mono);font-size:10px;color:var(--text3)">📌</span>` : '');
-        const claveTag = esCambio && claveCambio ? `<span style="font-family:var(--mono);font-size:10px;color:var(--yellow);cursor:pointer" onclick="scrollToCambio('${n.entry_id}')" title="Ver detalle del cambio">⚡ ${claveCambio}</span>` : esCambio ? `<span style="color:var(--yellow);font-family:var(--mono);font-size:10px">⚡ cambio</span>` : '';
+        const tipoPill = esCambio
+          ? `<span style="font-family:var(--mono);font-size:10px;padding:1px 6px;border-radius:3px;background:rgba(227,179,65,0.12);color:var(--yellow)">⚡ cambio</span>`
+          : `<span style="font-family:var(--mono);font-size:10px;padding:1px 6px;border-radius:3px;background:var(--surface2);color:var(--text3)">📌 ${notaTipoAbrev[notaData?.tipo] || notaData?.tipo || 'nota'}</span>`;
+        const claveTag = esCambio && claveCambio ? `<span style="font-family:var(--mono);font-size:10px;color:var(--yellow);cursor:pointer" onclick="scrollToCambio('${n.entry_id}')" title="Ver detalle del cambio">${claveCambio}</span>` : '';
         const tituloNota = notaData?.titulo
           ? `<div class="nota-titulo" style="font-weight:500;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%" title="${notaData.titulo}">${notaData.titulo}</div>`
           : esCambio && cd?.titulo
@@ -3810,13 +3894,13 @@ function renderNotas(proyecto) {
 
         return `
         <div class="nota-entry" data-entry-id="${n.entry_id}" data-hito-id="${n.hito_id || ''}">
-          <div class="nota-meta" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${formatDate(n.fecha_real)}${formatHora(n.timestamp) ? `<span style="font-size:9px;color:var(--text3)">${formatHora(n.timestamp)}</span>` : ''} · ${n.registrado_por || state.user?.name || '—'}${claveTag ? ' · ' + claveTag : ''}${tipoTag ? ' · ' + tipoTag : ''}${cd?.impacto_tipo ? ` · <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${cd.impacto_tipo}</span>` : ''}</div>
+          <div class="nota-meta" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${tipoPill}${claveTag ? ' ' + claveTag : ''} · ${formatDate(n.fecha_real)}${formatHora(n.timestamp) ? `<span style="font-size:9px;color:var(--text3)">${formatHora(n.timestamp)}</span>` : ''} · ${n.registrado_por || state.user?.name || '—'}${cd?.impacto_tipo ? ` · <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${cd.impacto_tipo}</span>` : ''}</div>
           ${tituloNota}
           ${expandHTML}
         </div>`;
       }).join('');
 
-  const filtroActivo = state._filtroRegistro || 'todos';
+const filtroActivo = state._filtroRegistro || 'todos';
   const filtroOpts = [
     { key: 'todos',    label: 'Todos' },
     { key: 'cambios',  label: '⚡ Cambios' },
@@ -3826,18 +3910,20 @@ function renderNotas(proyecto) {
   ];
   return `
   <div class="notas-section">
-    <div class="notas-header" id="notas-toggle" onclick="toggleNotas()" >
+    <div class="notas-header" id="notas-toggle" onclick="toggleNotas()">
       <div style="display:flex;align-items:center;gap:10px">
         <span style="font-size:10px;color:var(--text3);transition:transform 0.15s" id="notas-chevron">▶</span>
         <span class="section-title" style="margin:0">Registro del proyecto</span>
         <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${todosEntries.length}</span>
       </div>
-      <button class="btn-ghost" style="font-size:11px" onclick="event.stopPropagation();openNotaCambio()">+ Nota / Cambio</button>
-    </div>
-    <div style="display:flex;gap:4px;padding:8px 0 4px;flex-wrap:wrap" id="registro-filtros" onclick="event.stopPropagation()">
-      ${filtroOpts.map(f => `<button style="font-size:11px;padding:3px 10px;border-radius:var(--radius);border:1px solid ${filtroActivo===f.key?'var(--accent)':'var(--border)'};background:${filtroActivo===f.key?'rgba(88,166,255,0.1)':'none'};color:${filtroActivo===f.key?'var(--accent)':'var(--text3)'};cursor:pointer;font-family:var(--sans)" onclick="setFiltroRegistro('${f.key}')">${f.label}</button>`).join('')}
     </div>
     <div class="notas-body" id="notas-body">
+      <div style="display:flex;gap:4px;padding:0 0 12px;flex-wrap:wrap;align-items:center;justify-content:space-between" id="registro-filtros" onclick="event.stopPropagation()">
+        <div style="display:flex;gap:4px;flex-wrap:wrap">
+          ${filtroOpts.map(f => `<button style="font-size:11px;padding:3px 10px;border-radius:var(--radius);border:1px solid ${filtroActivo===f.key?'var(--accent)':'var(--border)'};background:${filtroActivo===f.key?'rgba(88,166,255,0.1)':'none'};color:${filtroActivo===f.key?'var(--accent)':'var(--text3)'};cursor:pointer;font-family:var(--sans)" onclick="setFiltroRegistro('${f.key}')">${f.label}</button>`).join('')}
+        </div>
+        <button class="btn-ghost" style="font-size:11px" onclick="openNotaCambio()">+ Nueva Entrada</button>
+      </div> 
       <div id="notas-lista">${notasHTML}</div>
       ${renderEntriesEliminados(proyecto)}
       <div class="nota-form" id="nota-form">
@@ -3849,6 +3935,96 @@ function renderNotas(proyecto) {
       </div>
     </div>
   </div>`;
+}
+
+function abrirHistorialRiesgo(riesgoId) {
+  const rd = getRiesgoDetalle(riesgoId);
+  const entries = state.logEventos.filter(e => {
+    if (e.tipo_entry === 'riesgo') {
+      try { return JSON.parse(e.nota||'{}').riesgo_id === riesgoId; } catch(err) { return false; }
+    }
+    if (e.tipo_entry === 'riesgo_update') {
+      try { return JSON.parse(e.nota||'{}').riesgo_id === riesgoId; } catch(err) { return false; }
+    }
+    return false;
+  }).sort((a,b) => new Date(a.timestamp||a.fecha_real) - new Date(b.timestamp||b.fecha_real));
+  document.getElementById('historial-riesgo-titulo').textContent = `${riesgoId} — ${getRiesgoTitulo(entries[0]?.entry_id || '')}`;
+  state._historialRiesgoId = riesgoId;
+  const PROB_L = ['','Muy improbable','Poco probable','Posible','Probable','Casi seguro'];
+  const IMP_L  = ['','Insignificante','Menor','Moderado','Mayor','Crítico'];
+  const body = document.getElementById('historial-riesgo-body');
+  body.innerHTML = entries.map(e => {
+    let data = {}; try { data = JSON.parse(e.nota||'{}'); } catch(err) {}
+    const esOrig = e.tipo_entry === 'riesgo';
+    const prob = esOrig ? rd?.probabilidad : (data.probabilidad || 0);
+    const imp  = esOrig ? rd?.impacto     : (data.impacto || 0);
+    const score = prob && imp ? prob * imp : (esOrig ? rd?.score : 0);
+    const scoreClass = riesgoScoreClass(score);
+    const estatus = esOrig ? rd?.estatus : (data.estatus || '—');
+    const colorEstatus = riesgoEstatusColor(estatus);
+    const autor = (state.usuarios.find(u => u.email === e.arquitecto_id)?.nombre) || e.registrado_por || e.arquitecto_id || '—';
+    return `<div style="padding:12px 0;border-bottom:1px solid var(--border)">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap">
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${formatDate(e.fecha_real)}${formatHora(e.timestamp)?' · '+formatHora(e.timestamp):''}</span>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${autor}</span>
+        <span style="font-family:var(--mono);font-size:10px;padding:1px 6px;border-radius:3px;background:var(--surface2);color:var(--text3)">${esOrig?'Declaración inicial':'Update'}</span>
+        ${estatus?`<span style="font-family:var(--mono);font-size:10px;color:${colorEstatus}">${estatus}</span>`:''}
+        ${score?`<span class="riesgo-score-badge ${scoreClass}" style="cursor:pointer" onclick="abrirMatrizRiesgo(${prob||0},${imp||0},'${riesgoId}')" title="Ver matriz PMI">${score}</span>`:''}
+        ${prob?`<span style="font-family:var(--mono);font-size:10px;color:var(--text3)">P:${prob} ${PROB_L[prob]||''} · I:${imp} ${IMP_L[imp]||''}</span>`:''}
+      </div>
+      ${data.descripcion?`<div style="font-size:13px;color:var(--text2);line-height:1.5">${data.descripcion}</div>`:''}
+    </div>`;
+  }).join('') || '<div style="color:var(--text3);font-family:var(--mono);font-size:12px">Sin historial registrado.</div>';
+  openModal('modal-historial-riesgo');
+}
+
+function abrirUpdateDesdeHistorial() {
+  const riesgoId = state._historialRiesgoId;
+  closeModal('modal-historial-riesgo');
+  if (!riesgoId) return;
+  abrirUpdateRiesgo(riesgoId);
+}
+
+function abrirMatrizRiesgo(prob, imp, riesgoId) {
+  const PROB_L = ['','Muy improbable','Poco probable','Posible','Probable','Casi seguro'];
+  const IMP_L  = ['','Insignificante','Menor','Moderado','Mayor','Crítico'];
+  const score = prob * imp;
+  const cls = score >= 15 ? 'riesgo-score-red' : score >= 7 ? 'riesgo-score-yellow' : 'riesgo-score-green';
+  document.getElementById('matriz-riesgo-titulo').textContent = `${riesgoId} · Exposición al riesgo`;
+  const cellColor = (p, i) => {
+    const s = p * i;
+    return s >= 15 ? 'rgba(226,75,74,0.15)' : s >= 7 ? 'rgba(186,117,23,0.18)' : 'rgba(99,153,34,0.15)';
+  };
+  const cellText = (p, i) => {
+    const s = p * i;
+    return s >= 15 ? '#a32d2d' : s >= 7 ? '#854f0b' : '#3b6d11';
+  };
+  let grid = `<div style="font-size:12px;color:var(--text2);margin-bottom:12px">P: <strong>${prob}</strong> ${PROB_L[prob]||''} · I: <strong>${imp}</strong> ${IMP_L[imp]||''} · Score: <span class="riesgo-score-badge ${cls}">${score}</span></div>`;
+  grid += `<div style="display:flex;gap:4px;align-items:flex-start">`;
+  grid += `<div style="writing-mode:vertical-rl;transform:rotate(180deg);font-size:10px;color:var(--text3);padding:4px 0;text-align:center;font-family:var(--mono)">impacto</div>`;
+  grid += `<div style="flex:1">`;
+  for (let i = 5; i >= 1; i--) {
+    grid += `<div style="display:grid;grid-template-columns:16px repeat(5,1fr);gap:2px;margin-bottom:2px">`;
+    grid += `<div style="font-size:10px;color:var(--text3);text-align:right;padding-right:4px;line-height:28px;font-family:var(--mono)">${i}</div>`;
+    for (let p = 1; p <= 5; p++) {
+      const s = p * i;
+      const isActive = p === prob && i === imp;
+      grid += `<div style="height:28px;border-radius:3px;background:${cellColor(p,i)};display:flex;align-items:center;justify-content:center;font-size:10px;font-family:var(--mono);font-weight:500;color:${cellText(p,i)};${isActive?'outline:2px solid var(--text);outline-offset:-2px':''}">${s}</div>`;
+    }
+    grid += `</div>`;
+  }
+  grid += `<div style="display:grid;grid-template-columns:16px repeat(5,1fr);gap:2px;margin-top:3px">`;
+  grid += `<div></div>`;
+  for (let p = 1; p <= 5; p++) grid += `<div style="font-size:10px;color:var(--text3);text-align:center;font-family:var(--mono)">${p}</div>`;
+  grid += `</div>`;
+  grid += `<div style="font-size:10px;color:var(--text3);text-align:center;margin-top:4px;font-family:var(--mono)">probabilidad</div>`;
+  grid += `<div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap">`;
+  grid += `<div style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text2)"><div style="width:10px;height:10px;border-radius:2px;background:rgba(99,153,34,0.3)"></div>Bajo (1-6)</div>`;
+  grid += `<div style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text2)"><div style="width:10px;height:10px;border-radius:2px;background:rgba(186,117,23,0.3)"></div>Medio (7-14)</div>`;
+  grid += `<div style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text2)"><div style="width:10px;height:10px;border-radius:2px;background:rgba(226,75,74,0.25)"></div>Crítico (15-25)</div>`;
+  grid += `</div></div></div>`;
+  document.getElementById('matriz-riesgo-body').innerHTML = grid;
+  openModal('modal-matriz-riesgo');
 }
 
 function abrirUpdateRiesgo(riesgoId) {
@@ -3864,27 +4040,36 @@ function abrirUpdateRiesgo(riesgoId) {
 }
 
 function borrarRiesgoEntry(entryId, riesgoId) {
+  const esEntryOriginal = (() => {
+    const e = state.logEventos.find(x => x.entry_id === entryId);
+    return e?.tipo_entry === 'riesgo';
+  })();
+  const tieneUpdates = state.logEventos.some(e => {
+    if (e.tipo_entry !== 'riesgo_update') return false;
+    try { return JSON.parse(e.nota||'{}').riesgo_id === riesgoId; } catch(err) { return false; }
+  });
+  const mensaje = esEntryOriginal && tieneUpdates
+    ? `Vas a eliminar un entry del riesgo <strong>${riesgoId}</strong>.<br><br><strong>¿Qué quieres eliminar?</strong><br>— Solo este entry<br>— El riesgo completo (entry original + todos sus updates)`
+    : `Vas a eliminar este entry del riesgo <strong>${riesgoId}</strong>.<br><br>El registro desaparecerá del Registro del Proyecto.`;
   confirmarBorrado({
-    titulo: 'Eliminar riesgo',
-    mensaje: `Vas a eliminar el riesgo <strong>${riesgoId}</strong> y todos sus updates.<br><br>El registro se archivará en el historial de eliminados.`,
-    labelBoton: 'Eliminar riesgo',
+    titulo: `Eliminar entry de ${riesgoId}`,
+    mensaje,
+    labelBoton: esEntryOriginal && tieneUpdates ? 'Eliminar completo' : 'Eliminar entry',
     onConfirm: async () => {
       const estadoPaneles = capturarEstadoPaneles();
       try {
-        await api('borrarRiesgo', { entry_id: entryId, motivo: 'Eliminado desde UI' });
+        const scope = esEntryOriginal && tieneUpdates ? 'completo' : 'entry';
+        await api('borrarRiesgo', { entry_id: entryId, scope, motivo: 'Eliminado desde UI' });
         state.logEventos = state.logEventos.filter(e => {
           if (e.entry_id === entryId) return false;
-          if (e.tipo_entry === 'riesgo_update') {
+          if (scope === 'completo' && e.tipo_entry === 'riesgo_update') {
             try { return JSON.parse(e.nota||'{}').riesgo_id !== riesgoId; } catch(err) { return true; }
           }
           return true;
         });
-        state.riesgosDetalle = (state.riesgosDetalle || []).filter(r => r.riesgo_id !== riesgoId);
-        showToast('Riesgo eliminado', 'success');
-        if (state.currentProyecto) {
-          await openProyecto(state.currentProyecto.proyecto_id);
-          restaurarEstadoPaneles(estadoPaneles);
-        }
+        if (scope === 'completo') state.riesgosDetalle = (state.riesgosDetalle || []).filter(r => r.riesgo_id !== riesgoId);
+        showToast(scope === 'completo' ? `Riesgo ${riesgoId} eliminado` : 'Entry eliminado', 'success');
+        if (state.currentProyecto) { await openProyecto(state.currentProyecto.proyecto_id); restaurarEstadoPaneles(estadoPaneles); }
       } catch(e) { showToast('Error: ' + e.message, 'error'); }
     }
   });
@@ -5378,6 +5563,8 @@ function selectNotaCambioTipo(tipo) {
   document.getElementById('cambio-fields').style.display = tipo === 'cambio_registrado' ? 'block' : 'none';
   document.getElementById('duda-fields').style.display = tipo === 'duda' ? 'block' : 'none';
   document.getElementById('riesgo-fields').style.display = tipo === 'riesgo' ? 'block' : 'none';
+  const camposExtra = document.getElementById('riesgo-campos-extra');
+  if (camposExtra) camposExtra.style.display = tipo === 'riesgo' ? 'block' : 'none';
   const label = document.getElementById('nc-texto-label');
   if (label) {
     if (tipo === 'nota') label.textContent = 'Detalle / contenido';
@@ -5492,6 +5679,30 @@ function buildRiesgoSelectors() {
       riesgosActivos.map(r => `<option value="${r.riesgo_id}">${r.riesgo_id} — ${getRiesgoTitulo(r.entry_id)} (${r.estatus})</option>`).join('');
   }
   setRiesgoModo('nuevo');
+}
+
+function precargarRiesgoUpdate(riesgoId) {
+  if (!riesgoId) return;
+  const rd = getRiesgoDetalle(riesgoId);
+  if (!rd) return;
+  state._riesgoUpdateProb = rd.probabilidad || 0;
+  state._riesgoUpdateImp  = rd.impacto || 0;
+  const probStars = document.querySelectorAll('#riesgo-update-fields .form-row .form-group:nth-child(1) .riesgo-star');
+  const impStars  = document.querySelectorAll('#riesgo-update-fields .form-row .form-group:nth-child(2) .riesgo-star');
+  renderRiesgoStarsEl(probStars, rd.probabilidad || 0);
+  renderRiesgoStarsEl(impStars,  rd.impacto || 0);
+  const probDisp = document.getElementById('nc-riesgo-update-prob-display');
+  const impDisp  = document.getElementById('nc-riesgo-update-imp-display');
+  if (probDisp) probDisp.textContent = RIESGO_PROB_LABELS[rd.probabilidad] || 'Sin cambio';
+  if (impDisp)  impDisp.textContent  = RIESGO_IMP_LABELS[rd.impacto]      || 'Sin cambio';
+}
+
+function updateRiesgoCategoriaTip() {
+  const val = document.getElementById('nc-riesgo-categoria').value;
+  const desc = document.getElementById('riesgo-cat-desc');
+  if (!desc) return;
+  if (!val) { desc.innerHTML = '<span style="color:var(--text3)">Selecciona una categoría</span>'; return; }
+  desc.textContent = RIESGO_CAT_DESC[val] || '';
 }
 
 function setRiesgoModo(modo) {
