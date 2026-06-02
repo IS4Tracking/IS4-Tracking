@@ -719,10 +719,10 @@
       <div id="duda-fields" style="display:none">
         <div class="form-group"><label class="form-label">Título <span style="color:var(--accent)">*</span></label><input class="form-input" id="nc-duda-titulo" placeholder="¿Qué necesitas definir o resolver?" maxlength="80" autocomplete="off"></div>
         <div class="form-group">
-          <div class="cambio-disc-label">Disciplina relacionada <span>opcional</span></div>
+          <div class="cambio-disc-label">Referencia <span>opcional</span></div>
           <div class="form-row" style="gap:8px">
-            <select class="form-select" id="nc-duda-grupo" onchange="updateDudaGrupo()" style="flex:1"><option value="">Sin referencia</option></select>
-            <select class="form-select" id="nc-duda-disciplina" style="flex:1"><option value="">—</option></select>
+            <select class="form-select" id="nc-duda-grupo" onchange="updateDudaGrupo()" style="flex:1"><option value="">Grupo…</option></select>
+            <select class="form-select" id="nc-duda-disciplina" style="flex:1"><option value="">Tarea…</option></select>
           </div>
         </div>
       </div>
@@ -735,10 +735,10 @@
         </div>
         <div class="form-group"><label class="form-label">Título <span style="color:var(--accent)">*</span></label><input class="form-input" id="nc-titulo" placeholder="Título corto de la nota…" maxlength="80"></div>
         <div class="form-group cambio-disc-section">
-          <div class="cambio-disc-label">Disciplina relacionada <span>opcional</span></div>
+<div class="cambio-disc-label">Referencia <span>opcional</span></div>
           <div class="form-row" style="gap:8px">
-            <select class="form-select" id="nc-nota-grupo" onchange="updateNotaGrupo()" style="flex:1"><option value="">Sin referencia</option></select>
-            <select class="form-select" id="nc-nota-disciplina" style="flex:1"><option value="">—</option></select>
+            <select class="form-select" id="nc-riesgo-grupo" onchange="updateRiesgoGrupo()" style="flex:1"><option value="">Grupo…</option></select>
+            <select class="form-select" id="nc-riesgo-disciplina" style="flex:1"><option value="">Tarea…</option></select>
           </div>
         </div>
       </div>
@@ -769,16 +769,14 @@
           <div class="form-row">
             <div class="form-group">
               <label class="form-label">Categoría <span style="color:var(--accent)">*</span></label>
-              <div style="display:flex;gap:10px;align-items:flex-start">
-                <select class="form-select" id="nc-riesgo-categoria" onchange="updateRiesgoCategoriaTip()" style="flex:1"><option value="">Seleccionar…</option><option value="Supuesto no validado">Supuesto no validado</option><option value="Dependencia externa">Dependencia externa</option><option value="Alcance reactivo">Alcance reactivo</option><option value="Técnico">Técnico</option><option value="Recurso">Recurso</option><option value="Regulatorio">Regulatorio</option><option value="Comunicación">Comunicación</option><option value="Otro">Otro</option></select>
-                <div id="riesgo-cat-desc" style="flex:1;font-size:11px;color:var(--text2);line-height:1.5;padding:6px 10px;background:var(--surface2);border-radius:var(--radius);min-height:36px;display:flex;align-items:center"><span style="color:var(--text3)">Selecciona una categoría</span></div>
-              </div>
+              <select class="form-select" id="nc-riesgo-categoria" onchange="updateRiesgoCategoriaTip()"><option value="">Seleccionar…</option><option value="Supuesto no validado">Supuesto no validado</option><option value="Dependencia externa">Dependencia externa</option><option value="Alcance reactivo">Alcance reactivo</option><option value="Técnico">Técnico</option><option value="Recurso">Recurso</option><option value="Regulatorio">Regulatorio</option><option value="Comunicación">Comunicación</option><option value="Otro">Otro</option></select>
             </div>
             <div class="form-group">
               <label class="form-label">Estatus inicial</label>
               <select class="form-select" id="nc-riesgo-estatus-nuevo"><option value="Activo">Activo</option><option value="En mitigación">En mitigación</option></select>
             </div>
           </div>
+          <div id="riesgo-cat-desc" style="font-size:11px;color:var(--text2);line-height:1.5;padding:6px 10px;background:var(--surface2);border-radius:var(--radius);min-height:32px;margin-bottom:8px;display:none"><span style="color:var(--text3)">Selecciona una categoría</span></div>
           <div class="form-row">
             <div class="form-group">
               <label class="form-label">Probabilidad <span style="color:var(--accent)">*</span></label>
@@ -1383,15 +1381,16 @@ async function loadProyectoData(proyectoId) {
   console.time('[PERF] loadProyectoData total · ' + proyectoId);
   try {
     console.time('[PERF] loadProyectoData Promise.all');
-    const [proyectos, log, disciplinas, cambiosDetalle, snapshots, tareas, dudas, riesgos] = await Promise.all([
+    const [proyectos, log, disciplinas, cambiosDetalle, snapshots, tareas, dudas, riesgos, riesgosBorrados] = await Promise.all([
       api('getProyectos'),
-      api('getLogEventos',          { proyecto_id: proyectoId }),
-      api('getDisciplinasProyecto', { proyecto_id: proyectoId }),
-      api('getCambiosDetalle',      { proyecto_id: proyectoId }),
-      api('getSnapshotsEntrega',    { proyecto_id: proyectoId }),
-      api('getTareasAdhoc',         { proyecto_id: proyectoId }).catch(() => []),
-      api('getDudasDetalle',        { proyecto_id: proyectoId }).catch(() => []),
-      api('getRiesgosDetalle',      { proyecto_id: proyectoId }).catch(() => [])
+      api('getLogEventos',                { proyecto_id: proyectoId }),
+      api('getDisciplinasProyecto',       { proyecto_id: proyectoId }),
+      api('getCambiosDetalle',            { proyecto_id: proyectoId }),
+      api('getSnapshotsEntrega',          { proyecto_id: proyectoId }),
+      api('getTareasAdhoc',               { proyecto_id: proyectoId }).catch(() => []),
+      api('getDudasDetalle',              { proyecto_id: proyectoId }).catch(() => []),
+      api('getRiesgosDetalle',            { proyecto_id: proyectoId }).catch(() => []),
+      api('getRiesgosDetalleBorrados',    { proyecto_id: proyectoId }).catch(() => [])
     ]);
     console.timeEnd('[PERF] loadProyectoData Promise.all');
 
@@ -1419,8 +1418,9 @@ async function loadProyectoData(proyectoId) {
     // merge riesgos activos
     const otrosRiesgos = (state.riesgosDetalle || []).filter(r => r.proyecto_id !== proyectoId);
     state.riesgosDetalle = [...otrosRiesgos, ...(riesgos || [])];
-    // riesgos borrados — se leen desde getRiesgosDetalleBorrados si existe el endpoint, por ahora vacío
-    state.riesgosDetalleBorrados = state.riesgosDetalleBorrados || [];
+    // merge riesgos borrados
+    const otrosRiesgosBorrados = (state.riesgosDetalleBorrados || []).filter(r => r.proyecto_id !== proyectoId);
+    state.riesgosDetalleBorrados = [...otrosRiesgosBorrados, ...(riesgosBorrados || [])];
   } catch(e) { showToast('Error cargando proyecto: ' + e.message, 'error'); console.error(e); }
   console.timeEnd('[PERF] loadProyectoData total · ' + proyectoId);
 }
@@ -1911,7 +1911,7 @@ function renderEntriesGrupo(proyecto, grupoId) {
     const titulo = cd?.titulo || data.titulo || e.hito_id || '—';
     const iconMap = { 'nota': '📌', 'cambio_registrado': '⚡', 'duda': '❓', 'riesgo': '⚠️', 'riesgo_update': '⚠️' };
     const colorMap = { 'nota': 'var(--text3)', 'cambio_registrado': 'var(--yellow)', 'duda': 'var(--yellow)', 'riesgo': 'var(--yellow)', 'riesgo_update': 'var(--accent)' };
-    return `<div style="padding:6px 16px 6px 52px;border-bottom:1px solid var(--border);font-size:12px;display:flex;align-items:center;gap:8px">
+    return `<div style="padding:6px 16px 6px 52px;border-bottom:1px solid var(--border);font-size:12px;display:flex;align-items:center;gap:8px;cursor:pointer;transition:background 0.1s" onmouseenter="this.style.background='var(--surface2)'" onmouseleave="this.style.background=''" onclick="navegarAEntryRegistro('${e.entry_id}')">
       <span style="color:${colorMap[e.tipo_entry]};font-size:11px">${iconMap[e.tipo_entry]||''}</span>
       <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${formatDate(e.fecha_real)}</span>
       <span style="color:var(--text2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${titulo}</span>
@@ -2938,21 +2938,46 @@ function updateEventos() {
     });
 }
 
-async function guardarNotaCambio() {
-  const texto = document.getElementById('nc-texto').value.trim();
-  const fecha = document.getElementById('nc-fecha').value;
-  const esNota = state.entryTipo === 'nota';
-  const titulo = esNota ? document.getElementById('nc-titulo').value.trim() : '';
-  const tipoNota = esNota ? document.getElementById('nc-tipo-nota').value : '';
+function resetModalNotaCambio() {
+  document.getElementById('nc-texto').value = '';
+  document.getElementById('nc-fecha').value = new Date().toISOString().split('T')[0];
+  document.getElementById('nc-titulo').value = '';
+  document.getElementById('nc-tipo-nota').value = '';
+  document.getElementById('nc-cambio-titulo').value = '';
+  document.getElementById('nc-duda-titulo').value = '';
+  document.getElementById('nc-duda-grupo').value = '';
+  document.getElementById('nc-duda-disciplina').innerHTML = '<option value="">—</option>';
+  document.getElementById('nc-riesgo-titulo').value = '';
+  document.getElementById('nc-riesgo-categoria').value = '';
+  const scoreDisp = document.getElementById('nc-riesgo-score-display');
+  if (scoreDisp) { scoreDisp.style.display = 'none'; scoreDisp.innerHTML = ''; }
+  state._riesgoProb = 0; state._riesgoImp = 0;
+  state._riesgoUpdateProb = 0; state._riesgoUpdateImp = 0;
+  state._riesgoModo = 'nuevo';
+  state.cambioDiscsSeleccionadas = new Set();
+}
 
+async function guardarNotaCambio() {
+  const tipo = state.entryTipo;
+  const fecha = document.getElementById('nc-fecha').value;
   if (!fecha) { showToast('La fecha es requerida', 'error'); return; }
-  if (esNota && !titulo) { showToast('El título es requerido', 'error'); return; }
-  if (esNota && !tipoNota) { showToast('La clasificación es requerida', 'error'); return; }
-  const esCambio = state.entryTipo === 'cambio_registrado';
-  const tituloCambio = esCambio ? document.getElementById('nc-cambio-titulo').value.trim() : '';
-  if (esCambio && !tituloCambio) { showToast('El título del cambio es requerido', 'error'); return; }
-  if (esCambio && !texto) { showToast('La descripción es requerida', 'error'); return; }
   if (!state.currentProyecto) { showToast('Selecciona un proyecto primero', 'error'); return; }
+
+  // Cada tipo lee únicamente sus propios campos — el resto se ignora
+  const esNota   = tipo === 'nota';
+  const esCambio = tipo === 'cambio_registrado';
+  const esDuda   = tipo === 'duda';
+  const esRiesgo = tipo === 'riesgo';
+
+  const texto      = (esNota || esCambio || esDuda || esRiesgo) ? document.getElementById('nc-texto').value.trim() : '';
+  const titulo     = esNota   ? document.getElementById('nc-titulo').value.trim()        : '';
+  const tipoNota   = esNota   ? document.getElementById('nc-tipo-nota').value            : '';
+  const tituloCambio = esCambio ? document.getElementById('nc-cambio-titulo').value.trim() : '';
+
+  if (esNota   && !titulo)       { showToast('El título es requerido', 'error'); return; }
+  if (esNota   && !tipoNota)     { showToast('La clasificación es requerida', 'error'); return; }
+  if (esCambio && !tituloCambio) { showToast('El título del cambio es requerido', 'error'); return; }
+  if (esCambio && !texto)        { showToast('La descripción es requerida', 'error'); return; }
 
   const estadoPaneles = capturarEstadoPaneles();
   const btn = document.getElementById('btn-guardar-nc');
@@ -2988,7 +3013,7 @@ async function guardarNotaCambio() {
         state.logEventos[idx].nota = notaJsonActualizado;
       }
       state.editandoNotaId = null;
-      closeModal('modal-nota-cambio');
+      closeModal('modal-nota-cambio'); resetModalNotaCambio();
       showToast('Nota actualizada', 'success');
     } else if (state.editandoCambioId) {
       const discs = [...(state.cambioDiscsSeleccionadas || [])];
@@ -3001,7 +3026,7 @@ async function guardarNotaCambio() {
         origen_cambio: document.getElementById('e-origen').value,
         alcance: texto
       });
-      closeModal('modal-nota-cambio');
+      closeModal('modal-nota-cambio'); resetModalNotaCambio();
       showToast('Cambio actualizado', 'success');
     } else {
       if (state.entryTipo === 'duda') {
@@ -3017,7 +3042,7 @@ async function guardarNotaCambio() {
           fecha_real: fecha,
           disciplina_id: dudaDiscKey
         });
-        closeModal('modal-nota-cambio');
+        closeModal('modal-nota-cambio'); resetModalNotaCambio();
         showToast('Duda registrada', 'success');
         await confirmBtn(btn, 'Guardar'); stopSaving(true);
         await loadProyectoData(state.currentProyecto.proyecto_id);
@@ -3053,7 +3078,7 @@ async function guardarNotaCambio() {
             notas_mitigacion: document.getElementById('nc-riesgo-mitigacion').value || '',
             fecha_real:       fecha
           });
-          closeModal('modal-nota-cambio');
+          closeModal('modal-nota-cambio'); resetModalNotaCambio();
           showToast(`Riesgo ${res.riesgo_id} registrado`, 'success');
         } else {
           const riesgoId = document.getElementById('nc-riesgo-update-ref').value;
@@ -3071,7 +3096,7 @@ async function guardarNotaCambio() {
           if (state._riesgoUpdateProb) updateBody.probabilidad = state._riesgoUpdateProb;
           if (state._riesgoUpdateImp)  updateBody.impacto = state._riesgoUpdateImp;
           await api('actualizarRiesgo', updateBody);
-          closeModal('modal-nota-cambio');
+          closeModal('modal-nota-cambio'); resetModalNotaCambio();
           showToast(`Riesgo ${riesgoId} actualizado`, 'success');
           if (nuevoEstatus === 'Cristalizado') {
             await loadProyectoData(state.currentProyecto.proyecto_id);
@@ -3129,7 +3154,7 @@ async function guardarNotaCambio() {
           });
         }
         await confirmBtn(btn, 'Guardar'); stopSaving(true);
-        closeModal('modal-nota-cambio');
+        closeModal('modal-nota-cambio'); resetModalNotaCambio();
         showToast('Nota guardada', 'success');
       } else {
         // Generar clave de cambio F1
@@ -3200,7 +3225,7 @@ async function guardarNotaCambio() {
         }
 
         await confirmBtn(btn, 'Guardar'); stopSaving(true);
-        closeModal('modal-nota-cambio');
+        closeModal('modal-nota-cambio'); resetModalNotaCambio();
         showToast(`Cambio ${claveCambio} registrado`, 'success');
       }
     }
@@ -3648,16 +3673,17 @@ function renderEntriesEliminados(proyecto) {
     </div>`;
   });
   const filasRiesgos = riesgosBorrados.map(r => {
-    let rd = {}; try { rd = JSON.parse(r.nota||'{}'); } catch(e) {}
-    const titulo = rd.titulo || r.hito_id || '(sin título)';
-    const borradoPor = (state.usuarios||[]).find(u => u.email === r.borrado_por)?.nombre || r.borrado_por || '—';
+    const entryLog = (state.logEventos||[]).find(e => e.entry_id === r.entry_id);
+    let tituloR = '(sin título)';
+    if (entryLog) { try { tituloR = JSON.parse(entryLog.nota||'{}').titulo || tituloR; } catch(e) {} }
+    const riesgoIdDisplay = r.riesgo_id ? r.riesgo_id.split('-').slice(1).join('-') || r.riesgo_id : '—';
+    const fechaBorrado = r.fecha_borrado ? formatDate(r.fecha_borrado.toString().split('T')[0]) : '—';
     return `<div style="padding:10px 0;border-bottom:1px solid var(--border);font-size:12px">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-        <span style="font-family:var(--mono);font-size:10px;color:var(--yellow)">⚠️ ${r.hito_id||'riesgo'}</span>
-        <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${r.fecha_borrado?formatDate(r.fecha_borrado.toString().split('T')[0]):'—'} · por ${borradoPor}</span>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--yellow)">⚠️ ${riesgoIdDisplay}</span>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${fechaBorrado}</span>
       </div>
-      <div style="font-weight:500;color:var(--text)">${titulo}</div>
-      <div style="font-size:11px;color:var(--text3);font-style:italic;margin-top:2px">Eliminado: ${r.motivo||'—'}</div>
+      <div style="font-weight:500;color:var(--text)">${tituloR}</div>
     </div>`;
   });
   const filasRespDudas = dudasBorradas.map(d => {
@@ -3685,6 +3711,11 @@ function renderEntriesEliminados(proyecto) {
     </div>
   </div>`;
 }
+function stripRiesgoPrefix(riesgoId) {
+  if (!riesgoId || !riesgoId.includes('-')) return riesgoId;
+  return riesgoId.split('-').slice(1).join('-') || riesgoId;
+}
+
 function renderNotas(proyecto) {
   const todosEntries = state.logEventos.filter(e => e.proyecto_id === proyecto.proyecto_id && (e.tipo_entry === 'nota' || e.tipo_entry === 'cambio_registrado' || e.tipo_entry === 'duda' || e.tipo_entry === 'riesgo' || e.tipo_entry === 'riesgo_update'));
   const filtro = state._filtroRegistro || 'todos';
@@ -3713,7 +3744,8 @@ function renderNotas(proyecto) {
             ? getRiesgoDetalleByEntry(n.entry_id)
             : getRiesgoDetalle(riesgoData.riesgo_id);
           const riesgoId = riesgoData.riesgo_id || n.hito_id || '—';
-          const titulo = riesgoData.titulo || (esRiesgoUpdate ? `Update de ${riesgoId}` : riesgoId);
+          const riesgoIdDisplay = stripRiesgoPrefix(riesgoId);
+          const titulo = riesgoData.titulo || (esRiesgoUpdate ? `Update de ${riesgoIdDisplay}` : riesgoIdDisplay);
           const estatus = rd?.estatus || (esRiesgo ? 'Activo' : '—');
           const score = rd?.score || (riesgoData.probabilidad && riesgoData.impacto ? riesgoData.probabilidad * riesgoData.impacto : 0);
           const scoreClass = riesgoScoreClass(score);
@@ -3738,7 +3770,7 @@ function renderNotas(proyecto) {
           <div class="nota-entry" data-entry-id="${n.entry_id}">
             <div class="nota-meta" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
               ${formatDate(n.fecha_real)}${formatHora(n.timestamp)?`<span style="font-size:9px;color:var(--text3)">${formatHora(n.timestamp)}</span>`:''} · ${n.registrado_por||state.user?.name||'—'} ·
-              <span style="font-family:var(--mono);font-size:10px;cursor:pointer;color:${esRiesgoUpdate?'var(--accent)':'var(--yellow)'}" onclick="abrirHistorialRiesgo('${riesgoId}')">⚠️ ${esRiesgoUpdate?'→ ':''}<strong>${riesgoId}</strong></span>
+              <span style="font-family:var(--mono);font-size:10px;cursor:pointer;color:${esRiesgoUpdate?'var(--accent)':'var(--yellow)'}" onclick="abrirHistorialRiesgo('${riesgoId}')">⚠️ ${esRiesgoUpdate?'→ ':''}<strong>${riesgoIdDisplay}</strong></span>
               ${rd?.categoria?`<span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${rd.categoria}</span>`:''}
               ${score?`<span class="riesgo-score-badge ${scoreClass}" style="cursor:pointer;position:relative" onclick="abrirMatrizRiesgo(${rd?.probabilidad||0},${rd?.impacto||0},'${riesgoId}')" title="P:${rd?.probabilidad||0} × I:${rd?.impacto||0} = ${score} · Click para ver matriz PMI">${score}</span>`:''}
               <span style="font-family:var(--mono);font-size:10px;color:${colorEstatus}">${estatus}</span>
@@ -3948,7 +3980,7 @@ function abrirHistorialRiesgo(riesgoId) {
     }
     return false;
   }).sort((a,b) => new Date(a.timestamp||a.fecha_real) - new Date(b.timestamp||b.fecha_real));
-  document.getElementById('historial-riesgo-titulo').textContent = `${riesgoId} — ${getRiesgoTitulo(entries[0]?.entry_id || '')}`;
+  document.getElementById('historial-riesgo-titulo').textContent = `${stripRiesgoPrefix(riesgoId)} — ${getRiesgoTitulo(entries[0]?.entry_id || '')}`;
   state._historialRiesgoId = riesgoId;
   const PROB_L = ['','Muy improbable','Poco probable','Posible','Probable','Casi seguro'];
   const IMP_L  = ['','Insignificante','Menor','Moderado','Mayor','Crítico'];
@@ -3960,19 +3992,23 @@ function abrirHistorialRiesgo(riesgoId) {
     const imp  = esOrig ? rd?.impacto     : (data.impacto || 0);
     const score = prob && imp ? prob * imp : (esOrig ? rd?.score : 0);
     const scoreClass = riesgoScoreClass(score);
-    const estatus = esOrig ? rd?.estatus : (data.estatus || '—');
+    const estatus = esOrig ? rd?.estatus : (data.estatus || '');
     const colorEstatus = riesgoEstatusColor(estatus);
     const autor = (state.usuarios.find(u => u.email === e.arquitecto_id)?.nombre) || e.registrado_por || e.arquitecto_id || '—';
-    return `<div style="padding:12px 0;border-bottom:1px solid var(--border)">
-      <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap">
+    const etiqueta = esOrig ? 'Declaración inicial' : 'Update';
+    const descripcion = data.descripcion || '';
+    return `<div style="padding:14px 0;border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px">
+        <span style="font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:3px;background:var(--surface2);color:var(--text2);font-weight:500">${etiqueta}</span>
+        ${estatus?`<span style="font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:3px;background:var(--surface2);color:${colorEstatus}">${estatus}</span>`:''}
+        ${score?`<span class="riesgo-score-badge ${scoreClass}" style="cursor:pointer" onclick="abrirMatrizRiesgo(${prob||0},${imp||0},'${riesgoId}')" title="Ver matriz PMI">${score}</span>`:''}
+      </div>
+      ${descripcion?`<div style="font-size:13px;color:var(--text);line-height:1.5;margin-bottom:6px">${descripcion}</div>`:`<div style="font-size:12px;color:var(--text3);font-style:italic;margin-bottom:6px">Sin descripción registrada.</div>`}
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
         <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${formatDate(e.fecha_real)}${formatHora(e.timestamp)?' · '+formatHora(e.timestamp):''}</span>
         <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${autor}</span>
-        <span style="font-family:var(--mono);font-size:10px;padding:1px 6px;border-radius:3px;background:var(--surface2);color:var(--text3)">${esOrig?'Declaración inicial':'Update'}</span>
-        ${estatus?`<span style="font-family:var(--mono);font-size:10px;color:${colorEstatus}">${estatus}</span>`:''}
-        ${score?`<span class="riesgo-score-badge ${scoreClass}" style="cursor:pointer" onclick="abrirMatrizRiesgo(${prob||0},${imp||0},'${riesgoId}')" title="Ver matriz PMI">${score}</span>`:''}
-        ${prob?`<span style="font-family:var(--mono);font-size:10px;color:var(--text3)">P:${prob} ${PROB_L[prob]||''} · I:${imp} ${IMP_L[imp]||''}</span>`:''}
+        ${prob?`<span style="font-family:var(--mono);font-size:10px;color:var(--text3)">P:${prob} · I:${imp}</span>`:''}
       </div>
-      ${data.descripcion?`<div style="font-size:13px;color:var(--text2);line-height:1.5">${data.descripcion}</div>`:''}
     </div>`;
   }).join('') || '<div style="color:var(--text3);font-family:var(--mono);font-size:12px">Sin historial registrado.</div>';
   openModal('modal-historial-riesgo');
@@ -4121,6 +4157,21 @@ function borrarNota(entryId, hitoId, proyectoId) {
       } catch(e) { showToast('Error: ' + e.message, 'error'); }
     }
   });
+}
+
+function navegarAEntryRegistro(entryId) {
+  const notasBody = document.getElementById('notas-body');
+  if (notasBody && !notasBody.classList.contains('open')) {
+    document.getElementById('notas-toggle')?.click();
+  }
+  setTimeout(() => {
+    const el = document.querySelector(`.nota-entry[data-entry-id="${entryId}"]`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.style.outline = '1px solid var(--accent)';
+      setTimeout(() => { el.style.outline = ''; }, 1500);
+    }
+  }, 250);
 }
 
 function scrollToCambio(entryId) {
@@ -4956,9 +5007,9 @@ function renderTareasAdhoc(proyecto) {
         <span class="section-title" style="margin:0">Tareas del proyecto</span>
         <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${tareas.length}</span>
       </div>
-      ${esPM?`<button class="btn-ghost" style="font-size:11px" onclick="event.stopPropagation();openNuevaTarea()">+ Tarea</button>`:''}
     </div>
     <div style="display:none" id="tareas-body">
+      ${esPM?`<div style="padding:8px 16px;border:1px solid var(--border);border-top:none;border-bottom:none;background:var(--surface);display:flex;justify-content:flex-end"><button class="btn-ghost" style="font-size:11px" onclick="openNuevaTarea()">+ Tarea</button></div>`:''}
       <div style="background:var(--surface);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--radius) var(--radius)">
         ${tareasHTML}
       </div>
@@ -5628,7 +5679,7 @@ function buildCambioRiesgoRefSelector() {
     r.estatus === 'Cristalizado'
   );
   sel.innerHTML = '<option value="">Sin referencia</option>' +
-    riesgos.map(r => `<option value="${r.riesgo_id}">${r.riesgo_id} — ${getRiesgoTitulo(r.entry_id)}</option>`).join('');
+    riesgos.map(r => `<option value="${r.riesgo_id}">${stripRiesgoPrefix(r.riesgo_id)} — ${getRiesgoTitulo(r.entry_id)}</option>`).join('');
 }
 
 function getRiesgoTitulo(entryId) {
@@ -5701,7 +5752,8 @@ function updateRiesgoCategoriaTip() {
   const val = document.getElementById('nc-riesgo-categoria').value;
   const desc = document.getElementById('riesgo-cat-desc');
   if (!desc) return;
-  if (!val) { desc.innerHTML = '<span style="color:var(--text3)">Selecciona una categoría</span>'; return; }
+  if (!val) { desc.style.display = 'none'; return; }
+  desc.style.display = 'block';
   desc.textContent = RIESGO_CAT_DESC[val] || '';
 }
 
