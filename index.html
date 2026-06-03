@@ -43,7 +43,7 @@
   ::-webkit-scrollbar { width:4px; height:4px; }
   ::-webkit-scrollbar-track { background:var(--bg); }
   ::-webkit-scrollbar-thumb { background:var(--border2); border-radius:2px; }
-  .entry-acciones-menu:hover { display:block !important; }
+  .entry-acciones-menu { pointer-events: auto; }
   .riesgo-star { font-size:18px; cursor:pointer; color:var(--border2); transition:color 0.1s; user-select:none; }
   .riesgo-star.filled { color:var(--yellow); }
   .riesgo-score-badge { display:inline-block; font-family:var(--mono); font-size:11px; padding:2px 8px; border-radius:3px; font-weight:500; }
@@ -1382,18 +1382,17 @@ async function loadProyectoData(proyectoId) {
   console.time('[PERF] loadProyectoData total · ' + proyectoId);
   try {
     console.time('[PERF] loadProyectoData Promise.all');
-    const [proyectos, log, disciplinas, cambiosDetalle, snapshots, tareas, dudas, riesgos, riesgosBorrados, notasBorradas, dudasBorradas] = await Promise.all([
+    const [proyectos, log, disciplinas, cambiosDetalle, snapshots, tareas, dudas, riesgos, riesgosBorrados, entriesBorrados] = await Promise.all([
       api('getProyectos'),
-      api('getLogEventos',                { proyecto_id: proyectoId }),
-      api('getDisciplinasProyecto',       { proyecto_id: proyectoId }),
-      api('getCambiosDetalle',            { proyecto_id: proyectoId }),
-      api('getSnapshotsEntrega',          { proyecto_id: proyectoId }),
-      api('getTareasAdhoc',               { proyecto_id: proyectoId }).catch(() => []),
-      api('getDudasDetalle',              { proyecto_id: proyectoId }).catch(() => []),
-      api('getRiesgosDetalle',            { proyecto_id: proyectoId }).catch(() => []),
-      api('getRiesgosDetalleBorrados',    { proyecto_id: proyectoId }).catch(() => []),
-      api('getNotasBorradas',             { proyecto_id: proyectoId }).catch(() => []),
-      api('getDudasBorradas',             { proyecto_id: proyectoId }).catch(() => [])
+      api('getLogEventos',             { proyecto_id: proyectoId }),
+      api('getDisciplinasProyecto',    { proyecto_id: proyectoId }),
+      api('getCambiosDetalle',         { proyecto_id: proyectoId }),
+      api('getSnapshotsEntrega',       { proyecto_id: proyectoId }),
+      api('getTareasAdhoc',            { proyecto_id: proyectoId }).catch(() => []),
+      api('getDudasDetalle',           { proyecto_id: proyectoId }).catch(() => []),
+      api('getRiesgosDetalle',         { proyecto_id: proyectoId }).catch(() => []),
+      api('getRiesgosDetalleBorrados', { proyecto_id: proyectoId }).catch(() => []),
+      api('getEntriesBorrados',        { proyecto_id: proyectoId }).catch(() => [])
     ]);
     console.timeEnd('[PERF] loadProyectoData Promise.all');
 
@@ -1421,15 +1420,12 @@ async function loadProyectoData(proyectoId) {
     // merge riesgos activos
     const otrosRiesgos = (state.riesgosDetalle || []).filter(r => r.proyecto_id !== proyectoId);
     state.riesgosDetalle = [...otrosRiesgos, ...(riesgos || [])];
-    // merge riesgos borrados
+    // merge riesgos borrados (modelo propio en riesgos_detalle)
     const otrosRiesgosBorrados = (state.riesgosDetalleBorrados || []).filter(r => r.proyecto_id !== proyectoId);
     state.riesgosDetalleBorrados = [...otrosRiesgosBorrados, ...(riesgosBorrados || [])];
-    // merge notas borradas
-    const otrasNotasBorradas = (state.notasBorradas || []).filter(n => n.proyecto_id !== proyectoId);
-    state.notasBorradas = [...otrasNotasBorradas, ...(notasBorradas || [])];
-    // merge dudas borradas
-    const otrasDudasBorradas = (state.dudasBorradas || []).filter(d => d.proyecto_id !== proyectoId);
-    state.dudasBorradas = [...otrasDudasBorradas, ...(dudasBorradas || [])];
+    // merge entries borrados (notas, cambios, dudas — soft-delete en log_eventos)
+    const otrosEntriesBorrados = (state.entriesBorrados || []).filter(e => e.proyecto_id !== proyectoId);
+    state.entriesBorrados = [...otrosEntriesBorrados, ...(entriesBorrados || [])];
   } catch(e) { showToast('Error cargando proyecto: ' + e.message, 'error'); console.error(e); }
   console.timeEnd('[PERF] loadProyectoData total · ' + proyectoId);
 }
@@ -2814,9 +2810,11 @@ function buildNotaGrupoSelector() {
     if (!grupos[e.grupo_id]) grupos[e.grupo_id] = e.grupo_nombre;
   });
   const sel = document.getElementById('nc-nota-grupo');
+  if (!sel) return;
   sel.innerHTML = '<option value="">Sin referencia</option>' +
     Object.entries(grupos).map(([gid, nombre]) => `<option value="${gid}">${gid} — ${nombre}</option>`).join('');
-  document.getElementById('nc-nota-disciplina').innerHTML = '<option value="">—</option>';
+  const selDisc = document.getElementById('nc-nota-disciplina');
+  if (selDisc) selDisc.innerHTML = '<option value="">—</option>';
 }
 
 function updateNotaGrupo() {
@@ -3647,51 +3645,52 @@ function borrarProyecto() {
 // ── NOTAS ──
 function renderEntriesEliminados(proyecto) {
   const pid = proyecto.proyecto_id;
-  const cambiosBorrados = (state.cambiosBorrados || []).filter(c => c.proyecto_id === pid);
-  const notasBorradas = (state.notasBorradas || []).filter(n => n.proyecto_id === pid);
-  const riesgosBorrados = (state.riesgosDetalleBorrados || []).filter(r => r.proyecto_id === pid);
-  const dudasBorradas = (state.dudasBorradas || []).filter(d => d.proyecto_id === pid);
-  const total = cambiosBorrados.length + notasBorradas.length + riesgosBorrados.length + dudasBorradas.length;
-  if (total === 0) return '';
-  const panelId = 'entries-borrados-panel';
   const esPMel = state.rol === 'PM';
+
+  // Entries borrados vía soft-delete en log_eventos (notas, cambios, dudas)
+  const entriesBorrados = (state.entriesBorrados || []).filter(e => e.proyecto_id === pid);
+  // Riesgos borrados vía soft-delete en riesgos_detalle (modelo propio)
+  const riesgosBorrados = (state.riesgosDetalleBorrados || []).filter(r => r.proyecto_id === pid);
+  const total = entriesBorrados.length + riesgosBorrados.length;
+  if (total === 0) return '';
+
+  const panelId = 'entries-borrados-panel';
   const btnRestaurar = (tipo, entryId) => esPMel
     ? `<button style="font-size:11px;padding:2px 8px;background:none;border:0.5px solid var(--border);border-radius:3px;color:var(--text3);cursor:pointer;margin-top:4px" onclick="restaurarEntry('${tipo}','${entryId}')">Restaurar</button>`
     : '';
-  const filasCambios = cambiosBorrados.map(c => {
-    let snap = []; try { snap = JSON.parse(c.snapshot_cambio_detalle || '[]'); } catch(e) {}
-    const titulo = snap[13] || snap[12] || '(sin título)';
-    const clave = c.clave_cambio || snap[12] || '—';
-    const disciplinas = snap[3] ? snap[3].split(',').map(d => d.split('::')[1] || d).filter(Boolean).join(', ') : '';
+
+  // Pill HTML por tipo
+  const pillMap = {
+    'cambio_registrado': `<span style="font-family:var(--mono);font-size:10px;padding:1px 6px;border-radius:3px;background:rgba(255,107,107,0.15);color:#ff6b6b">⚡ cambio</span>`,
+    'nota':              `<span style="font-family:var(--mono);font-size:10px;padding:1px 6px;border-radius:3px;background:rgba(139,139,139,0.15);color:var(--text2)">📌 nota</span>`,
+    'duda':              `<span style="font-family:var(--mono);font-size:10px;padding:1px 6px;border-radius:3px;background:rgba(88,166,255,0.15);color:#58a6ff">❓ duda</span>`
+  };
+
+  const filasEntries = entriesBorrados.map(e => {
+    let nd = {}; try { nd = JSON.parse(e.nota||'{}'); } catch(err) {}
+    const cd = e.tipo_entry === 'cambio_registrado'
+      ? (state.cambiosDetalle||[]).find(c => c.entry_id === e.entry_id)
+      : null;
+    const titulo = nd.titulo || cd?.titulo || e.hito_id || '(sin título)';
+    const pill = pillMap[e.tipo_entry] || pillMap['nota'];
+    const fecha = e.fecha_borrado ? formatDate(e.fecha_borrado.toString().split('T')[0]) : '—';
     return `<div style="padding:10px 0;border-bottom:1px solid var(--border);font-size:12px">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-        <span style="font-family:var(--mono);font-size:10px;padding:1px 6px;border-radius:3px;background:rgba(255,107,107,0.15);color:#ff6b6b">⚡ ${clave}</span>
-        <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${c.fecha_borrado?formatDate(c.fecha_borrado.toString().split('T')[0]):'—'}</span>
+        ${pill}
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${fecha}</span>
       </div>
       <div style="font-weight:500;color:var(--text);margin-bottom:2px">${titulo}</div>
-      ${disciplinas?`<div style="font-family:var(--mono);font-size:11px;color:var(--text3)">${disciplinas}</div>`:''}
-      ${c.motivo?`<div style="font-size:11px;color:var(--text3);font-style:italic">Motivo: ${c.motivo}</div>`:''}
-      ${btnRestaurar('cambio', c.entry_id)}
+      ${btnRestaurar(e.tipo_entry === 'cambio_registrado' ? 'cambio' : e.tipo_entry, e.entry_id)}
     </div>`;
   });
-  const filasNotas = notasBorradas.map(n => {
-    let nd = {}; try { nd = JSON.parse(n.nota||'{}'); } catch(e) {}
-    const titulo = nd.titulo || n.hito_id || '(sin título)';
-    return `<div style="padding:10px 0;border-bottom:1px solid var(--border);font-size:12px">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-        <span style="font-family:var(--mono);font-size:10px;padding:1px 6px;border-radius:3px;background:rgba(139,139,139,0.15);color:var(--text2)">📌 nota</span>
-        <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${n.fecha_borrado?formatDate(n.fecha_borrado.toString().split('T')[0]):'—'}</span>
-      </div>
-      <div style="font-weight:500;color:var(--text);margin-bottom:2px">${titulo}</div>
-      ${btnRestaurar('nota', n.entry_id)}
-    </div>`;
-  });
+
   const filasRiesgos = riesgosBorrados.map(r => {
-    const entryLog = (state.logEventos||[]).find(e => e.entry_id === r.entry_id);
-    let tituloR = '(sin título)';
-    if (entryLog) { try { tituloR = JSON.parse(entryLog.nota||'{}').titulo || tituloR; } catch(e) {} }
     const riesgoIdDisplay = r.riesgo_id ? r.riesgo_id.split('-').slice(1).join('-') || r.riesgo_id : '—';
     const fechaBorrado = r.fecha_borrado ? formatDate(r.fecha_borrado.toString().split('T')[0]) : '—';
+    // Intentar obtener título desde log si existe
+    const entryLog = (state.logEventos||[]).find(ev => ev.entry_id === r.entry_id);
+    let tituloR = '(sin título)';
+    if (entryLog) { try { tituloR = JSON.parse(entryLog.nota||'{}').titulo || tituloR; } catch(err) {} }
     return `<div style="padding:10px 0;border-bottom:1px solid var(--border);font-size:12px">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
         <span style="font-family:var(--mono);font-size:10px;padding:1px 6px;border-radius:3px;background:rgba(227,179,65,0.15);color:#e3b341">⚠️ ${riesgoIdDisplay}</span>
@@ -3701,19 +3700,8 @@ function renderEntriesEliminados(proyecto) {
       ${btnRestaurar('riesgo', r.entry_id)}
     </div>`;
   });
-  const filasRespDudas = dudasBorradas.map(d => {
-    let dd2 = {}; try { dd2 = JSON.parse(d.nota||'{}'); } catch(e) {}
-    const titulo = dd2.titulo || d.hito_id || '(sin título)';
-    return `<div style="padding:10px 0;border-bottom:1px solid var(--border);font-size:12px">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-        <span style="font-family:var(--mono);font-size:10px;padding:1px 6px;border-radius:3px;background:rgba(88,166,255,0.15);color:#58a6ff">❓ duda</span>
-        <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${d.fecha_borrado?formatDate(d.fecha_borrado.toString().split('T')[0]):'—'}</span>
-      </div>
-      <div style="font-weight:500;color:var(--text);margin-bottom:2px">${titulo}</div>
-      ${btnRestaurar('duda', d.entry_id)}
-    </div>`;
-  });
-  const filas = [...filasCambios, ...filasNotas, ...filasRiesgos, ...filasRespDudas].join('');
+
+  const filas = [...filasEntries, ...filasRiesgos].join('');
   return `
   <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
     <button class="cambio-expand-btn" onclick="toggleCambioPanel('${panelId}')">
@@ -3785,9 +3773,9 @@ function renderNotas(proyecto) {
               <div style="padding:6px 14px;font-size:12px;color:var(--text2);cursor:pointer;white-space:nowrap" onmouseenter="this.style.background='var(--surface)'" onmouseleave="this.style.background=''" onclick="abrirHistorialRiesgo('${riesgoId}')">Ver historial</div>
               ${puedeEliminar ? `<div style="padding:6px 14px;font-size:12px;color:var(--red);cursor:pointer;white-space:nowrap" onmouseenter="this.style.background='var(--surface)'" onmouseleave="this.style.background=''" onclick="borrarRiesgoEntry('${n.entry_id}','${riesgoId}')">Eliminar</div>` : ''}
             </div>` : '';
-          const menuBtnRiesgo = `<button style="font-size:11px;padding:2px 6px;background:none;border:none;color:var(--text3);cursor:pointer;border-radius:3px;line-height:1;flex-shrink:0;opacity:0" class="entry-menu-btn" onmouseenter="this.style.opacity='1';this.style.color='var(--text)';this.nextElementSibling.style.display='block'" onmouseleave="setTimeout(()=>{const m=this.nextElementSibling;if(m&&!m.matches(':hover')){m.style.display='none';this.style.opacity='0'}},150)" onclick="event.stopPropagation()">•••</button>`;
+          const menuBtnRiesgo = `<button style="font-size:11px;padding:2px 6px;background:none;border:none;color:var(--text3);cursor:pointer;border-radius:3px;line-height:1;flex-shrink:0" class="entry-menu-btn" onclick="event.stopPropagation();toggleEntryMenu(this)">•••</button>`;
           return `
-          <div class="nota-entry" data-entry-id="${n.entry_id}" style="position:relative" onmouseenter="this.querySelector('.entry-menu-btn').style.opacity='1'" onmouseleave="this.querySelector('.entry-menu-btn').style.opacity='0'">
+          <div class="nota-entry" data-entry-id="${n.entry_id}" style="position:relative">
             <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:space-between">
               <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;flex:1;min-width:0">
                 ${tipoPillHTML('riesgo')}
@@ -3834,9 +3822,9 @@ function renderNotas(proyecto) {
               ${puedeResponder ? `<div style="padding:6px 14px;font-size:12px;color:var(--text2);cursor:pointer;white-space:nowrap" onmouseenter="this.style.background='var(--surface)'" onmouseleave="this.style.background=''" onclick="openResponderDuda('${n.entry_id}','${tituloDuda.replace(/'/g,"\\'")}')">Responder</div>` : ''}
               ${puedeEliminar ? `<div style="padding:6px 14px;font-size:12px;color:var(--red);cursor:pointer;white-space:nowrap" onmouseenter="this.style.background='var(--surface)'" onmouseleave="this.style.background=''" onclick="borrarDudaEntry('${n.entry_id}','${tituloDuda.replace(/'/g,"\\'")}')">Eliminar</div>` : ''}
             </div>`;
-          const menuBtnDuda = `<button style="font-size:11px;padding:2px 6px;background:none;border:none;color:var(--text3);cursor:pointer;border-radius:3px;line-height:1;flex-shrink:0;opacity:0" class="entry-menu-btn" onmouseenter="this.style.opacity='1';this.style.color='var(--text)';this.nextElementSibling.style.display='block'" onmouseleave="setTimeout(()=>{const m=this.nextElementSibling;if(m&&!m.matches(':hover')){m.style.display='none';this.style.opacity='0'}},150)" onclick="event.stopPropagation()">•••</button>`;
+          const menuBtnDuda = `<button style="font-size:11px;padding:2px 6px;background:none;border:none;color:var(--text3);cursor:pointer;border-radius:3px;line-height:1;flex-shrink:0" class="entry-menu-btn" onclick="event.stopPropagation();toggleEntryMenu(this)">•••</button>`;
           return `
-          <div class="nota-entry" data-entry-id="${n.entry_id}" style="position:relative" onmouseenter="this.querySelector('.entry-menu-btn').style.opacity='1'" onmouseleave="this.querySelector('.entry-menu-btn').style.opacity='0'">
+          <div class="nota-entry" data-entry-id="${n.entry_id}" style="position:relative">
             <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:space-between">
               <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;flex:1;min-width:0">
                 ${tipoPillHTML('duda')}
@@ -3895,9 +3883,9 @@ function renderNotas(proyecto) {
             ${puedeEditar ? `<div style="padding:6px 14px;font-size:12px;color:var(--text2);cursor:pointer;white-space:nowrap" onmouseenter="this.style.background='var(--surface)'" onmouseleave="this.style.background=''" onclick="${esCambio?`editarCambioCompleto('${n.entry_id}')`:`abrirEditarNota('${n.entry_id}')`}">Editar</div>` : ''}
             ${puedeEliminar ? `<div style="padding:6px 14px;font-size:12px;color:var(--red);cursor:pointer;white-space:nowrap" onmouseenter="this.style.background='var(--surface)'" onmouseleave="this.style.background=''" onclick="${esCambio?`borrarCambio('${n.entry_id}')`:`borrarNota('${n.entry_id}','${n.hito_id||''}','${state.currentProyecto?.proyecto_id||''}')`}">Eliminar</div>` : ''}
           </div>`;
-        const menuBtn = (puedeEditar || puedeEliminar) ? `<button style="font-size:11px;padding:2px 6px;background:none;border:none;color:var(--text3);cursor:pointer;border-radius:3px;line-height:1;flex-shrink:0;opacity:0" class="entry-menu-btn" onmouseenter="this.style.opacity='1';this.style.color='var(--text)';this.nextElementSibling.style.display='block'" onmouseleave="setTimeout(()=>{const m=this.nextElementSibling;if(m&&!m.matches(':hover')){m.style.display='none';this.style.opacity='0'}},150)" onclick="event.stopPropagation()">•••</button>` : '';
+        const menuBtn = (puedeEditar || puedeEliminar) ? `<button style="font-size:11px;padding:2px 6px;background:none;border:none;color:var(--text3);cursor:pointer;border-radius:3px;line-height:1;flex-shrink:0" class="entry-menu-btn" onclick="event.stopPropagation();toggleEntryMenu(this)">•••</button>` : '';
         return `
-        <div class="nota-entry" data-entry-id="${n.entry_id}" data-hito-id="${n.hito_id || ''}" style="position:relative" onmouseenter="this.querySelector('.entry-menu-btn')&&(this.querySelector('.entry-menu-btn').style.opacity='1')" onmouseleave="this.querySelector('.entry-menu-btn')&&(this.querySelector('.entry-menu-btn').style.opacity='0')">
+        <div class="nota-entry" data-entry-id="${n.entry_id}" data-hito-id="${n.hito_id || ''}" style="position:relative">
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:space-between">
             <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;flex:1;min-width:0">
               ${tipoPillHTML(n.tipo_entry, notaData?.tipo)}${idTag ? ` ${idTag}` : ''}
@@ -4179,7 +4167,8 @@ async function restaurarEntry(tipo, entryId) {
         await api('restaurarEntryEliminado', { tipo, entry_id: entryId, proyecto_id: proyectoId });
         showToast('Entrada restaurada', 'success');
         await loadProyectoData(proyectoId);
-        if (state.currentProyecto) { await openProyecto(proyectoId); restaurarEstadoPaneles(estadoPaneles); }
+        await openProyecto(proyectoId);
+        restaurarEstadoPaneles(estadoPaneles);
       } catch(e) { showToast('Error: ' + e.message, 'error'); }
     }
   });
@@ -4285,6 +4274,21 @@ function scrollToNota(claveNota) {
   }, 250);
 }
 
+
+function toggleEntryMenu(btn) {
+  const menu = btn.nextElementSibling;
+  if (!menu) return;
+  const isOpen = menu.style.display === 'block';
+  // Cerrar todos los menús abiertos
+  document.querySelectorAll('.entry-acciones-menu').forEach(m => { m.style.display = 'none'; });
+  if (!isOpen) menu.style.display = 'block';
+}
+
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.entry-menu-btn') && !e.target.closest('.entry-acciones-menu')) {
+    document.querySelectorAll('.entry-acciones-menu').forEach(m => { m.style.display = 'none'; });
+  }
+});
 
 function toggleCambioPanel(panelId) {
   const panel = document.getElementById(panelId);
