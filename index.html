@@ -1382,7 +1382,7 @@ async function loadProyectoData(proyectoId) {
   console.time('[PERF] loadProyectoData total · ' + proyectoId);
   try {
     console.time('[PERF] loadProyectoData Promise.all');
-    const [proyectos, log, disciplinas, cambiosDetalle, snapshots, tareas, dudas, riesgos, riesgosBorrados] = await Promise.all([
+    const [proyectos, log, disciplinas, cambiosDetalle, snapshots, tareas, dudas, riesgos, riesgosBorrados, notasBorradas, dudasBorradas] = await Promise.all([
       api('getProyectos'),
       api('getLogEventos',                { proyecto_id: proyectoId }),
       api('getDisciplinasProyecto',       { proyecto_id: proyectoId }),
@@ -1391,7 +1391,9 @@ async function loadProyectoData(proyectoId) {
       api('getTareasAdhoc',               { proyecto_id: proyectoId }).catch(() => []),
       api('getDudasDetalle',              { proyecto_id: proyectoId }).catch(() => []),
       api('getRiesgosDetalle',            { proyecto_id: proyectoId }).catch(() => []),
-      api('getRiesgosDetalleBorrados',    { proyecto_id: proyectoId }).catch(() => [])
+      api('getRiesgosDetalleBorrados',    { proyecto_id: proyectoId }).catch(() => []),
+      api('getNotasBorradas',             { proyecto_id: proyectoId }).catch(() => []),
+      api('getDudasBorradas',             { proyecto_id: proyectoId }).catch(() => [])
     ]);
     console.timeEnd('[PERF] loadProyectoData Promise.all');
 
@@ -1422,6 +1424,12 @@ async function loadProyectoData(proyectoId) {
     // merge riesgos borrados
     const otrosRiesgosBorrados = (state.riesgosDetalleBorrados || []).filter(r => r.proyecto_id !== proyectoId);
     state.riesgosDetalleBorrados = [...otrosRiesgosBorrados, ...(riesgosBorrados || [])];
+    // merge notas borradas
+    const otrasNotasBorradas = (state.notasBorradas || []).filter(n => n.proyecto_id !== proyectoId);
+    state.notasBorradas = [...otrasNotasBorradas, ...(notasBorradas || [])];
+    // merge dudas borradas
+    const otrasDudasBorradas = (state.dudasBorradas || []).filter(d => d.proyecto_id !== proyectoId);
+    state.dudasBorradas = [...otrasDudasBorradas, ...(dudasBorradas || [])];
   } catch(e) { showToast('Error cargando proyecto: ' + e.message, 'error'); console.error(e); }
   console.timeEnd('[PERF] loadProyectoData total · ' + proyectoId);
 }
@@ -2758,8 +2766,8 @@ function openNotaCambio(modoEdicion = false, cambioData = null) {
   document.getElementById('nc-titulo').value = cambioData?.titulo || '';
   document.getElementById('nc-cambio-titulo').value = cambioData?.titulo || '';
   document.getElementById('nc-tipo-nota').value = cambioData?.tipo_nota || '';
-  document.getElementById('nc-nota-grupo').value = '';
-  document.getElementById('nc-nota-disciplina').innerHTML = '<option value="">—</option>';
+  const _ng = document.getElementById('nc-nota-grupo'); if (_ng) _ng.value = '';
+  const _nd = document.getElementById('nc-nota-disciplina'); if (_nd) _nd.innerHTML = '<option value="">—</option>';
   state.cambioDiscsSeleccionadas = new Set();
   state.editandoCambioId = modoEdicion ? cambioData?.entry_id : null;
   state._riesgoProb = 0;
@@ -3646,33 +3654,36 @@ function renderEntriesEliminados(proyecto) {
   const total = cambiosBorrados.length + notasBorradas.length + riesgosBorrados.length + dudasBorradas.length;
   if (total === 0) return '';
   const panelId = 'entries-borrados-panel';
+  const esPMel = state.rol === 'PM';
+  const btnRestaurar = (tipo, entryId) => esPMel
+    ? `<button style="font-size:11px;padding:2px 8px;background:none;border:0.5px solid var(--border);border-radius:3px;color:var(--text3);cursor:pointer;margin-top:4px" onclick="restaurarEntry('${tipo}','${entryId}')">Restaurar</button>`
+    : '';
   const filasCambios = cambiosBorrados.map(c => {
     let snap = []; try { snap = JSON.parse(c.snapshot_cambio_detalle || '[]'); } catch(e) {}
     const titulo = snap[13] || snap[12] || '(sin título)';
     const clave = c.clave_cambio || snap[12] || '—';
     const disciplinas = snap[3] ? snap[3].split(',').map(d => d.split('::')[1] || d).filter(Boolean).join(', ') : '';
-    const borradoPor = (state.usuarios||[]).find(u => u.email === c.borrado_por)?.nombre || c.borrado_por || '—';
     return `<div style="padding:10px 0;border-bottom:1px solid var(--border);font-size:12px">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-        <span style="font-family:var(--mono);font-size:10px;color:var(--yellow)">⚡ ${clave}</span>
-        <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${c.fecha_borrado?formatDate(c.fecha_borrado.toString().split('T')[0]):'—'} · por ${borradoPor}</span>
+        <span style="font-family:var(--mono);font-size:10px;padding:1px 6px;border-radius:3px;background:rgba(255,107,107,0.15);color:#ff6b6b">⚡ ${clave}</span>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${c.fecha_borrado?formatDate(c.fecha_borrado.toString().split('T')[0]):'—'}</span>
       </div>
-      <div style="font-weight:500;color:var(--text);margin-bottom:3px">${titulo}</div>
-      ${disciplinas?`<div style="font-family:var(--mono);font-size:11px;color:var(--text3)">Disciplinas: ${disciplinas}</div>`:''}
-      <div style="font-size:11px;color:var(--text3);font-style:italic;margin-top:2px">Eliminado: ${c.motivo||'—'}</div>
+      <div style="font-weight:500;color:var(--text);margin-bottom:2px">${titulo}</div>
+      ${disciplinas?`<div style="font-family:var(--mono);font-size:11px;color:var(--text3)">${disciplinas}</div>`:''}
+      ${c.motivo?`<div style="font-size:11px;color:var(--text3);font-style:italic">Motivo: ${c.motivo}</div>`:''}
+      ${btnRestaurar('cambio', c.entry_id)}
     </div>`;
   });
   const filasNotas = notasBorradas.map(n => {
     let nd = {}; try { nd = JSON.parse(n.nota||'{}'); } catch(e) {}
     const titulo = nd.titulo || n.hito_id || '(sin título)';
-    const borradoPor = (state.usuarios||[]).find(u => u.email === n.borrado_por)?.nombre || n.borrado_por || '—';
     return `<div style="padding:10px 0;border-bottom:1px solid var(--border);font-size:12px">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-        <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">📌 nota</span>
-        <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${n.fecha_borrado?formatDate(n.fecha_borrado.toString().split('T')[0]):'—'} · por ${borradoPor}</span>
+        <span style="font-family:var(--mono);font-size:10px;padding:1px 6px;border-radius:3px;background:rgba(139,139,139,0.15);color:var(--text2)">📌 nota</span>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${n.fecha_borrado?formatDate(n.fecha_borrado.toString().split('T')[0]):'—'}</span>
       </div>
-      <div style="font-weight:500;color:var(--text)">${titulo}</div>
-      <div style="font-size:11px;color:var(--text3);font-style:italic;margin-top:2px">Eliminado: ${n.motivo||'—'}</div>
+      <div style="font-weight:500;color:var(--text);margin-bottom:2px">${titulo}</div>
+      ${btnRestaurar('nota', n.entry_id)}
     </div>`;
   });
   const filasRiesgos = riesgosBorrados.map(r => {
@@ -3683,23 +3694,23 @@ function renderEntriesEliminados(proyecto) {
     const fechaBorrado = r.fecha_borrado ? formatDate(r.fecha_borrado.toString().split('T')[0]) : '—';
     return `<div style="padding:10px 0;border-bottom:1px solid var(--border);font-size:12px">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-        <span style="font-family:var(--mono);font-size:10px;color:var(--yellow)">⚠️ ${riesgoIdDisplay}</span>
+        <span style="font-family:var(--mono);font-size:10px;padding:1px 6px;border-radius:3px;background:rgba(227,179,65,0.15);color:#e3b341">⚠️ ${riesgoIdDisplay}</span>
         <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${fechaBorrado}</span>
       </div>
-      <div style="font-weight:500;color:var(--text)">${tituloR}</div>
+      <div style="font-weight:500;color:var(--text);margin-bottom:2px">${tituloR}</div>
+      ${btnRestaurar('riesgo', r.entry_id)}
     </div>`;
   });
   const filasRespDudas = dudasBorradas.map(d => {
-    let dd = {}; try { dd = JSON.parse(d.nota||'{}'); } catch(e) {}
-    const titulo = dd.titulo || d.hito_id || '(sin título)';
-    const borradoPor = (state.usuarios||[]).find(u => u.email === d.borrado_por)?.nombre || d.borrado_por || '—';
+    let dd2 = {}; try { dd2 = JSON.parse(d.nota||'{}'); } catch(e) {}
+    const titulo = dd2.titulo || d.hito_id || '(sin título)';
     return `<div style="padding:10px 0;border-bottom:1px solid var(--border);font-size:12px">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-        <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">❓ duda</span>
-        <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${d.fecha_borrado?formatDate(d.fecha_borrado.toString().split('T')[0]):'—'} · por ${borradoPor}</span>
+        <span style="font-family:var(--mono);font-size:10px;padding:1px 6px;border-radius:3px;background:rgba(88,166,255,0.15);color:#58a6ff">❓ duda</span>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${d.fecha_borrado?formatDate(d.fecha_borrado.toString().split('T')[0]):'—'}</span>
       </div>
-      <div style="font-weight:500;color:var(--text)">${titulo}</div>
-      <div style="font-size:11px;color:var(--text3);font-style:italic;margin-top:2px">Eliminado: ${d.motivo||'—'}</div>
+      <div style="font-weight:500;color:var(--text);margin-bottom:2px">${titulo}</div>
+      ${btnRestaurar('duda', d.entry_id)}
     </div>`;
   });
   const filas = [...filasCambios, ...filasNotas, ...filasRiesgos, ...filasRespDudas].join('');
@@ -3720,6 +3731,19 @@ function stripRiesgoPrefix(riesgoId) {
 }
 
 function renderNotas(proyecto) {
+  const puedeEditar = state.rol === 'PM' || state.rol === 'Arquitecto' || state.rol === 'Validador';
+  const puedeEliminar = state.rol === 'PM' || state.rol === 'Arquitecto';
+  const esPM = state.rol === 'PM';
+
+  // helpers de color/label por tipo
+  function tipoPillHTML(tipo, subTipo) {
+    if (tipo === 'cambio_registrado') return `<span style="font-family:var(--mono);font-size:10px;padding:1px 7px;border-radius:3px;background:rgba(255,107,107,0.15);color:#ff6b6b">⚡ cambio</span>`;
+    if (tipo === 'riesgo' || tipo === 'riesgo_update') return `<span style="font-family:var(--mono);font-size:10px;padding:1px 7px;border-radius:3px;background:rgba(227,179,65,0.15);color:#e3b341">⚠️ riesgo</span>`;
+    if (tipo === 'duda') return `<span style="font-family:var(--mono);font-size:10px;padding:1px 7px;border-radius:3px;background:rgba(88,166,255,0.15);color:#58a6ff">❓ duda</span>`;
+    const abrev = {'Lección aprendida':'LA','Decisión':'DEC','Pendiente externo':'PE','General':'GEN'};
+    return `<span style="font-family:var(--mono);font-size:10px;padding:1px 7px;border-radius:3px;background:rgba(139,139,139,0.15);color:var(--text2)">📌 ${abrev[subTipo] || subTipo || 'nota'}</span>`;
+  }
+
   const todosEntries = state.logEventos.filter(e => e.proyecto_id === proyecto.proyecto_id && (e.tipo_entry === 'nota' || e.tipo_entry === 'cambio_registrado' || e.tipo_entry === 'duda' || e.tipo_entry === 'riesgo' || e.tipo_entry === 'riesgo_update'));
   const filtro = state._filtroRegistro || 'todos';
   const notas = filtro === 'todos' ? todosEntries :
@@ -3736,228 +3760,169 @@ function renderNotas(proyecto) {
         return ta - tb;
       }).map(n => {
         const esCambio = n.tipo_entry === 'cambio_registrado';
-        const esPM = state.rol === 'PM';
-
-        // RIESGOS
         const esRiesgo = n.tipo_entry === 'riesgo';
         const esRiesgoUpdate = n.tipo_entry === 'riesgo_update';
+        const esDuda = n.tipo_entry === 'duda';
+        const esNota = n.tipo_entry === 'nota';
+        const autor = n.registrado_por || state.user?.name || '—';
+        const panelId = `entry-panel-${n.entry_id}`;
+
+        // ── RIESGO / RIESGO_UPDATE ──
         if (esRiesgo || esRiesgoUpdate) {
           let riesgoData = {}; try { riesgoData = JSON.parse(n.nota||'{}'); } catch(e) {}
-          const rd = esRiesgo
-            ? getRiesgoDetalleByEntry(n.entry_id)
-            : getRiesgoDetalle(riesgoData.riesgo_id);
+          const rd = esRiesgo ? getRiesgoDetalleByEntry(n.entry_id) : getRiesgoDetalle(riesgoData.riesgo_id);
           const riesgoId = riesgoData.riesgo_id || n.hito_id || '—';
           const riesgoIdDisplay = stripRiesgoPrefix(riesgoId);
-          const titulo = riesgoData.titulo || (esRiesgoUpdate ? `Update de ${riesgoIdDisplay}` : riesgoIdDisplay);
-          const estatus = rd?.estatus || (esRiesgo ? 'Activo' : '—');
+          const titulo = riesgoData.titulo || riesgoIdDisplay;
+          const estatus = rd?.estatus || 'Activo';
           const score = rd?.score || (riesgoData.probabilidad && riesgoData.impacto ? riesgoData.probabilidad * riesgoData.impacto : 0);
           const scoreClass = riesgoScoreClass(score);
           const colorEstatus = riesgoEstatusColor(estatus);
-          const esPM = state.rol === 'PM';
-          const puedeEditar = state.rol === 'PM' || state.rol === 'Arquitecto' || state.rol === 'Validador';
-          const panelId = `riesgo-panel-${n.entry_id}`;
-          const allUpdates = esRiesgo
-            ? state.logEventos.filter(e => e.proyecto_id === proyecto.proyecto_id && e.tipo_entry === 'riesgo_update' && (() => { try { return JSON.parse(e.nota||'{}').riesgo_id === riesgoId; } catch(err) { return false; } })())
-            : [];
-          const updatesHTML = allUpdates.length === 0 ? '' : allUpdates.sort((a,b) => new Date(a.timestamp||a.fecha_real) - new Date(b.timestamp||b.fecha_real)).map(u => {
-            let ud = {}; try { ud = JSON.parse(u.nota||'{}'); } catch(e) {}
-            const uAutor = (state.usuarios.find(x => x.email === u.arquitecto_id)?.nombre) || u.registrado_por || u.arquitecto_id || '—';
-            return `<div style="margin-top:6px;padding:8px 10px;background:var(--surface2);border-radius:var(--radius);border-left:2px solid var(--accent);font-size:12px">
-              <div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-bottom:3px">${formatDate(u.fecha_real)}${formatHora(u.timestamp)?` · ${formatHora(u.timestamp)}`:''} · ${uAutor}</div>
-              ${ud.estatus ? `<span style="font-family:var(--mono);font-size:10px;color:${riesgoEstatusColor(ud.estatus)}">${ud.estatus}</span> ` : ''}
-              ${ud.probabilidad && ud.impacto ? `<span class="riesgo-score-badge ${riesgoScoreClass(ud.probabilidad*ud.impacto)}">${ud.probabilidad*ud.impacto}</span> ` : ''}
-              ${ud.descripcion ? `<div style="color:var(--text2);margin-top:3px">${ud.descripcion}</div>` : ''}
-            </div>`;
-          }).join('');
+          const descripcionRiesgo = riesgoData.descripcion || riesgoData.texto || '';
+          const menuRiesgo = (puedeEliminar || puedeEditar) ? `
+            <div class="entry-acciones-menu" style="display:none;position:absolute;right:0;top:0;padding:4px 0;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);min-width:150px;z-index:10">
+              ${puedeEditar ? `<div style="padding:6px 14px;font-size:12px;color:var(--text2);cursor:pointer;white-space:nowrap" onmouseenter="this.style.background='var(--surface)'" onmouseleave="this.style.background=''" onclick="abrirEditarRiesgoEntry('${n.entry_id}','${riesgoId}')">Editar</div>` : ''}
+              <div style="padding:6px 14px;font-size:12px;color:var(--text2);cursor:pointer;white-space:nowrap" onmouseenter="this.style.background='var(--surface)'" onmouseleave="this.style.background=''" onclick="abrirHistorialRiesgo('${riesgoId}')">Ver historial</div>
+              ${puedeEliminar ? `<div style="padding:6px 14px;font-size:12px;color:var(--red);cursor:pointer;white-space:nowrap" onmouseenter="this.style.background='var(--surface)'" onmouseleave="this.style.background=''" onclick="borrarRiesgoEntry('${n.entry_id}','${riesgoId}')">Eliminar</div>` : ''}
+            </div>` : '';
+          const menuBtnRiesgo = `<button style="font-size:11px;padding:2px 6px;background:none;border:none;color:var(--text3);cursor:pointer;border-radius:3px;line-height:1;flex-shrink:0;opacity:0" class="entry-menu-btn" onmouseenter="this.style.opacity='1';this.style.color='var(--text)';this.nextElementSibling.style.display='block'" onmouseleave="setTimeout(()=>{const m=this.nextElementSibling;if(m&&!m.matches(':hover')){m.style.display='none';this.style.opacity='0'}},150)" onclick="event.stopPropagation()">•••</button>`;
           return `
-          <div class="nota-entry" data-entry-id="${n.entry_id}">
-            <div class="nota-meta" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-              ${formatDate(n.fecha_real)}${formatHora(n.timestamp)?`<span style="font-size:9px;color:var(--text3)">${formatHora(n.timestamp)}</span>`:''} · ${n.registrado_por||state.user?.name||'—'} ·
-              <span style="font-family:var(--mono);font-size:10px;cursor:pointer;color:${esRiesgoUpdate?'var(--text2)':'var(--text2)'}" onclick="abrirHistorialRiesgo('${riesgoId}')">⚠️ <span style="color:${esRiesgoUpdate?'var(--accent)':'var(--yellow)'}">${riesgoIdDisplay}</span></span>
-              ${rd?.categoria?`<span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${rd.categoria}</span>`:''}
-              ${score?`<span class="riesgo-score-badge ${scoreClass}" style="cursor:pointer;position:relative" onclick="abrirMatrizRiesgo(${rd?.probabilidad||0},${rd?.impacto||0},'${riesgoId}')" title="P:${rd?.probabilidad||0} × I:${rd?.impacto||0} = ${score} · Click para ver matriz PMI">${score}</span>`:''}
-              <span style="font-family:var(--mono);font-size:10px;color:${colorEstatus}">${estatus}</span>
+          <div class="nota-entry" data-entry-id="${n.entry_id}" style="position:relative" onmouseenter="this.querySelector('.entry-menu-btn').style.opacity='1'" onmouseleave="this.querySelector('.entry-menu-btn').style.opacity='0'">
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:space-between">
+              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;flex:1;min-width:0">
+                ${tipoPillHTML('riesgo')}
+                <span style="font-family:var(--mono);font-size:10px;color:var(--text2);cursor:pointer" onclick="abrirHistorialRiesgo('${riesgoId}')">${riesgoIdDisplay}</span>
+                <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${formatDate(n.fecha_real)}${formatHora(n.timestamp)?` · ${formatHora(n.timestamp)}`:''} · ${autor}</span>
+                <span style="font-family:var(--mono);font-size:10px;color:${colorEstatus}">${estatus}</span>
+                ${score ? `<span class="riesgo-score-badge ${scoreClass}" style="cursor:pointer" onclick="abrirMatrizRiesgo(${rd?.probabilidad||0},${rd?.impacto||0},'${riesgoId}')">${score}</span>` : ''}
+              </div>
+              <div style="position:relative;flex-shrink:0">${menuBtnRiesgo}${menuRiesgo}</div>
             </div>
-            ${esRiesgo&&titulo?`<div style="font-weight:500;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%" title="${titulo}">${titulo}</div>`:''}
+            <div style="font-weight:500;font-size:13px;margin:4px 0 2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${titulo}</div>
             <button class="cambio-expand-btn" onclick="toggleCambioPanel('${panelId}')">
               <span id="chevron-${panelId}" style="transition:transform 0.15s;display:inline-block">▶</span> ver detalle
             </button>
             <div class="cambio-detail-panel" id="${panelId}">
-              ${esRiesgo&&rd ? `
-                <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:8px">
-                  ${rd.hito_ref_id?`<div style="font-size:11px;font-family:var(--mono);color:var(--text3)">Hito: <span style="color:var(--text2)">${rd.hito_ref_id}</span></div>`:''}
-                  ${rd.disc_ref?`<div style="font-size:11px;font-family:var(--mono);color:var(--text3)">Disc: <span style="color:var(--text2)">${rd.disc_ref.split('::')[1]||rd.disc_ref}</span></div>`:''}
-                  ${rd.fecha_revision?`<div style="font-size:11px;font-family:var(--mono);color:var(--text3)">Rev: <span style="color:var(--accent)">${formatDate(rd.fecha_revision)}</span></div>`:''}
+              ${descripcionRiesgo ? `<div class="cambio-detail-alcance" style="margin-bottom:8px">${descripcionRiesgo}</div>` : '<div style="color:var(--text3);font-family:var(--mono);font-size:12px;margin-bottom:8px">Sin descripción registrada.</div>'}
+              ${rd && (rd.hito_ref_id || rd.disc_ref || rd.fecha_revision || rd.notas_mitigacion) ? `
+                <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:6px">
+                  ${rd.hito_ref_id?`<span style="font-size:11px;font-family:var(--mono);color:var(--text3)">Hito: <span style="color:var(--text2)">${rd.hito_ref_id}</span></span>`:''}
+                  ${rd.disc_ref?`<span style="font-size:11px;font-family:var(--mono);color:var(--text3)">Ref: <span style="color:var(--text2)">${rd.disc_ref.split('::')[1]||rd.disc_ref}</span></span>`:''}
+                  ${rd.fecha_revision?`<span style="font-size:11px;font-family:var(--mono);color:var(--text3)">Revisión: <span style="color:var(--accent)">${formatDate(rd.fecha_revision)}</span></span>`:''}
                 </div>
-                ${riesgoData.descripcion||riesgoData.texto?`<div class="cambio-detail-alcance">${riesgoData.descripcion||riesgoData.texto}</div>`:''}
-                ${rd.notas_mitigacion?`<div style="margin-top:6px;font-size:12px;color:var(--text2);font-style:italic">Mitigación: ${rd.notas_mitigacion}</div>`:''}
-                ${updatesHTML}
-              ` : `${riesgoData.descripcion?`<div class="cambio-detail-alcance">${riesgoData.descripcion}</div>`:''}`}
-              <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
-                ${puedeEditar&&esRiesgo?`<button class="btn-secondary" style="font-size:12px;padding:5px 12px" onclick="abrirUpdateRiesgo('${riesgoId}')">↻ Update</button>`:''}
-                ${esPM?`<button class="btn-danger" style="font-size:12px;padding:5px 12px" onclick="borrarRiesgoEntry('${n.entry_id}','${riesgoId}')">Eliminar…</button>`:''}
-              </div>
+                ${rd.notas_mitigacion?`<div style="font-size:12px;color:var(--text2);font-style:italic;margin-bottom:6px">Mitigación: ${rd.notas_mitigacion}</div>`:''}
+              ` : ''}
             </div>
           </div>`;
         }
 
-        // H11-04 — Dudas
-        const esDuda = n.tipo_entry === 'duda';
-        const dd = esDuda ? getDudaDetalle(n.entry_id) : null;
-        const respuesta = esDuda ? getRespuestaDuda(n.entry_id) : null;
-        const estatusDuda = dd?.estatus || 'pendiente';
-
+        // ── DUDA ──
         if (esDuda) {
+          const dd = getDudaDetalle(n.entry_id);
           let dudaData = {}; try { dudaData = JSON.parse(n.nota||'{}'); } catch(e) {}
           const tituloDuda = dudaData.titulo || n.hito_id || 'Duda';
           const textoDuda = dudaData.texto || '';
-          const tiempoResp = dd?.tiempo_respuesta_habil ? `${dd.tiempo_respuesta_habil}d hábiles` : null;
-          const badgeColor = estatusDuda === 'respondida' ? 'var(--green)' : estatusDuda === 'obsoleta' ? 'var(--text3)' : 'var(--yellow)';
+          const estatusDuda = dd?.estatus || 'pendiente';
+          const tiempoResp = dd?.tiempo_respuesta_habil ? `${dd.tiempo_respuesta_habil}d hábil${dd.tiempo_respuesta_habil==='1'?'':'es'}` : null;
+          const colorEstDuda = estatusDuda === 'respondida' ? 'var(--green)' : 'var(--text3)';
           const puedeResponder = (state.rol === 'PM' || state.rol === 'Validador') && estatusDuda === 'pendiente';
+          const respuesta = getRespuestaDuda(n.entry_id);
           const respData = respuesta ? (() => { try { return JSON.parse(respuesta.nota||'{}'); } catch(e) { return {}; } })() : null;
           const autorRespNombre = respuesta ? (state.usuarios.find(u => u.email === respuesta.arquitecto_id)?.nombre || respuesta.arquitecto_id) : null;
+          const menuDuda = `
+            <div class="entry-acciones-menu" style="display:none;position:absolute;right:0;top:0;padding:4px 0;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);min-width:150px;z-index:10">
+              ${puedeResponder ? `<div style="padding:6px 14px;font-size:12px;color:var(--text2);cursor:pointer;white-space:nowrap" onmouseenter="this.style.background='var(--surface)'" onmouseleave="this.style.background=''" onclick="openResponderDuda('${n.entry_id}','${tituloDuda.replace(/'/g,"\\'")}')">Responder</div>` : ''}
+              ${puedeEliminar ? `<div style="padding:6px 14px;font-size:12px;color:var(--red);cursor:pointer;white-space:nowrap" onmouseenter="this.style.background='var(--surface)'" onmouseleave="this.style.background=''" onclick="borrarDudaEntry('${n.entry_id}','${tituloDuda.replace(/'/g,"\\'")}')">Eliminar</div>` : ''}
+            </div>`;
+          const menuBtnDuda = `<button style="font-size:11px;padding:2px 6px;background:none;border:none;color:var(--text3);cursor:pointer;border-radius:3px;line-height:1;flex-shrink:0;opacity:0" class="entry-menu-btn" onmouseenter="this.style.opacity='1';this.style.color='var(--text)';this.nextElementSibling.style.display='block'" onmouseleave="setTimeout(()=>{const m=this.nextElementSibling;if(m&&!m.matches(':hover')){m.style.display='none';this.style.opacity='0'}},150)" onclick="event.stopPropagation()">•••</button>`;
           return `
-          <div class="nota-entry" data-entry-id="${n.entry_id}">
-            <div class="nota-meta" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-              <span style="font-family:var(--mono);font-size:10px;padding:1px 6px;border-radius:3px;background:rgba(${estatusDuda==='respondida'?'68,204,136':estatusDuda==='obsoleta'?'96,96,96':'227,179,65'},0.12);color:${badgeColor}">❓ duda</span>
-              <span style="font-family:var(--mono);font-size:10px;color:${badgeColor}">${estatusDuda}</span> ·
-              ${formatDate(n.fecha_real)} · ${n.registrado_por || state.user?.name || '—'} ·
-              ${tiempoResp ? `· <span style="font-family:var(--mono);font-size:10px;color:var(--green)">respondida en ${tiempoResp}</span>` : ''}
+          <div class="nota-entry" data-entry-id="${n.entry_id}" style="position:relative" onmouseenter="this.querySelector('.entry-menu-btn').style.opacity='1'" onmouseleave="this.querySelector('.entry-menu-btn').style.opacity='0'">
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:space-between">
+              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;flex:1;min-width:0">
+                ${tipoPillHTML('duda')}
+                <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${formatDate(n.fecha_real)}${formatHora(n.timestamp)?` · ${formatHora(n.timestamp)}`:''} · ${autor}</span>
+                <span style="font-family:var(--mono);font-size:10px;color:${colorEstDuda}">${estatusDuda}</span>
+                ${tiempoResp ? `<span style="font-family:var(--mono);font-size:10px;color:var(--green)">${tiempoResp}</span>` : ''}
+              </div>
+              <div style="position:relative;flex-shrink:0">${menuBtnDuda}${menuDuda}</div>
             </div>
-            <div style="font-weight:500;font-size:13px;margin-top:2px">${tituloDuda}</div>
-            ${textoDuda ? `<div style="font-size:13px;color:var(--text2);margin-top:4px;line-height:1.5">${textoDuda}</div>` : ''}
-            ${respuesta ? `<div style="margin-top:8px;padding:10px 12px;background:var(--surface2);border-radius:var(--radius);border-left:2px solid var(--green)">
-              <div style="font-size:11px;font-family:var(--mono);color:var(--text3);margin-bottom:4px">${formatDate(respuesta.fecha_real)} · ${autorRespNombre}</div>
-              <div style="font-size:13px;color:var(--text)">${respData?.texto || ''}</div>
-            </div>` : ''}
-            <div style="display:flex;gap:8px;margin-top:8px">
-              ${puedeResponder ? `<button class="btn-ghost" style="font-size:11px" onclick="openResponderDuda('${n.entry_id}','${tituloDuda.replace(/'/g,"\\'")}')">Responder</button>` : ''}
-              ${(state.rol==='PM'||state.rol==='Validador') && estatusDuda !== 'obsoleta' ? `<button class="btn-ghost" style="font-size:11px;color:var(--text3)" onclick="obsoletarDuda('${n.entry_id}')">Marcar obsoleta</button>` : ''}
+            <div style="font-weight:500;font-size:13px;margin:4px 0 2px">${tituloDuda}</div>
+            <button class="cambio-expand-btn" onclick="toggleCambioPanel('${panelId}')">
+              <span id="chevron-${panelId}" style="transition:transform 0.15s;display:inline-block">▶</span> ver detalle
+            </button>
+            <div class="cambio-detail-panel" id="${panelId}">
+              ${textoDuda ? `<div class="cambio-detail-alcance" style="margin-bottom:8px">${textoDuda}</div>` : ''}
+              ${respuesta ? `<div style="margin-top:4px;padding:10px 12px;background:var(--surface2);border-radius:var(--radius);border-left:2px solid var(--green)">
+                <div style="font-size:11px;font-family:var(--mono);color:var(--text3);margin-bottom:4px">${formatDate(respuesta.fecha_real)} · ${autorRespNombre}</div>
+                <div style="font-size:13px;color:var(--text)">${respData?.texto || ''}</div>
+              </div>` : ''}
             </div>
           </div>`;
         }
 
-        // Parsear nota estructurada F3
+        // ── NOTA / CAMBIO ──
         let notaData = null;
-        if (n.tipo_entry === 'nota') {
-          try { notaData = JSON.parse(n.nota || '{}'); } catch(e) { notaData = null; }
-        }
-        // Buscar detalle del cambio si existe
+        if (esNota) { try { notaData = JSON.parse(n.nota || '{}'); } catch(e) { notaData = null; } }
         const cd = esCambio ? (state.cambiosDetalle || []).find(c => c.entry_id === n.entry_id) : null;
         const claveCambio = cd?.clave_cambio || '';
         const discs = cd?.disciplinas_afectadas ? cd.disciplinas_afectadas.split(',').map(s => s.trim()).filter(Boolean) : [];
         const hitos = cd?.hitos_afectados ? cd.hitos_afectados.split(',').map(s => s.trim()).filter(Boolean) : [];
         const historial = (() => { try { return JSON.parse(cd?.historial_ediciones || '[]'); } catch(e) { return []; } })();
-        const panelId = `cambio-panel-${n.entry_id}`;
 
-        const chipsHTML = discs.length === 0
-          ? '<span style="color:var(--text3);font-family:var(--mono);font-size:11px">Sin disciplinas registradas</span>'
-          : discs.map(d => `<div class="chip-disc on readonly"><div class="chip-dot" style="background:var(--accent)"></div>${d.split('::')[1] || d}</div>`).join('');
-
-        const hitosHTML = hitos.length > 0
-          ? `<div style="margin-top:6px;font-size:11px;font-family:var(--mono);color:var(--text3)">Hitos afectados: <span style="color:var(--yellow)">${hitos.join(' · ')}</span></div>`
-          : '';
-
-        const histHTML = historial.length === 0
-          ? '<div style="color:var(--text3);font-family:var(--mono);font-size:11px">Sin ediciones previas</div>'
-          : historial.map((h, i) => {
-              // Construir descripción del diff comparando con snapshot anterior
-              const partes = [];
-              if (h.alcance && h.alcance !== (cd?.alcance || n.nota || '')) partes.push(`Alcance editado`);
-              if (h.disciplinas_afectadas !== undefined) {
-                const discAntes = h.disciplinas_afectadas ? h.disciplinas_afectadas.split(',').filter(Boolean).map(d => d.split('::')[1] || d).join(', ') : 'ninguna';
-                partes.push(`Disciplinas: ${discAntes || 'ninguna'}`);
-              }
-              if (h.hitos_afectados !== undefined) {
-                const hitosAntes = h.hitos_afectados || 'ninguno';
-                partes.push(`Hitos: ${hitosAntes || 'ninguno'}`);
-              }
-              const desc = partes.length > 0 ? partes.join(' · ') : 'Edición registrada';
-              return `
-              <div class="cambio-hist-row">
-                <div class="cambio-hist-fecha">${formatDate(h.fecha_edicion)}</div>
-                <div class="cambio-hist-diff">${desc} <span style="color:var(--text3);font-size:10px">· ${h.editado_por || '—'}</span></div>
-              </div>`;
-            }).join('');
-
-        // Texto de contenido — cubre notas estructuradas (JSON) y notas legacy (texto plano)
         const textoNota = esCambio
           ? (cd?.alcance || n.nota || '')
           : (notaData?.contenido || (typeof n.nota === 'string' && !n.nota.startsWith('{') ? n.nota : '') || '');
-
-        const expandHTML = esCambio ? `
-          <button class="cambio-expand-btn" onclick="toggleCambioPanel('${panelId}')">
-            <span id="chevron-${panelId}" style="transition:transform 0.15s;display:inline-block">▶</span> ver detalle
-          </button>
-          <div class="cambio-detail-panel" id="${panelId}">
-            <div class="cambio-detail-alcance">${cd?.alcance || n.nota || '—'}</div>
-            <div class="cambio-detail-chips">${chipsHTML}</div>
-            ${hitosHTML}
-            ${esPM ? `<div style="margin-top:10px;display:flex;gap:8px">
-              <button class="btn-secondary" style="font-size:12px;padding:5px 12px" onclick="editarImpactoCambio('${n.entry_id}')">✏️ Editar impacto</button>
-              <button class="btn-danger" style="font-size:12px;padding:5px 12px" onclick="borrarCambio('${n.entry_id}')">Eliminar cambio…</button>
-            </div>` : ''}
-            <div class="cambio-detail-hist" style="margin-top:10px">
-              <div class="cambio-hist-title">Historial de ediciones</div>
-              ${histHTML}
-            </div>
-          </div>`
-        : `
-          <button class="cambio-expand-btn" onclick="toggleCambioPanel('${panelId}')">
-            <span id="chevron-${panelId}" style="transition:transform 0.15s;display:inline-block">▶</span> ver detalle
-          </button>
-          <div class="cambio-detail-panel" id="${panelId}">
-            ${textoNota ? `<div class="cambio-detail-alcance">${textoNota}</div>` : '<div style="color:var(--text3);font-family:var(--mono);font-size:12px">Sin contenido registrado.</div>'}
-            ${notaData?.disc_ref ? `<div style="margin-top:6px;font-family:var(--mono);font-size:11px;color:var(--text3)">Ref: ${notaData.disc_ref}</div>` : ''}
-            ${esPM ? `<div style="margin-top:10px;display:flex;gap:8px">
-              <button class="btn-secondary" style="font-size:12px;padding:5px 12px" onclick="abrirEditarNota('${n.entry_id}')">✏️ Editar nota</button>
-              <button class="btn-danger" style="font-size:12px;padding:5px 12px" onclick="borrarNota('${n.entry_id}','${n.hito_id || ''}','${state.currentProyecto?.proyecto_id || ''}')">Eliminar nota</button>
-            </div>` : ''}
-          </div>`;
-
-        const notaTipoAbrev = { 'Lección aprendida': 'LA', 'Decisión': 'DEC', 'Pendiente externo': 'PE', 'General': 'GEN' };
-        const tipoColor = esCambio ? 'var(--yellow)' : 'var(--text3)';
-        const tipoLabel = esCambio
-          ? `⚡ cambio`
-          : `📌 ${notaTipoAbrev[notaData?.tipo] || notaData?.tipo || 'nota'}`;
-        const tipoPill = `<span style="font-family:var(--mono);font-size:10px;padding:1px 6px;border-radius:3px;background:${esCambio?'rgba(227,179,65,0.12)':'var(--surface2)'};color:${tipoColor}">${tipoLabel}</span>`;
+        const chipsHTML = discs.length === 0
+          ? '<span style="color:var(--text3);font-family:var(--mono);font-size:11px">Sin disciplinas registradas</span>'
+          : discs.map(d => `<div class="chip-disc on readonly"><div class="chip-dot" style="background:var(--accent)"></div>${d.split('::')[1] || d}</div>`).join('');
+        const hitosHTML = hitos.length > 0
+          ? `<div style="margin-top:6px;font-size:11px;font-family:var(--mono);color:var(--text3)">Hitos afectados: <span style="color:var(--yellow)">${hitos.join(' · ')}</span></div>` : '';
+        const histHTML = historial.length === 0
+          ? '<div style="color:var(--text3);font-family:var(--mono);font-size:11px">Sin ediciones previas</div>'
+          : historial.map(h => {
+              const partes = [];
+              if (h.disciplinas_afectadas !== undefined) partes.push(`Disciplinas: ${h.disciplinas_afectadas ? h.disciplinas_afectadas.split(',').filter(Boolean).map(d => d.split('::')[1]||d).join(', ') : 'ninguna'}`);
+              if (h.hitos_afectados !== undefined) partes.push(`Hitos: ${h.hitos_afectados||'ninguno'}`);
+              return `<div class="cambio-hist-row"><div class="cambio-hist-fecha">${formatDate(h.fecha_edicion)}</div><div class="cambio-hist-diff">${partes.length?partes.join(' · '):'Edición registrada'} <span style="color:var(--text3);font-size:10px">· ${h.editado_por||'—'}</span></div></div>`;
+            }).join('');
+        const tituloTexto = notaData?.titulo || (esCambio && cd?.titulo) || '';
         const idTag = esCambio && claveCambio
           ? `<span style="font-family:var(--mono);font-size:10px;color:var(--text2)">${claveCambio}</span>`
-          : !esCambio && n.hito_id
-            ? `<span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${n.hito_id}</span>`
-            : '';
-        const tituloTexto = notaData?.titulo || (esCambio && cd?.titulo) || '';
-        const tituloNota = tituloTexto
-          ? `<div style="font-weight:500;font-size:13px;margin:4px 0 2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${tituloTexto}">${tituloTexto}</div>`
-          : '';
-        const autor = n.registrado_por || state.user?.name || '—';
+          : (esNota && n.hito_id ? `<span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${n.hito_id}</span>` : '');
         const metaSecundaria = `<span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${formatDate(n.fecha_real)}${formatHora(n.timestamp)?` · ${formatHora(n.timestamp)}`:''} · ${autor}${cd?.impacto_tipo?` · ${cd.impacto_tipo}`:''}</span>`;
-
-        // Menú de acciones ••• en hover
-        const accionesMenu = `<div class="entry-acciones-menu" style="display:none;position:absolute;right:0;top:0;padding:4px 0;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);min-width:140px;z-index:10;box-shadow:0 4px 12px rgba(0,0,0,0.3)">
-          ${esPM ? `<div style="padding:6px 14px;font-size:12px;color:var(--text2);cursor:pointer;white-space:nowrap" onmouseenter="this.style.background='var(--surface)'" onmouseleave="this.style.background=''" onclick="abrirEditarNota('${n.entry_id}')">Editar</div>` : ''}
-          ${esPM ? `<div style="padding:6px 14px;font-size:12px;color:var(--red);cursor:pointer;white-space:nowrap" onmouseenter="this.style.background='var(--surface)'" onmouseleave="this.style.background=''" onclick="borrarNota('${n.entry_id}','${n.hito_id || ''}','${state.currentProyecto?.proyecto_id || ''}')">Eliminar</div>` : ''}
-        </div>`;
-        const accionesCambioMenu = `<div class="entry-acciones-menu" style="display:none;position:absolute;right:0;top:0;padding:4px 0;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);min-width:140px;z-index:10;box-shadow:0 4px 12px rgba(0,0,0,0.3)">
-          ${esPM ? `<div style="padding:6px 14px;font-size:12px;color:var(--text2);cursor:pointer;white-space:nowrap" onmouseenter="this.style.background='var(--surface)'" onmouseleave="this.style.background=''" onclick="editarImpactoCambio('${n.entry_id}')">Editar impacto</div>` : ''}
-          ${esPM ? `<div style="padding:6px 14px;font-size:12px;color:var(--red);cursor:pointer;white-space:nowrap" onmouseenter="this.style.background='var(--surface)'" onmouseleave="this.style.background=''" onclick="borrarCambio('${n.entry_id}')">Eliminar</div>` : ''}
-        </div>`;
-        const menuBtn = (esPM) ? `<button style="font-size:11px;padding:2px 6px;background:none;border:none;color:var(--text3);cursor:pointer;border-radius:3px;line-height:1;flex-shrink:0" class="entry-menu-btn" onmouseenter="this.style.color='var(--text)';this.nextElementSibling.style.display='block'" onmouseleave="setTimeout(()=>{const m=this.nextElementSibling;if(m&&!m.matches(':hover'))m.style.display='none'},150)" onclick="event.stopPropagation()">•••</button>` : '';
-
+        const menuNotaCambio = `
+          <div class="entry-acciones-menu" style="display:none;position:absolute;right:0;top:0;padding:4px 0;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);min-width:150px;z-index:10">
+            ${puedeEditar ? `<div style="padding:6px 14px;font-size:12px;color:var(--text2);cursor:pointer;white-space:nowrap" onmouseenter="this.style.background='var(--surface)'" onmouseleave="this.style.background=''" onclick="${esCambio?`editarCambioCompleto('${n.entry_id}')`:`abrirEditarNota('${n.entry_id}')`}">Editar</div>` : ''}
+            ${puedeEliminar ? `<div style="padding:6px 14px;font-size:12px;color:var(--red);cursor:pointer;white-space:nowrap" onmouseenter="this.style.background='var(--surface)'" onmouseleave="this.style.background=''" onclick="${esCambio?`borrarCambio('${n.entry_id}')`:`borrarNota('${n.entry_id}','${n.hito_id||''}','${state.currentProyecto?.proyecto_id||''}')`}">Eliminar</div>` : ''}
+          </div>`;
+        const menuBtn = (puedeEditar || puedeEliminar) ? `<button style="font-size:11px;padding:2px 6px;background:none;border:none;color:var(--text3);cursor:pointer;border-radius:3px;line-height:1;flex-shrink:0;opacity:0" class="entry-menu-btn" onmouseenter="this.style.opacity='1';this.style.color='var(--text)';this.nextElementSibling.style.display='block'" onmouseleave="setTimeout(()=>{const m=this.nextElementSibling;if(m&&!m.matches(':hover')){m.style.display='none';this.style.opacity='0'}},150)" onclick="event.stopPropagation()">•••</button>` : '';
         return `
-        <div class="nota-entry" data-entry-id="${n.entry_id}" data-hito-id="${n.hito_id || ''}" style="position:relative">
+        <div class="nota-entry" data-entry-id="${n.entry_id}" data-hito-id="${n.hito_id || ''}" style="position:relative" onmouseenter="this.querySelector('.entry-menu-btn')&&(this.querySelector('.entry-menu-btn').style.opacity='1')" onmouseleave="this.querySelector('.entry-menu-btn')&&(this.querySelector('.entry-menu-btn').style.opacity='0')">
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:space-between">
             <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;flex:1;min-width:0">
-              ${tipoPill}${idTag ? ` ${idTag}` : ''}
+              ${tipoPillHTML(n.tipo_entry, notaData?.tipo)}${idTag ? ` ${idTag}` : ''}
               ${metaSecundaria}
             </div>
-            <div style="position:relative;flex-shrink:0">
-              ${menuBtn}
-              ${esCambio ? accionesCambioMenu : accionesMenu}
-            </div>
+            <div style="position:relative;flex-shrink:0">${menuBtn}${menuNotaCambio}</div>
           </div>
-          ${tituloNota}
-          ${expandHTML}
+          ${tituloTexto ? `<div style="font-weight:500;font-size:13px;margin:4px 0 2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${tituloTexto}">${tituloTexto}</div>` : ''}
+          <button class="cambio-expand-btn" onclick="toggleCambioPanel('${panelId}')">
+            <span id="chevron-${panelId}" style="transition:transform 0.15s;display:inline-block">▶</span> ver detalle
+          </button>
+          <div class="cambio-detail-panel" id="${panelId}">
+            ${esCambio ? `
+              <div class="cambio-detail-alcance">${cd?.alcance || n.nota || '—'}</div>
+              <div class="cambio-detail-chips">${chipsHTML}</div>
+              ${hitosHTML}
+              <div class="cambio-detail-hist" style="margin-top:10px">
+                <div class="cambio-hist-title">Historial de ediciones</div>
+                ${histHTML}
+              </div>
+            ` : `
+              ${textoNota ? `<div class="cambio-detail-alcance">${textoNota}</div>` : '<div style="color:var(--text3);font-family:var(--mono);font-size:12px">Sin contenido registrado.</div>'}
+              ${notaData?.disc_ref ? `<div style="margin-top:6px;font-family:var(--mono);font-size:11px;color:var(--text3)">Ref: ${notaData.disc_ref}</div>` : ''}
+            `}
+          </div>
         </div>`;
       }).join('');
 
@@ -4135,6 +4100,86 @@ function borrarRiesgoEntry(entryId, riesgoId) {
         if (scope === 'completo') state.riesgosDetalle = (state.riesgosDetalle || []).filter(r => r.riesgo_id !== riesgoId);
         showToast(scope === 'completo' ? `Riesgo ${riesgoId} eliminado` : 'Entry eliminado', 'success');
         if (state.currentProyecto) { await openProyecto(state.currentProyecto.proyecto_id); restaurarEstadoPaneles(estadoPaneles); }
+      } catch(e) { showToast('Error: ' + e.message, 'error'); }
+    }
+  });
+}
+
+function borrarDudaEntry(entryId, tituloDuda) {
+  confirmarBorrado({
+    titulo: 'Eliminar duda',
+    mensaje: `Vas a eliminar la duda "${tituloDuda}".<br><br>El registro se archivará y ya no aparecerá en el proyecto.`,
+    labelBoton: 'Eliminar duda',
+    onConfirm: async () => {
+      const estadoPaneles = capturarEstadoPaneles();
+      try {
+        await api('borrarDuda', { entry_id: entryId, proyecto_id: state.currentProyecto?.proyecto_id || '' });
+        state.logEventos = state.logEventos.filter(e => e.entry_id !== entryId);
+        state.dudasDetalle = (state.dudasDetalle || []).filter(d => d.entry_id !== entryId);
+        showToast('Duda eliminada', 'success');
+        if (state.currentProyecto) { await openProyecto(state.currentProyecto.proyecto_id); restaurarEstadoPaneles(estadoPaneles); }
+      } catch(e) { showToast('Error: ' + e.message, 'error'); }
+    }
+  });
+}
+
+function editarCambioCompleto(entryId) {
+  const n = state.logEventos.find(e => e.entry_id === entryId);
+  const cd = (state.cambiosDetalle || []).find(c => c.entry_id === entryId);
+  if (!n) return;
+  openNotaCambio(true, {
+    entry_id: entryId,
+    fecha: n.fecha_real,
+    texto: cd?.alcance || n.nota || '',
+    impacto_tipo: cd?.impacto_tipo || '',
+    origen: cd?.origen_cambio || '',
+    disciplinas_afectadas: cd?.disciplinas_afectadas || '',
+    titulo: cd?.titulo || ''
+  });
+  document.getElementById('nota-cambio-title').textContent = 'Editar cambio';
+}
+
+function abrirEditarRiesgoEntry(entryId, riesgoId) {
+  const n = state.logEventos.find(e => e.entry_id === entryId);
+  if (!n) return;
+  let riesgoData = {}; try { riesgoData = JSON.parse(n.nota||'{}'); } catch(e) {}
+  const rd = getRiesgoDetalle(riesgoId);
+  state.editandoRiesgoEntryId = entryId;
+  openNotaCambio();
+  setTimeout(() => {
+    selectNotaCambioTipo('riesgo');
+    setTimeout(() => {
+      document.getElementById('nota-cambio-title').textContent = 'Editar entrada de riesgo';
+      setRiesgoModo('nuevo');
+      const tituloEl = document.getElementById('nc-riesgo-titulo');
+      if (tituloEl) tituloEl.value = riesgoData.titulo || '';
+      const catEl = document.getElementById('nc-riesgo-categoria');
+      if (catEl) { catEl.value = rd?.categoria || ''; updateRiesgoCategoriaTip(); }
+      const descEl = document.getElementById('nc-riesgo-descripcion');
+      if (descEl) descEl.value = riesgoData.descripcion || '';
+      const fechaEl = document.getElementById('nc-fecha');
+      if (fechaEl) fechaEl.value = normalizarFechaParaInput(n.fecha_real);
+      if (rd?.probabilidad) { state._riesgoProb = rd.probabilidad; renderRiesgoStars('nc-riesgo-prob-container', rd.probabilidad); }
+      if (rd?.impacto) { state._riesgoImp = rd.impacto; renderRiesgoStars('nc-riesgo-imp-container', rd.impacto); }
+    }, 100);
+  }, 100);
+}
+
+async function restaurarEntry(tipo, entryId) {
+  if (state.rol !== 'PM') { showToast('Solo el PM puede restaurar entradas', 'error'); return; }
+  const proyectoId = state.currentProyecto?.proyecto_id;
+  if (!proyectoId) return;
+  confirmarBorrado({
+    titulo: 'Restaurar entrada',
+    mensaje: 'La entrada volverá a aparecer en el Registro del Proyecto.',
+    labelBoton: 'Restaurar',
+    onConfirm: async () => {
+      const estadoPaneles = capturarEstadoPaneles();
+      try {
+        await api('restaurarEntryEliminado', { tipo, entry_id: entryId, proyecto_id: proyectoId });
+        showToast('Entrada restaurada', 'success');
+        await loadProyectoData(proyectoId);
+        if (state.currentProyecto) { await openProyecto(proyectoId); restaurarEstadoPaneles(estadoPaneles); }
       } catch(e) { showToast('Error: ' + e.message, 'error'); }
     }
   });
