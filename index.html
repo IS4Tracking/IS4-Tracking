@@ -43,6 +43,7 @@
   ::-webkit-scrollbar { width:4px; height:4px; }
   ::-webkit-scrollbar-track { background:var(--bg); }
   ::-webkit-scrollbar-thumb { background:var(--border2); border-radius:2px; }
+  .entry-acciones-menu:hover { display:block !important; }
   .riesgo-star { font-size:18px; cursor:pointer; color:var(--border2); transition:color 0.1s; user-select:none; }
   .riesgo-star.filled { color:var(--yellow); }
   .riesgo-score-badge { display:inline-block; font-family:var(--mono); font-size:11px; padding:2px 8px; border-radius:3px; font-weight:500; }
@@ -2939,16 +2940,18 @@ function updateEventos() {
 }
 
 function resetModalNotaCambio() {
-  document.getElementById('nc-texto').value = '';
-  document.getElementById('nc-fecha').value = new Date().toISOString().split('T')[0];
-  document.getElementById('nc-titulo').value = '';
-  document.getElementById('nc-tipo-nota').value = '';
-  document.getElementById('nc-cambio-titulo').value = '';
-  document.getElementById('nc-duda-titulo').value = '';
-  document.getElementById('nc-duda-grupo').value = '';
-  document.getElementById('nc-duda-disciplina').innerHTML = '<option value="">—</option>';
-  document.getElementById('nc-riesgo-titulo').value = '';
-  document.getElementById('nc-riesgo-categoria').value = '';
+  const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+  const setHTML = (id, html) => { const el = document.getElementById(id); if (el) el.innerHTML = html; };
+  setVal('nc-texto', '');
+  setVal('nc-fecha', new Date().toISOString().split('T')[0]);
+  setVal('nc-titulo', '');
+  setVal('nc-tipo-nota', '');
+  setVal('nc-cambio-titulo', '');
+  setVal('nc-duda-titulo', '');
+  setVal('nc-duda-grupo', '');
+  setHTML('nc-duda-disciplina', '<option value="">—</option>');
+  setVal('nc-riesgo-titulo', '');
+  setVal('nc-riesgo-categoria', '');
   const scoreDisp = document.getElementById('nc-riesgo-score-display');
   if (scoreDisp) { scoreDisp.style.display = 'none'; scoreDisp.innerHTML = ''; }
   state._riesgoProb = 0; state._riesgoImp = 0;
@@ -3770,7 +3773,7 @@ function renderNotas(proyecto) {
           <div class="nota-entry" data-entry-id="${n.entry_id}">
             <div class="nota-meta" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
               ${formatDate(n.fecha_real)}${formatHora(n.timestamp)?`<span style="font-size:9px;color:var(--text3)">${formatHora(n.timestamp)}</span>`:''} · ${n.registrado_por||state.user?.name||'—'} ·
-              <span style="font-family:var(--mono);font-size:10px;cursor:pointer;color:${esRiesgoUpdate?'var(--accent)':'var(--yellow)'}" onclick="abrirHistorialRiesgo('${riesgoId}')">⚠️ ${esRiesgoUpdate?'→ ':''}<strong>${riesgoIdDisplay}</strong></span>
+              <span style="font-family:var(--mono);font-size:10px;cursor:pointer;color:${esRiesgoUpdate?'var(--text2)':'var(--text2)'}" onclick="abrirHistorialRiesgo('${riesgoId}')">⚠️ <span style="color:${esRiesgoUpdate?'var(--accent)':'var(--yellow)'}">${riesgoIdDisplay}</span></span>
               ${rd?.categoria?`<span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${rd.categoria}</span>`:''}
               ${score?`<span class="riesgo-score-badge ${scoreClass}" style="cursor:pointer;position:relative" onclick="abrirMatrizRiesgo(${rd?.probabilidad||0},${rd?.impacto||0},'${riesgoId}')" title="P:${rd?.probabilidad||0} × I:${rd?.impacto||0} = ${score} · Click para ver matriz PMI">${score}</span>`:''}
               <span style="font-family:var(--mono);font-size:10px;color:${colorEstatus}">${estatus}</span>
@@ -3913,20 +3916,46 @@ function renderNotas(proyecto) {
           </div>`;
 
         const notaTipoAbrev = { 'Lección aprendida': 'LA', 'Decisión': 'DEC', 'Pendiente externo': 'PE', 'General': 'GEN' };
-        const tipoPill = esCambio
-          ? `<span style="font-family:var(--mono);font-size:10px;padding:1px 6px;border-radius:3px;background:rgba(227,179,65,0.12);color:var(--yellow)">⚡ cambio</span>`
-          : `<span style="font-family:var(--mono);font-size:10px;padding:1px 6px;border-radius:3px;background:var(--surface2);color:var(--text3)">📌 ${notaTipoAbrev[notaData?.tipo] || notaData?.tipo || 'nota'}</span>`;
-        const claveTag = esCambio && claveCambio ? `<span style="font-family:var(--mono);font-size:10px;color:var(--yellow);cursor:pointer" onclick="scrollToCambio('${n.entry_id}')" title="Ver detalle del cambio">${claveCambio}</span>` : '';
-        const tituloNota = notaData?.titulo
-          ? `<div class="nota-titulo" style="font-weight:500;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%" title="${notaData.titulo}">${notaData.titulo}</div>`
-          : esCambio && cd?.titulo
-            ? `<div class="nota-titulo" style="font-weight:500;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%" title="${cd.titulo}">${cd.titulo}</div>`
+        const tipoColor = esCambio ? 'var(--yellow)' : 'var(--text3)';
+        const tipoLabel = esCambio
+          ? `⚡ cambio`
+          : `📌 ${notaTipoAbrev[notaData?.tipo] || notaData?.tipo || 'nota'}`;
+        const tipoPill = `<span style="font-family:var(--mono);font-size:10px;padding:1px 6px;border-radius:3px;background:${esCambio?'rgba(227,179,65,0.12)':'var(--surface2)'};color:${tipoColor}">${tipoLabel}</span>`;
+        const idTag = esCambio && claveCambio
+          ? `<span style="font-family:var(--mono);font-size:10px;color:var(--text2)">${claveCambio}</span>`
+          : !esCambio && n.hito_id
+            ? `<span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${n.hito_id}</span>`
             : '';
-        const claveNota = !esCambio && n.hito_id ? `<span style="font-family:var(--mono);font-size:10px;color:var(--text3);cursor:pointer" title="Ver nota">${n.hito_id}</span>` : '';
+        const tituloTexto = notaData?.titulo || (esCambio && cd?.titulo) || '';
+        const tituloNota = tituloTexto
+          ? `<div style="font-weight:500;font-size:13px;margin:4px 0 2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${tituloTexto}">${tituloTexto}</div>`
+          : '';
+        const autor = n.registrado_por || state.user?.name || '—';
+        const metaSecundaria = `<span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${formatDate(n.fecha_real)}${formatHora(n.timestamp)?` · ${formatHora(n.timestamp)}`:''} · ${autor}${cd?.impacto_tipo?` · ${cd.impacto_tipo}`:''}</span>`;
+
+        // Menú de acciones ••• en hover
+        const accionesMenu = `<div class="entry-acciones-menu" style="display:none;position:absolute;right:0;top:0;padding:4px 0;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);min-width:140px;z-index:10;box-shadow:0 4px 12px rgba(0,0,0,0.3)">
+          ${esPM ? `<div style="padding:6px 14px;font-size:12px;color:var(--text2);cursor:pointer;white-space:nowrap" onmouseenter="this.style.background='var(--surface)'" onmouseleave="this.style.background=''" onclick="abrirEditarNota('${n.entry_id}')">Editar</div>` : ''}
+          ${esPM ? `<div style="padding:6px 14px;font-size:12px;color:var(--red);cursor:pointer;white-space:nowrap" onmouseenter="this.style.background='var(--surface)'" onmouseleave="this.style.background=''" onclick="borrarNota('${n.entry_id}','${n.hito_id || ''}','${state.currentProyecto?.proyecto_id || ''}')">Eliminar</div>` : ''}
+        </div>`;
+        const accionesCambioMenu = `<div class="entry-acciones-menu" style="display:none;position:absolute;right:0;top:0;padding:4px 0;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);min-width:140px;z-index:10;box-shadow:0 4px 12px rgba(0,0,0,0.3)">
+          ${esPM ? `<div style="padding:6px 14px;font-size:12px;color:var(--text2);cursor:pointer;white-space:nowrap" onmouseenter="this.style.background='var(--surface)'" onmouseleave="this.style.background=''" onclick="editarImpactoCambio('${n.entry_id}')">Editar impacto</div>` : ''}
+          ${esPM ? `<div style="padding:6px 14px;font-size:12px;color:var(--red);cursor:pointer;white-space:nowrap" onmouseenter="this.style.background='var(--surface)'" onmouseleave="this.style.background=''" onclick="borrarCambio('${n.entry_id}')">Eliminar</div>` : ''}
+        </div>`;
+        const menuBtn = (esPM) ? `<button style="font-size:11px;padding:2px 6px;background:none;border:none;color:var(--text3);cursor:pointer;border-radius:3px;line-height:1;flex-shrink:0" class="entry-menu-btn" onmouseenter="this.style.color='var(--text)';this.nextElementSibling.style.display='block'" onmouseleave="setTimeout(()=>{const m=this.nextElementSibling;if(m&&!m.matches(':hover'))m.style.display='none'},150)" onclick="event.stopPropagation()">•••</button>` : '';
 
         return `
-        <div class="nota-entry" data-entry-id="${n.entry_id}" data-hito-id="${n.hito_id || ''}">
-          <div class="nota-meta" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${tipoPill}${claveTag ? ' ' + claveTag : ''} · ${formatDate(n.fecha_real)}${formatHora(n.timestamp) ? `<span style="font-size:9px;color:var(--text3)">${formatHora(n.timestamp)}</span>` : ''} · ${n.registrado_por || state.user?.name || '—'}${cd?.impacto_tipo ? ` · <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${cd.impacto_tipo}</span>` : ''}</div>
+        <div class="nota-entry" data-entry-id="${n.entry_id}" data-hito-id="${n.hito_id || ''}" style="position:relative">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:space-between">
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;flex:1;min-width:0">
+              ${tipoPill}${idTag ? ` ${idTag}` : ''}
+              ${metaSecundaria}
+            </div>
+            <div style="position:relative;flex-shrink:0">
+              ${menuBtn}
+              ${esCambio ? accionesCambioMenu : accionesMenu}
+            </div>
+          </div>
           ${tituloNota}
           ${expandHTML}
         </div>`;
