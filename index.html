@@ -1426,7 +1426,8 @@ async function loadProyectoData(proyectoId) {
     // merge entries borrados (notas, cambios, dudas — soft-delete en log_eventos)
     const otrosEntriesBorrados = (state.entriesBorrados || []).filter(e => e.proyecto_id !== proyectoId);
     state.entriesBorrados = [...otrosEntriesBorrados, ...(entriesBorrados || [])];
-    console.log('[DEBUG-EB] entriesBorrados cargados desde AS:', entriesBorrados);
+    console.log('[DEBUG-EB] entriesBorrados RAW desde AS:', JSON.stringify(entriesBorrados));
+    console.log('[DEBUG-EB] entriesBorrados length:', (entriesBorrados||[]).length);
     console.log('[DEBUG-EB] state.entriesBorrados total:', state.entriesBorrados.length);
   } catch(e) { showToast('Error cargando proyecto: ' + e.message, 'error'); console.error(e); }
   console.timeEnd('[PERF] loadProyectoData total · ' + proyectoId);
