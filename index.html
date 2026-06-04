@@ -1379,58 +1379,96 @@ async function loadHomeData() {
 
 async function loadProyectoData(proyectoId) {
   if (!proyectoId) return;
-  console.time('[PERF] loadProyectoData total · ' + proyectoId);
+
+  const runId = `${proyectoId} · ${Date.now()} · ${Math.random().toString(36).slice(2, 7)}`;
+  const timerTotal = `[PERF] loadProyectoData total · ${runId}`;
+  const timerPromise = `[PERF] loadProyectoData Promise.all · ${runId}`;
+  let promiseTimerStarted = false;
+
+  console.time(timerTotal);
+
   try {
-    console.time('[PERF] loadProyectoData Promise.all');
-    const [proyectos, log, disciplinas, cambiosDetalle, snapshots, tareas, dudas, riesgos, riesgosBorrados, entriesBorrados] = await Promise.all([
+    console.time(timerPromise);
+    promiseTimerStarted = true;
+
+    const [
+      proyectos,
+      log,
+      disciplinas,
+      cambiosDetalle,
+      snapshots,
+      tareas,
+      dudas,
+      riesgos,
+      riesgosBorrados,
+      entriesBorrados
+    ] = await Promise.all([
       api('getProyectos'),
       api('getLogEventos',             { proyecto_id: proyectoId }),
       api('getDisciplinasProyecto',    { proyecto_id: proyectoId }),
       api('getCambiosDetalle',         { proyecto_id: proyectoId }),
       api('getSnapshotsEntrega',       { proyecto_id: proyectoId }),
-      api('getTareasAdhoc',            { proyecto_id: proyectoId }).catch((e) => { console.error('[API-ERROR] getTareasAdhoc', e); return []; }),
-      api('getDudasDetalle',           { proyecto_id: proyectoId }).catch((e) => { console.error('[API-ERROR] getDudasDetalle', e); return []; }),
-      api('getRiesgosDetalle',         { proyecto_id: proyectoId }).catch((e) => { console.error('[API-ERROR] getRiesgosDetalle', e); return []; }),
-      api('getRiesgosDetalleBorrados', { proyecto_id: proyectoId }).catch((e) => { console.error('[API-ERROR] getRiesgosDetalleBorrados', e); return []; }),
-      api('getEntriesBorrados',        { proyecto_id: proyectoId }).catch((e) => { console.error('[API-ERROR] getEntriesBorrados', e); return []; })
+      api('getTareasAdhoc',            { proyecto_id: proyectoId }).catch(e => { console.error('[API-ERROR] getTareasAdhoc', e); return []; }),
+      api('getDudasDetalle',           { proyecto_id: proyectoId }).catch(e => { console.error('[API-ERROR] getDudasDetalle', e); return []; }),
+      api('getRiesgosDetalle',         { proyecto_id: proyectoId }).catch(e => { console.error('[API-ERROR] getRiesgosDetalle', e); return []; }),
+      api('getRiesgosDetalleBorrados', { proyecto_id: proyectoId }).catch(e => { console.error('[API-ERROR] getRiesgosDetalleBorrados', e); return []; }),
+      api('getEntriesBorrados',        { proyecto_id: proyectoId }).catch(e => { console.error('[API-ERROR] getEntriesBorrados', e); return []; })
     ]);
-    console.timeEnd('[PERF] loadProyectoData Promise.all');
 
-    state.proyectos           = proyectos    || [];
+    console.timeEnd(timerPromise);
+    promiseTimerStarted = false;
+
+    state.proyectos = proyectos || [];
+
     // IX-2: merge log filtrado en state.logEventos sin sobreescribir otros proyectos
     const otrosLogs = (state.logEventos || []).filter(e => e.proyecto_id !== proyectoId);
-    state.logEventos          = [...otrosLogs, ...(log || [])];
+    state.logEventos = [...otrosLogs, ...(log || [])];
+
     // merge disciplinas filtradas
     const otrasDiscs = (state.disciplinasProyecto || []).filter(d => d.proyecto_id !== proyectoId);
     state.disciplinasProyecto = [...otrasDiscs, ...(disciplinas || [])];
+
     // merge cambiosDetalle filtrados
     const entryIdsProyecto = new Set((log || []).map(e => e.entry_id));
     const otrosCambios = (state.cambiosDetalle || []).filter(c => !entryIdsProyecto.has(c.entry_id));
-    state.cambiosDetalle      = [...otrosCambios, ...(cambiosDetalle || [])];
+    state.cambiosDetalle = [...otrosCambios, ...(cambiosDetalle || [])];
+
     // merge snapshots filtrados
     const otrosSnaps = (state.snapshotsEntrega || []).filter(s => s.proyecto_id !== proyectoId);
-    state.snapshotsEntrega    = [...otrosSnaps, ...(snapshots || [])];
+    state.snapshotsEntrega = [...otrosSnaps, ...(snapshots || [])];
+
     // merge tareas filtradas
     const otrasTareas = (state.tareasAdhoc || []).filter(t => t.proyecto_id !== proyectoId);
-    state.tareasAdhoc         = [...otrasTareas, ...(tareas || [])];
+    state.tareasAdhoc = [...otrasTareas, ...(tareas || [])];
+
     // merge dudas
     const entryIdsSet = new Set((log || []).map(e => e.entry_id));
     const otrasDudas = (state.dudasDetalle || []).filter(d => !entryIdsSet.has(d.entry_id));
-    state.dudasDetalle        = [...otrasDudas, ...(dudas || [])];
+    state.dudasDetalle = [...otrasDudas, ...(dudas || [])];
+
     // merge riesgos activos
     const otrosRiesgos = (state.riesgosDetalle || []).filter(r => r.proyecto_id !== proyectoId);
     state.riesgosDetalle = [...otrosRiesgos, ...(riesgos || [])];
-    // merge riesgos borrados (modelo propio en riesgos_detalle)
+
+    // merge riesgos borrados
     const otrosRiesgosBorrados = (state.riesgosDetalleBorrados || []).filter(r => r.proyecto_id !== proyectoId);
     state.riesgosDetalleBorrados = [...otrosRiesgosBorrados, ...(riesgosBorrados || [])];
-    // merge entries borrados (notas, cambios, dudas — soft-delete en log_eventos)
+
+    // merge entries borrados
     const otrosEntriesBorrados = (state.entriesBorrados || []).filter(e => e.proyecto_id !== proyectoId);
     state.entriesBorrados = [...otrosEntriesBorrados, ...(entriesBorrados || [])];
+
     console.log('[DEBUG-EB] entriesBorrados RAW desde AS:', JSON.stringify(entriesBorrados));
-    console.log('[DEBUG-EB] entriesBorrados length:', (entriesBorrados||[]).length);
+    console.log('[DEBUG-EB] entriesBorrados length:', (entriesBorrados || []).length);
     console.log('[DEBUG-EB] state.entriesBorrados total:', state.entriesBorrados.length);
-  } catch(e) { showToast('Error cargando proyecto: ' + e.message, 'error'); console.error(e); }
-  console.timeEnd('[PERF] loadProyectoData total · ' + proyectoId);
+
+  } catch(e) {
+    showToast('Error cargando proyecto: ' + e.message, 'error');
+    console.error(e);
+  } finally {
+    if (promiseTimerStarted) console.timeEnd(timerPromise);
+    console.timeEnd(timerTotal);
+  }
 }
 
 async function loadEvergreenData() {
@@ -1809,21 +1847,58 @@ function renderScoreboard(proyectoId, inline = false) {
 }
 
 // ── PROYECTO DETAIL ──
+let proyectoEnAperturaId = null;
+
 async function openProyecto(proyectoId) {
-  document.getElementById('fab-buscar')?.classList.add('visible');
-  const p = state.proyectos.find(x => x.proyecto_id === proyectoId);
-  if (!p) return;
-  state.currentProyecto = p;
-  await loadProyectoData(proyectoId);
-  document.getElementById('detail-title').textContent = p.nombre;
-  document.getElementById('detail-meta').textContent = `${p.clave_innovasport ? p.clave_innovasport + ' · ' : ''}${p.tipo_proyecto || '—'} · Aprobación: ${formatDate(p.fecha_aprobacion)} · Entrega estimada: ${calcFechaEntrega(p.fecha_aprobacion)}`;
-  document.getElementById('detail-scoreboard').innerHTML = renderScoreboard(proyectoId, true);
-  renderGroups(p);
-  document.getElementById('detail-timeline').innerHTML = renderTimeline(p);
-  document.getElementById('detail-notas').innerHTML = renderNotas(p);
-  document.getElementById('detail-tareas').innerHTML = renderTareasAdhoc(p);
-  showView('proyecto-detail');
-  await evaluarHitos(proyectoId);
+  if (!proyectoId) return;
+
+  if (proyectoEnAperturaId === proyectoId) {
+    console.warn('[LOAD] openProyecto ignorado; el proyecto ya se está cargando:', proyectoId);
+    return;
+  }
+
+  proyectoEnAperturaId = proyectoId;
+
+  try {
+    document.getElementById('fab-buscar')?.classList.add('visible');
+
+    let p = state.proyectos.find(x => x.proyecto_id === proyectoId);
+    if (!p) return;
+
+    state.currentProyecto = p;
+
+    await loadProyectoData(proyectoId);
+
+    // Releer el proyecto después del refresh, por si cambió nombre, estado, arquitecto, etc.
+    p = state.proyectos.find(x => x.proyecto_id === proyectoId) || p;
+    state.currentProyecto = p;
+
+    document.getElementById('detail-title').textContent = p.nombre;
+    document.getElementById('detail-meta').textContent =
+      `${p.clave_innovasport ? p.clave_innovasport + ' · ' : ''}${p.tipo_proyecto || '—'} · Aprobación: ${formatDate(p.fecha_aprobacion)} · Entrega estimada: ${calcFechaEntrega(p.fecha_aprobacion)}`;
+
+    document.getElementById('detail-scoreboard').innerHTML = renderScoreboard(proyectoId, true);
+    renderGroups(p);
+    document.getElementById('detail-timeline').innerHTML = renderTimeline(p);
+    document.getElementById('detail-notas').innerHTML = renderNotas(p);
+    document.getElementById('detail-tareas').innerHTML = renderTareasAdhoc(p);
+
+    showView('proyecto-detail');
+    await evaluarHitos(proyectoId);
+
+  } finally {
+    proyectoEnAperturaId = null;
+  }
+}
+
+async function refreshProyectoDetalle(estadoPaneles = null) {
+  if (!state.currentProyecto?.proyecto_id) return;
+
+  await openProyecto(state.currentProyecto.proyecto_id);
+
+  if (estadoPaneles) {
+    restaurarEstadoPaneles(estadoPaneles);
+  }
 }
 
 function showView(view) {
@@ -3058,8 +3133,7 @@ async function guardarNotaCambio() {
         closeModal('modal-nota-cambio'); resetModalNotaCambio();
         showToast('Duda registrada', 'success');
         await confirmBtn(btn, 'Guardar'); stopSaving(true);
-        await loadProyectoData(state.currentProyecto.proyecto_id);
-        if (state.currentProyecto) { await openProyecto(state.currentProyecto.proyecto_id); restaurarEstadoPaneles(estadoPaneles); }
+        await refreshProyectoDetalle(estadoPaneles);
         btn.disabled=false; btn.textContent='Guardar';
         return;
       }
@@ -3111,33 +3185,33 @@ async function guardarNotaCambio() {
           await api('actualizarRiesgo', updateBody);
           closeModal('modal-nota-cambio'); resetModalNotaCambio();
           showToast(`Riesgo ${riesgoId} actualizado`, 'success');
-          if (nuevoEstatus === 'Cristalizado') {
-            await loadProyectoData(state.currentProyecto.proyecto_id);
-            if (state.currentProyecto) { await openProyecto(state.currentProyecto.proyecto_id); restaurarEstadoPaneles(estadoPaneles); }
-            btn.disabled=false; btn.textContent='Guardar';
-            setTimeout(() => {
-              confirmarBorrado({
-                titulo: `Riesgo ${riesgoId} cristalizado`,
-                mensaje: `El riesgo <strong>${riesgoId}</strong> se marcó como Cristalizado.<br><br>¿Quieres registrar un Cambio asociado a este riesgo ahora?`,
-                labelBoton: 'Sí, registrar cambio',
-                onConfirm: () => {
-                  openNotaCambio();
-                  setTimeout(() => {
-                    selectNotaCambioTipo('cambio_registrado');
-                    setTimeout(() => {
-                      const selRef = document.getElementById('nc-cambio-riesgo-ref');
-                      if (selRef) selRef.value = riesgoId;
-                    }, 100);
-                  }, 100);
-                }
-              });
-            }, 300);
-            return;
-          }
+if (nuevoEstatus === 'Cristalizado') {
+  await refreshProyectoDetalle(estadoPaneles);
+  btn.disabled = false;
+  btn.textContent = 'Guardar';
+  setTimeout(() => {
+    confirmarBorrado({
+      titulo: `Riesgo ${riesgoId} cristalizado`,
+      mensaje: `El riesgo <strong>${riesgoId}</strong> se marcó como Cristalizado.<br><br>¿Quieres registrar un Cambio asociado a este riesgo ahora?`,
+      labelBoton: 'Sí, registrar cambio',
+      onConfirm: () => {
+        openNotaCambio();
+        setTimeout(() => {
+          selectNotaCambioTipo('cambio_registrado');
+          setTimeout(() => {
+            const selRef = document.getElementById('nc-cambio-riesgo-ref');
+            if (selRef) selRef.value = riesgoId;
+          }, 100);
+        }, 100);
+      }
+    });
+  }, 300);
+
+  return;
+}
         }
         await confirmBtn(btn, 'Guardar'); stopSaving(true);
-        await loadProyectoData(state.currentProyecto.proyecto_id);
-        if (state.currentProyecto) { await openProyecto(state.currentProyecto.proyecto_id); restaurarEstadoPaneles(estadoPaneles); }
+        await refreshProyectoDetalle(estadoPaneles);
         btn.disabled=false; btn.textContent='Guardar';
         return;
       }
@@ -5182,8 +5256,7 @@ async function guardarTareaAdhoc() {
       showToast('Tarea creada', 'success');
     }
     closeModal('modal-tarea-adhoc');
-    await loadProyectoData(state.currentProyecto.proyecto_id);
-    if (state.currentProyecto) { await openProyecto(state.currentProyecto.proyecto_id); restaurarEstadoPaneles(estadoPaneles); }
+    await refreshProyectoDetalle(estadoPaneles);
   } catch(e) { stopSaving(false); showToast('Error: ' + e.message, 'error'); await restoreModalSnapshot(); }
   finally { btn.disabled = false; btn.textContent = state._editandoTareaId ? 'Guardar cambios' : 'Crear tarea'; }
 }
@@ -5227,17 +5300,16 @@ async function guardarTareaEvento() {
         if (state._modoEvergreen) await api('actualizarEvergreenTarea', { tarea_id: tareaId, estatus: estatusNuevo });
         else await api('actualizarTareaAdhoc', { tarea_id: tareaId, estatus: estatusNuevo });
       }
-      closeModal('modal-tarea-evento');
-      showToast('Evento actualizado', 'success');
-      await loadProyectoData(state.currentProyecto.proyecto_id);
-      if (state._modoEvergreen) {
-        const arqEmail = state.currentEvergreenArq;
-        state._modoEvergreen = false;
-        if (arqEmail) openEvergreen(arqEmail);
-      } else if (state.currentProyecto) {
-        await openProyecto(state.currentProyecto.proyecto_id);
-        restaurarEstadoPaneles(estadoPaneles);
-      }
+closeModal('modal-tarea-evento');
+showToast('Evento actualizado', 'success');
+
+if (state._modoEvergreen) {
+  const arqEmail = state.currentEvergreenArq;
+  state._modoEvergreen = false;
+  if (arqEmail) openEvergreen(arqEmail);
+} else if (state.currentProyecto) {
+  await refreshProyectoDetalle(estadoPaneles);
+}
     } catch(e) { showToast('Error: ' + e.message, 'error'); }
     finally { stopSaving(false); btn.disabled = false; btn.textContent = 'Guardar evento'; state._editandoTareaEventoId = null; }
     return;
@@ -5267,11 +5339,9 @@ async function guardarTareaEvento() {
       const arqEmail = state.currentEvergreenArq;
       state._modoEvergreen = false;
       if (arqEmail) openEvergreen(arqEmail);
-    } else if (state.currentProyecto) {
-      await loadProyectoData(state.currentProyecto.proyecto_id);
-      await openProyecto(state.currentProyecto.proyecto_id);
-      restaurarEstadoPaneles(estadoPaneles);
-    }
+} else if (state.currentProyecto) {
+  await refreshProyectoDetalle(estadoPaneles);
+}
   } catch(e) { stopSaving(false); showToast('Error: ' + e.message, 'error'); await restoreModalSnapshot(); }
   finally { btn.disabled = false; btn.textContent = 'Guardar evento'; state._modoEvergreen = false; }
 }
@@ -5292,8 +5362,7 @@ async function confirmarCierreTarea(tareaId) {
       version_timeline_activa: '1'
     });
     stopSaving(true); showToast('Tarea cerrada', 'success');
-    await loadProyectoData(state.currentProyecto.proyecto_id);
-    if (state.currentProyecto) { await openProyecto(state.currentProyecto.proyecto_id); restaurarEstadoPaneles(estadoPaneles); }
+    await refreshProyectoDetalle(estadoPaneles);
   } catch(e) { stopSaving(false); showToast('Error: ' + e.message, 'error'); }
 }
 
@@ -5308,8 +5377,7 @@ function borrarTareaAdhoc(tareaId) {
       try {
         await api('borrarTareaAdhoc', { tarea_id: tareaId });
         showToast('Tarea eliminada', 'success');
-        await loadProyectoData(state.currentProyecto.proyecto_id);
-        if (state.currentProyecto) { await openProyecto(state.currentProyecto.proyecto_id); restaurarEstadoPaneles(estadoPaneles); }
+        await refreshProyectoDetalle(estadoPaneles);
       } catch(e) { showToast('Error: ' + e.message, 'error'); }
     }
   });
@@ -5341,8 +5409,7 @@ function borrarTareaEvento(entryId, tareaId) {
         await api('borrarLogEvento', { entry_id: entryId });
         state.logEventos = state.logEventos.filter(x => x.entry_id !== entryId);
         stopSaving(true); showToast('Evento eliminado', 'success');
-        await loadProyectoData(state.currentProyecto.proyecto_id);
-        if (state.currentProyecto) { await openProyecto(state.currentProyecto.proyecto_id); restaurarEstadoPaneles(estadoPaneles); }
+        await refreshProyectoDetalle(estadoPaneles);
       } catch(e) { stopSaving(false); showToast('Error: ' + e.message, 'error'); }
     }
   });
@@ -6012,8 +6079,7 @@ async function guardarRespuestaDuda() {
     });
     closeModal('modal-respuesta-duda');
     showToast('Respuesta guardada', 'success');
-    await loadProyectoData(state.currentProyecto.proyecto_id);
-    if (state.currentProyecto) { await openProyecto(state.currentProyecto.proyecto_id); restaurarEstadoPaneles(estadoPaneles); }
+    await refreshProyectoDetalle(estadoPaneles);
   } catch(e) { stopSaving(false); showToast('Error: ' + e.message, 'error'); await restoreModalSnapshot(); }
   finally { btn.disabled = false; btn.textContent = 'Guardar respuesta'; }
 }
@@ -6023,8 +6089,7 @@ async function obsoletarDuda(entryId) {
   try {
     await api('actualizarEstatusDuda', { entry_id: entryId, estatus: 'obsoleta' });
     showToast('Duda marcada como obsoleta', 'success');
-    await loadProyectoData(state.currentProyecto.proyecto_id);
-    if (state.currentProyecto) { await openProyecto(state.currentProyecto.proyecto_id); restaurarEstadoPaneles(estadoPaneles); }
+    await refreshProyectoDetalle(estadoPaneles);
   } catch(e) { showToast('Error: ' + e.message, 'error'); }
 }
 
