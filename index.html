@@ -1426,6 +1426,8 @@ async function loadProyectoData(proyectoId) {
     // merge entries borrados (notas, cambios, dudas — soft-delete en log_eventos)
     const otrosEntriesBorrados = (state.entriesBorrados || []).filter(e => e.proyecto_id !== proyectoId);
     state.entriesBorrados = [...otrosEntriesBorrados, ...(entriesBorrados || [])];
+    console.log('[DEBUG-EB] entriesBorrados cargados desde AS:', entriesBorrados);
+    console.log('[DEBUG-EB] state.entriesBorrados total:', state.entriesBorrados.length);
   } catch(e) { showToast('Error cargando proyecto: ' + e.message, 'error'); console.error(e); }
   console.timeEnd('[PERF] loadProyectoData total · ' + proyectoId);
 }
@@ -3652,6 +3654,10 @@ function renderEntriesEliminados(proyecto) {
   // Riesgos borrados vía soft-delete en riesgos_detalle (modelo propio)
   const riesgosBorrados = (state.riesgosDetalleBorrados || []).filter(r => r.proyecto_id === pid);
   const total = entriesBorrados.length + riesgosBorrados.length;
+  console.log('[DEBUG-EB] renderEntriesEliminados — pid:', pid);
+  console.log('[DEBUG-EB] entriesBorrados para este proyecto:', entriesBorrados.length, entriesBorrados);
+  console.log('[DEBUG-EB] riesgosBorrados para este proyecto:', riesgosBorrados.length, riesgosBorrados);
+  console.log('[DEBUG-EB] total:', total);
   if (total === 0) return '';
 
   const panelId = 'entries-borrados-panel';
