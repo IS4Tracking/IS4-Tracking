@@ -1814,6 +1814,7 @@ async function openProyecto(proyectoId) {
   const p = state.proyectos.find(x => x.proyecto_id === proyectoId);
   if (!p) return;
   state.currentProyecto = p;
+  await loadProyectoData(proyectoId);
   document.getElementById('detail-title').textContent = p.nombre;
   document.getElementById('detail-meta').textContent = `${p.clave_innovasport ? p.clave_innovasport + ' · ' : ''}${p.tipo_proyecto || '—'} · Aprobación: ${formatDate(p.fecha_aprobacion)} · Entrega estimada: ${calcFechaEntrega(p.fecha_aprobacion)}`;
   document.getElementById('detail-scoreboard').innerHTML = renderScoreboard(proyectoId, true);
