@@ -1388,11 +1388,11 @@ async function loadProyectoData(proyectoId) {
       api('getDisciplinasProyecto',    { proyecto_id: proyectoId }),
       api('getCambiosDetalle',         { proyecto_id: proyectoId }),
       api('getSnapshotsEntrega',       { proyecto_id: proyectoId }),
-      api('getTareasAdhoc',            { proyecto_id: proyectoId }).catch(() => []),
-      api('getDudasDetalle',           { proyecto_id: proyectoId }).catch(() => []),
-      api('getRiesgosDetalle',         { proyecto_id: proyectoId }).catch(() => []),
-      api('getRiesgosDetalleBorrados', { proyecto_id: proyectoId }).catch(() => []),
-      api('getEntriesBorrados',        { proyecto_id: proyectoId }).catch(() => [])
+      api('getTareasAdhoc',            { proyecto_id: proyectoId }).catch((e) => { console.error('[API-ERROR] getTareasAdhoc', e); return []; }),
+      api('getDudasDetalle',           { proyecto_id: proyectoId }).catch((e) => { console.error('[API-ERROR] getDudasDetalle', e); return []; }),
+      api('getRiesgosDetalle',         { proyecto_id: proyectoId }).catch((e) => { console.error('[API-ERROR] getRiesgosDetalle', e); return []; }),
+      api('getRiesgosDetalleBorrados', { proyecto_id: proyectoId }).catch((e) => { console.error('[API-ERROR] getRiesgosDetalleBorrados', e); return []; }),
+      api('getEntriesBorrados',        { proyecto_id: proyectoId }).catch((e) => { console.error('[API-ERROR] getEntriesBorrados', e); return []; })
     ]);
     console.timeEnd('[PERF] loadProyectoData Promise.all');
 
