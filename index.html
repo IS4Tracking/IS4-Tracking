@@ -3663,7 +3663,9 @@ function renderEntriesEliminados(proyecto) {
   const pillMap = {
     'cambio_registrado': `<span style="font-family:var(--mono);font-size:10px;padding:1px 6px;border-radius:3px;background:rgba(255,107,107,0.15);color:#ff6b6b">⚡ cambio</span>`,
     'nota':              `<span style="font-family:var(--mono);font-size:10px;padding:1px 6px;border-radius:3px;background:rgba(139,139,139,0.15);color:var(--text2)">📌 nota</span>`,
-    'duda':              `<span style="font-family:var(--mono);font-size:10px;padding:1px 6px;border-radius:3px;background:rgba(88,166,255,0.15);color:#58a6ff">❓ duda</span>`
+    'duda':              `<span style="font-family:var(--mono);font-size:10px;padding:1px 6px;border-radius:3px;background:rgba(88,166,255,0.15);color:#58a6ff">❓ duda</span>`,
+    'riesgo':            `<span style="font-family:var(--mono);font-size:10px;padding:1px 6px;border-radius:3px;background:rgba(227,179,65,0.15);color:#e3b341">⚠️ riesgo</span>`,
+    'riesgo_update':     `<span style="font-family:var(--mono);font-size:10px;padding:1px 6px;border-radius:3px;background:rgba(227,179,65,0.15);color:#e3b341">⚠️ riesgo</span>`
   };
 
   const filasEntries = entriesBorrados.map(e => {
@@ -3671,7 +3673,7 @@ function renderEntriesEliminados(proyecto) {
     const cd = e.tipo_entry === 'cambio_registrado'
       ? (state.cambiosDetalle||[]).find(c => c.entry_id === e.entry_id)
       : null;
-    const titulo = nd.titulo || cd?.titulo || e.hito_id || '(sin título)';
+    const titulo = nd.titulo || cd?.titulo || (e.tipo_entry === 'riesgo' || e.tipo_entry === 'riesgo_update' ? e.hito_id : '') || e.hito_id || '(sin título)';
     const pill = pillMap[e.tipo_entry] || pillMap['nota'];
     const fecha = e.fecha_borrado ? formatDate(e.fecha_borrado.toString().split('T')[0]) : '—';
     return `<div style="padding:10px 0;border-bottom:1px solid var(--border);font-size:12px">
@@ -3680,7 +3682,7 @@ function renderEntriesEliminados(proyecto) {
         <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${fecha}</span>
       </div>
       <div style="font-weight:500;color:var(--text);margin-bottom:2px">${titulo}</div>
-      ${btnRestaurar(e.tipo_entry === 'cambio_registrado' ? 'cambio' : e.tipo_entry, e.entry_id)}
+      ${btnRestaurar(e.tipo_entry === 'cambio_registrado' ? 'cambio' : (e.tipo_entry === 'riesgo' || e.tipo_entry === 'riesgo_update' ? 'riesgo' : e.tipo_entry), e.entry_id)}
     </div>`;
   });
 
