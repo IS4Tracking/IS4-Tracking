@@ -3317,11 +3317,7 @@ if (nuevoEstatus === 'Cristalizado') {
       }
     }
 
-    await loadProyectoData(state.currentProyecto.proyecto_id);
-    if (state.currentProyecto) {
-      await openProyecto(state.currentProyecto.proyecto_id);
-      restaurarEstadoPaneles(estadoPaneles);
-    }
+await refreshProyectoDetalle(estadoPaneles);
   } catch(e) { showToast('Error: ' + e.message, 'error'); }
   finally { btn.disabled = false; btn.textContent = 'Guardar'; }
 }
@@ -3410,11 +3406,7 @@ async function guardarEntry() {
     closeModal('modal-entry');
     showToast('Evento registrado', 'success');
     await evaluarHitos(state.currentProyecto.proyecto_id, state.logEventos);
-    await loadProyectoData(state.currentProyecto.proyecto_id);
-    if (state.currentProyecto) {
-      await openProyecto(state.currentProyecto.proyecto_id);
-      restaurarEstadoPaneles(estadoPaneles);
-    }
+await refreshProyectoDetalle(estadoPaneles);
   } catch(e) { stopSaving(false); showToast('Error: ' + e.message, 'error'); await restoreModalSnapshot(); }
   finally { btn.disabled = false; btn.textContent = 'Guardar Evento'; }
 }
