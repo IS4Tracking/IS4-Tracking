@@ -477,7 +477,6 @@
     <div class="topbar-sep"></div>
     <div class="topbar-nav">
       <button class="nav-btn active" onclick="showView('dashboard')" id="nav-dashboard">Home</button>
-      <button class="nav-btn" onclick="showView('criterios')" id="nav-criterios">Criterios</button>
     </div>
     <div class="topbar-user">
       <span class="user-name" id="user-name-display"></span>
@@ -490,7 +489,7 @@
   <div class="main">
     <!-- DASHBOARD -->
     <div class="view active" id="view-dashboard">
-      <div id="criterios-banner-container"></div>
+      <div id="criterios-banner-container" style="display:none"></div>
       <div class="page-header">
         <div>
            <div class="page-title">Home</div>
@@ -601,7 +600,7 @@
     </div>
 
     <!-- CRITERIOS -->
-    <div class="view" id="view-criterios">
+    <div class="view" id="view-criterios" style="display:none">
       <div class="page-header">
         <div>
           <div class="page-title">Criterios del Programa</div>
@@ -1097,7 +1096,7 @@
 <script>
 const CONFIG = {
   CLIENT_ID: '917190875425-0ccso9k1pthi9imfsrjd39dc4jvg9run.apps.googleusercontent.com',
-  WEBAPP_URL: 'https://script.google.com/macros/s/AKfycbwN8LLJ3FXEb4M4qVINDQLmx60D4mXP57QMvsSTelwe71lXzu5Dvuae94TJgWignmFh/exec',
+  WEBAPP_URL: 'https://script.google.com/macros/s/AKfycbxkn7St49-mewL9DjwfZ_-H64kcLIi0xZeZOTCqYgI3BBQbsc0LXXbxDQE8c06k_p2O/exec',
   SCOPES: 'https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile openid'
 };
 
@@ -1118,6 +1117,899 @@ let state = {
   _confirmarBorradoFn: null,
   _filtroRegistro: 'todos'
 };
+
+const IS4TOptAdapter = {
+  bootstrap: null,
+  home: null,
+  projectBundles: {},
+  backlog: null,
+
+  async raw(action, body = {}) {
+    const payload = { action, token: state.accessToken, ...body };
+    const res = await fetch(CONFIG.WEBAPP_URL, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      headers: { 'Content-Type': 'text/plain' }
+    });
+    const data = await res.json();
+    if (data && data.error) throw new Error(data.error);
+    return data;
+  },
+
+  reset(scope, projectId) {
+    if (!scope || scope === 'home') this.home = null;
+    if (!scope || scope === 'backlog') this.backlog = null;
+    if (!scope || scope === 'project') {
+      if (projectId) delete this.projectBundles[projectId];
+      else this.projectBundles = {};
+    }
+  },
+
+  async ensureBootstrap() {
+    if (!this.bootstrap) this.bootstrap = await this.raw('getBootstrap');
+    return this.bootstrap;
+  },
+
+  async ensureHome() {
+    if (!this.home) this.home = await this.raw('getHomeBundle');
+    return this.home;
+  },
+
+  async ensureProject(projectId) {
+    if (!projectId) return null;
+    if (!this.projectBundles[projectId]) {
+      this.projectBundles[projectId] = await this.raw('getProjectBundle', { project_id: projectId });
+    }
+    return this.projectBundles[projectId];
+  },
+
+  async ensureBacklog() {
+    if (!this.backlog) this.backlog = await this.raw('getBacklog');
+    return this.backlog;
+  },
+
+  users() {
+    const rows = (this.bootstrap?.users || []);
+    return rows.map(u => ({
+      ...u,
+      nombre: u.name || u.nombre || u.email,
+      rol: u.role || u.rol,
+      email: u.email,
+      user_id: u.user_id
+    }));
+  },
+
+  userIdFromEmailOrId(value) {
+    const users = this.users();
+    const u = users.find(x => x.user_id === value || x.email === value);
+    return u ? u.user_id : value;
+  },
+
+  emailFromUserId(value) {
+    const users = this.users();
+    const u = users.find(x => x.user_id === value || x.email === value);
+    return u ? u.email : value;
+  },
+
+  catalogs() {
+    const catalogs = this.bootstrap?.catalogs || {};
+    const groups = catalogs.groups || [];
+    const tasks = catalogs.tasks || [];
+    const events = catalogs.events || [];
+    const groupById = {};
+    const taskById = {};
+    groups.forEach(g => { groupById[g.group_id] = g; });
+    tasks.forEach(t => { taskById[t.task_catalog_id] = t; });
+    return events.map(e => {
+      const task = taskById[e.task_catalog_id] || {};
+      const gid = e.group_id || task.group_id || '';
+      const group = groupById[gid] || {};
+      return {
+        ...e,
+        grupo_id: gid,
+        grupo_nombre: group.group_name || group.name || group.grupo_nombre || gid,
+        disciplina_nombre: task.task_name || e.task_name || e.disciplina_nombre || '',
+        evento_nombre: e.event_name || e.evento_nombre || '',
+        es_cierre: e.is_closing_event || e.is_closing || e.es_cierre || ''
+      };
+    });
+  },
+
+  projectRow(p) {
+    if (!p) return null;
+    const owner = p.assigned_architect_user_id || p.arquitecto_id || '';
+    return {
+      ...p,
+      proyecto_id: p.project_id || p.proyecto_id,
+      nombre: p.project_name || p.project_name_cache || p.project_name || p.nombre,
+      clave: p.project_code || p.project_code_cache || p.clave || '',
+      tipo: p.project_type || p.tipo || '',
+      estado: p.status || p.estado || 'Activo',
+      arquitecto_id: this.emailFromUserId(owner),
+      arquitecto_user_id: owner,
+      fecha_aprobacion: p.approval_date || p.fecha_aprobacion || '',
+      fecha_entrega: p.target_delivery_date || p.fecha_entrega || '',
+      fecha_apertura: p.opening_date || '',
+      bubble_plan: p.bubble_plan_applies || p.bubble_plan || '',
+      notas: p.notes || p.notas || '',
+      readiness_score: p.readiness_score,
+      health_score: p.health_score,
+      progress_percent: p.progress_percent
+    };
+  },
+
+  homeProjects() {
+    return (this.home?.projects || []).map(p => this.projectRow(p));
+  },
+
+  bundleProjects(projectId) {
+    const homeRows = this.homeProjects();
+    const bundle = projectId ? this.projectBundles[projectId] : null;
+    if (!bundle?.project) return homeRows;
+    const row = this.projectRow(bundle.project);
+    const idx = homeRows.findIndex(p => p.proyecto_id === row.proyecto_id);
+    if (idx >= 0) homeRows[idx] = row;
+    else homeRows.push(row);
+    return homeRows;
+  },
+
+  taskKey(task) {
+    return (task.group_id || '') + '::' + (task.task_name || task.title || '');
+  },
+
+  taskByIds(bundle) {
+    const out = {};
+    (bundle?.std_tasks || []).forEach(t => {
+      out[t.project_task_id] = t;
+      if (t.task_catalog_id) out[t.task_catalog_id] = t;
+    });
+    return out;
+  },
+
+  disciplinas(bundle) {
+    return (bundle?.std_tasks || []).map(t => ({
+      ...t,
+      proyecto_id: t.project_id,
+      project_task_id: t.project_task_id,
+      task_catalog_id: t.task_catalog_id,
+      disciplina_id: this.taskKey(t),
+      grupo_id: t.group_id,
+      aplica: t.applies,
+      estatus: t.status,
+      fecha_esperada: t.current_due_date,
+      is_effective: t.is_effective !== false,
+      inactive_reason: t.inactive_reason || ''
+    }));
+  },
+
+  projectEvents(bundle) {
+    const taskMap = this.taskByIds(bundle);
+    const rows = [];
+    (bundle?.events || []).forEach(e => {
+      const task = taskMap[e.project_task_id] || taskMap[e.task_catalog_id] || {};
+      rows.push({
+        ...e,
+        entry_id: e.project_event_id,
+        project_event_id: e.project_event_id,
+        proyecto_id: e.project_id,
+        disciplina_id: task.group_id ? this.taskKey(task) : ((e.group_id || '') + '::' + (e.task_name || '')),
+        tipo_entry: 'evento',
+        hito_id: e.event_name,
+        fecha_real: e.event_date,
+        timestamp: e.event_datetime,
+        nota: e.notes || '',
+        arquitecto_id: e.registered_by,
+        registrado_por: e.registered_by
+      });
+    });
+    (bundle?.milestones || []).forEach(m => {
+      if (normalizeText(m.status) === 'completado' && m.actual_date) {
+        rows.push({
+          entry_id: 'MS_' + m.project_milestone_id,
+          proyecto_id: m.project_id,
+          disciplina_id: '',
+          tipo_entry: 'hito_alcanzado',
+          hito_id: m.milestone_catalog_id,
+          fecha_real: m.actual_date,
+          timestamp: m.actual_date + 'T12:00:00',
+          nota: m.milestone_name || ''
+        });
+      }
+    });
+    return rows;
+  },
+
+  notes(bundle) {
+    return (bundle?.notes || []).map(n => ({
+      ...n,
+      entry_id: n.note_id,
+      proyecto_id: n.project_id,
+      tipo_entry: 'nota',
+      hito_id: n.title,
+      fecha_real: (n.created_at || '').toString().slice(0, 10),
+      timestamp: n.created_at,
+      nota: JSON.stringify({
+        titulo: n.title,
+        tipo: n.note_type || 'General',
+        contenido: n.description || '',
+        disc_ref: n.project_task_id || ''
+      }),
+      registrado_por: n.created_by,
+      arquitecto_id: n.created_by
+    }));
+  },
+
+  changes(bundle) {
+    return (bundle?.changes || []).map(c => ({
+      ...c,
+      entry_id: c.change_id,
+      proyecto_id: c.project_id,
+      tipo_entry: 'cambio_registrado',
+      hito_id: c.title,
+      fecha_real: (c.created_at || '').toString().slice(0, 10),
+      timestamp: c.created_at,
+      nota: c.scope_description || c.title || '',
+      registrado_por: c.created_by,
+      arquitecto_id: c.created_by
+    }));
+  },
+
+  cambiosDetalle(bundle) {
+    const taskMap = this.taskByIds(bundle);
+    return (bundle?.changes || []).map(c => {
+      const affected = normalizeList(c.affected_project_task_ids)
+        .map(id => taskMap[id] ? this.taskKey(taskMap[id]) : id)
+        .join(',');
+      return {
+        ...c,
+        entry_id: c.change_id,
+        clave_cambio: c.change_id,
+        titulo: c.title,
+        impacto_tipo: c.change_type,
+        origen_cambio: c.change_origin,
+        disciplinas_afectadas: affected,
+        hitos_afectados: c.affected_milestone_ids || '',
+        alcance: c.scope_description || '',
+        historial_ediciones: '[]'
+      };
+    });
+  },
+
+  risks(bundle) {
+    return (bundle?.risks || []).map(r => ({
+      ...r,
+      entry_id: r.risk_id,
+      proyecto_id: r.project_id,
+      tipo_entry: 'riesgo',
+      hito_id: r.risk_id,
+      fecha_real: (r.created_at || '').toString().slice(0, 10),
+      timestamp: r.created_at,
+      nota: JSON.stringify({
+        riesgo_id: r.risk_id,
+        titulo: r.title,
+        descripcion: r.description,
+        probabilidad: r.probability,
+        impacto: r.impact
+      }),
+      registrado_por: r.created_by,
+      arquitecto_id: r.created_by
+    }));
+  },
+
+  riesgosDetalle(bundle) {
+    return (bundle?.risks || []).map(r => ({
+      ...r,
+      riesgo_id: r.risk_id,
+      entry_id: r.risk_id,
+      proyecto_id: r.project_id,
+      titulo: r.title,
+      categoria: r.category,
+      estatus: r.status,
+      probabilidad: r.probability,
+      impacto: r.impact,
+      fecha_revision: r.review_date,
+      notas_mitigacion: r.mitigation_notes,
+      hito_ref_id: r.milestone_catalog_id,
+      disc_ref: r.project_task_id
+    }));
+  },
+
+  questions(bundle) {
+    return (bundle?.questions || []).map(q => ({
+      ...q,
+      entry_id: q.question_id,
+      proyecto_id: q.project_id,
+      tipo_entry: 'duda',
+      hito_id: q.title,
+      fecha_real: (q.created_at || '').toString().slice(0, 10),
+      timestamp: q.created_at,
+      nota: JSON.stringify({ titulo: q.title, texto: q.question_text }),
+      registrado_por: q.created_by,
+      arquitecto_id: q.created_by
+    }));
+  },
+
+  dudasDetalle(bundle) {
+    return (bundle?.questions || []).map(q => ({
+      ...q,
+      entry_id: q.question_id,
+      proyecto_id: q.project_id,
+      estatus: statusToLegacy(q.status),
+      respuesta: q.answer_text,
+      tiempo_respuesta_habil: ''
+    }));
+  },
+
+  extrTasks(bundle) {
+    return (bundle?.extr_tasks || []).map(t => ({
+      ...t,
+      tarea_id: t.manual_task_id,
+      proyecto_id: t.project_id,
+      titulo: t.title,
+      asignado_a: this.emailFromUserId(t.assigned_to_user_id),
+      estatus: statusToLegacy(t.status),
+      fecha_esperada: t.due_date,
+      notas: t.notes,
+      categoria: t.category,
+      is_effective: t.is_effective !== false,
+      inactive_reason: t.inactive_reason || ''
+    }));
+  },
+
+  extrEvents(bundle) {
+    return (bundle?.extr_task_events || []).map(e => ({
+      ...e,
+      entry_id: e.manual_task_event_id,
+      proyecto_id: e.project_id,
+      disciplina_id: 'ADHOC::' + e.manual_task_id,
+      tipo_entry: 'tarea_evento',
+      hito_id: e.title,
+      fecha_real: e.event_date,
+      timestamp: e.created_at,
+      nota: JSON.stringify({
+        titulo: e.title,
+        descripcion: e.description,
+        estatus_nuevo: statusToLegacy(e.status_change_to)
+      }),
+      registrado_por: e.registered_by,
+      arquitecto_id: e.registered_by
+    }));
+  },
+
+  snapshots(bundle) {
+    return (bundle?.snapshots || []).map(s => ({
+      ...s,
+      snapshot_id: s.snapshot_id,
+      proyecto_id: s.project_id,
+      entry_id: s.source_project_event_id || s.snapshot_id,
+      snapshot_data: safeJson(s.payload_json, {})
+    }));
+  },
+
+  deletedEntries(bundle) {
+    const d = bundle?.deleted_items || {};
+    const rows = [];
+    (d.events || []).forEach(e => rows.push({
+      ...e,
+      entry_id: e.project_event_id,
+      proyecto_id: e.project_id,
+      tipo_entry: 'evento',
+      hito_id: e.event_name,
+      nota: e.notes || '',
+      fecha_borrado: e.deleted_at
+    }));
+    (d.notes || []).forEach(n => rows.push({
+      ...n,
+      entry_id: n.note_id,
+      proyecto_id: n.project_id,
+      tipo_entry: 'nota',
+      hito_id: n.title,
+      nota: JSON.stringify({ titulo: n.title, tipo: n.note_type, contenido: n.description }),
+      fecha_borrado: n.deleted_at
+    }));
+    (d.changes || []).forEach(c => rows.push({
+      ...c,
+      entry_id: c.change_id,
+      proyecto_id: c.project_id,
+      tipo_entry: 'cambio_registrado',
+      hito_id: c.title,
+      nota: c.scope_description || c.title || '',
+      fecha_borrado: c.deleted_at,
+      inactive_reason: c.inactive_reason || 'Sin efecto por cambio eliminado'
+    }));
+    (d.questions || []).forEach(q => rows.push({
+      ...q,
+      entry_id: q.question_id,
+      proyecto_id: q.project_id,
+      tipo_entry: 'duda',
+      hito_id: q.title,
+      nota: JSON.stringify({ titulo: q.title, texto: q.question_text }),
+      fecha_borrado: q.deleted_at
+    }));
+    return rows;
+  },
+
+  deletedRisks(bundle) {
+    return (bundle?.deleted_items?.risks || []).map(r => ({
+      ...r,
+      riesgo_id: r.risk_id,
+      entry_id: r.risk_id,
+      proyecto_id: r.project_id,
+      fecha_borrado: r.deleted_at
+    }));
+  },
+
+  backlogTasks() {
+    return (this.backlog?.tasks || []).map(t => ({
+      ...t,
+      tarea_id: t.backlog_task_id,
+      proyecto_id: 'BACKLOG',
+      titulo: t.title,
+      asignado_a: this.emailFromUserId(t.owner_user_id),
+      owner_user_id: t.owner_user_id,
+      estatus: statusToLegacy(t.status),
+      fecha_esperada: t.due_date,
+      notas: t.notes
+    }));
+  },
+
+  backlogEvents() {
+    return (this.backlog?.events || []).map(e => ({
+      ...e,
+      entry_id: e.backlog_event_id,
+      proyecto_id: 'BACKLOG',
+      disciplina_id: 'EV::' + e.backlog_task_id,
+      tipo_entry: 'evergreen_evento',
+      hito_id: e.title,
+      fecha_real: e.event_date,
+      timestamp: e.created_at,
+      nota: JSON.stringify({
+        titulo: e.title,
+        descripcion: e.description,
+        estatus_nuevo: statusToLegacy(e.status_change_to)
+      }),
+      registrado_por: e.registered_by,
+      arquitecto_id: e.registered_by
+    }));
+  },
+
+  backlogDeleted() {
+    const d = this.backlog?.deleted_items || {};
+    return {
+      tasks: (d.tasks || []).map(t => ({
+        ...t,
+        tarea_id: t.backlog_task_id,
+        titulo: t.title,
+        asignado_a: this.emailFromUserId(t.owner_user_id),
+        estatus: statusToLegacy(t.status),
+        fecha_borrado: t.deleted_at
+      })),
+      events: (d.events || []).map(e => ({
+        ...e,
+        entry_id: e.backlog_event_id,
+        tarea_id: e.backlog_task_id,
+        titulo: e.title,
+        fecha_borrado: e.deleted_at,
+        can_restore: e.can_restore !== false
+      }))
+    };
+  },
+
+  async legacyApi(action, body = {}) {
+    await this.ensureBootstrap();
+    if (action === 'getUsuarios') return this.users();
+    if (action === 'getEventosCatalogo') return this.catalogs();
+    if (action === 'getCriteriosPrograma') return [];
+    if (action === 'getCambiosBorrados') return [];
+
+    if (action === 'getProyectos') {
+      await this.ensureHome();
+      return this.bundleProjects(body.proyecto_id || body.project_id);
+    }
+
+    if (action === 'getBacklog' || action === 'getEvergreen') {
+      await this.ensureBacklog();
+      return this.backlogTasks();
+    }
+
+    if (['getLogEventos','getDisciplinasProyecto','getCambiosDetalle','getSnapshotsEntrega',
+         'getTareasAdhoc','getDudasDetalle','getRiesgosDetalle','getRiesgosDetalleBorrados',
+         'getEntriesBorrados','getHistorialArquitecto'].includes(action)) {
+      const projectId = body.proyecto_id || body.project_id;
+      if (!projectId) {
+        await this.ensureHome();
+        const ids = this.homeProjects().map(p => p.proyecto_id).filter(Boolean);
+        const chunks = [];
+        for (const id of ids) {
+          chunks.push(await this.legacyApi(action, { proyecto_id: id }));
+        }
+        return chunks.flat();
+      }
+      const bundle = await this.ensureProject(projectId);
+      if (action === 'getLogEventos') {
+        return [
+          ...this.projectEvents(bundle),
+          ...this.notes(bundle),
+          ...this.changes(bundle),
+          ...this.questions(bundle),
+          ...this.risks(bundle),
+          ...this.extrEvents(bundle)
+        ];
+      }
+      if (action === 'getDisciplinasProyecto') return this.disciplinas(bundle);
+      if (action === 'getCambiosDetalle') return this.cambiosDetalle(bundle);
+      if (action === 'getSnapshotsEntrega') return this.snapshots(bundle);
+      if (action === 'getTareasAdhoc') return this.extrTasks(bundle);
+      if (action === 'getDudasDetalle') return this.dudasDetalle(bundle);
+      if (action === 'getRiesgosDetalle') return this.riesgosDetalle(bundle);
+      if (action === 'getRiesgosDetalleBorrados') return this.deletedRisks(bundle);
+      if (action === 'getEntriesBorrados') return this.deletedEntries(bundle);
+      if (action === 'getHistorialArquitecto') return bundle?.assignment_history || [];
+    }
+
+    return this.legacyWrite(action, body);
+  },
+
+  async legacyWrite(action, body = {}) {
+    const projectId = body.proyecto_id || body.project_id || state.currentProyecto?.proyecto_id;
+    const projectBody = () => ({ project_id: projectId });
+    let result;
+
+    if (action === 'crearProyecto') {
+      const selected = [...(state.disciplinasSeleccionadas || [])]
+        .map(k => {
+          const [g, d] = k.split('::');
+          const task = (this.bootstrap?.catalogs?.tasks || []).find(t => t.group_id === g && t.task_name === d);
+          return task ? task.task_catalog_id : '';
+        }).filter(Boolean);
+      result = await this.raw('createProject', {
+        project_name: body.nombre,
+        project_code: body.clave,
+        project_type: body.tipo,
+        approval_date: body.fecha_aprobacion,
+        assigned_architect_user_id: this.userIdFromEmailOrId(body.arquitecto_id),
+        bubble_plan_applies: body.bubble_plan,
+        notes: body.notas,
+        selected_task_catalog_ids: selected.join(',')
+      });
+      this.reset();
+      return { proyecto_id: result.project_id, project_id: result.project_id };
+    }
+
+    if (action === 'actualizarProyecto') {
+      await this.raw('updateProject', {
+        project_id: projectId,
+        project_name: body.nombre,
+        project_code: body.clave,
+        project_type: body.tipo,
+        approval_date: body.fecha_aprobacion,
+        bubble_plan_applies: body.bubble_plan,
+        notes: body.notas
+      });
+      if (body.estado) await this.raw('changeProjectStatus', { project_id: projectId, new_status: body.estado });
+      if (body.arquitecto_id) {
+        await this.raw('reassignArchitect', {
+          project_id: projectId,
+          assigned_architect_user_id: this.userIdFromEmailOrId(body.arquitecto_id)
+        });
+      }
+      this.reset('project', projectId); this.reset('home');
+      return { ok: true };
+    }
+
+    if (action === 'borrarProyecto') {
+      result = await this.raw('deleteProject', { project_id: projectId });
+      this.reset();
+      return result;
+    }
+
+    if (action === 'appendLogEvento') {
+      if (body.proyecto_id === 'BACKLOG' || body.proyecto_id === 'EVERGREEN' || (body.disciplina_id || '').startsWith('EV::')) {
+        const taskId = (body.disciplina_id || '').replace('EV::', '');
+        result = await this.raw('addBacklogEvent', {
+          backlog_task_id: taskId,
+          title: body.hito_id || body.titulo || 'Evento',
+          description: body.nota || body.descripcion || '',
+          status_change_to: statusToNew(body.estatus_nuevo || safeJson(body.nota, {}).estatus_nuevo || ''),
+          event_date: body.fecha_real || todayISO()
+        });
+        this.reset('backlog');
+        return { entry_id: result.backlog_event_id };
+      }
+      if ((body.disciplina_id || '').startsWith('ADHOC::')) {
+        const taskId = body.disciplina_id.replace('ADHOC::', '');
+        result = await this.raw('addExtrTaskEvent', {
+          ...projectBody(),
+          manual_task_id: taskId,
+          title: body.hito_id || body.titulo || 'Evento',
+          description: body.nota || body.descripcion || '',
+          status_change_to: statusToNew(body.estatus_nuevo || safeJson(body.nota, {}).estatus_nuevo || ''),
+          event_date: body.fecha_real || todayISO()
+        });
+        this.reset('project', projectId);
+        return { entry_id: result.manual_task_event_id };
+      }
+      if (body.tipo_entry === 'hito_alcanzado') return { ok: true };
+      result = await this.raw('addProjectEvent', {
+        ...projectBody(),
+        group_id: body.grupo_id || (body.disciplina_id || '').split('::')[0],
+        task_name: (body.disciplina_id || '').split('::')[1] || body.disciplina_nombre || '',
+        event_name: body.hito_id || body.evento_nombre,
+        event_date: body.fecha_real || todayISO(),
+        event_time: body.hora || '',
+        notes: body.nota || ''
+      });
+      this.reset('project', projectId);
+      return { entry_id: result.project_event_id };
+    }
+
+    if (action === 'editarLogEvento') {
+      const entry = (state.logEventos || []).find(e => e.entry_id === body.entry_id);
+      if (entry?.tipo_entry === 'tarea_evento') {
+        return { ok: true, warning: 'Edición de evento de Tarea de Proyecto no soportada por AS v1.0.2' };
+      }
+      result = await this.raw('editProjectEvent', {
+        project_id: projectId,
+        project_event_id: body.entry_id,
+        event_date: body.fecha_real,
+        notes: body.nota
+      });
+      this.reset('project', projectId);
+      return result;
+    }
+
+    if (action === 'borrarLogEvento') {
+      const entry = (state.logEventos || []).find(e => e.entry_id === body.entry_id);
+      if (entry?.tipo_entry === 'tarea_evento') {
+        result = await this.raw('deleteExtrTaskEvent', { project_id: projectId, manual_task_event_id: body.entry_id });
+      } else if (entry?.tipo_entry === 'evergreen_evento') {
+        result = await this.raw('deleteBacklogEvent', { backlog_event_id: body.entry_id });
+        this.reset('backlog');
+        return result;
+      } else {
+        result = await this.raw('deleteProjectEvent', { project_id: projectId, project_event_id: body.entry_id });
+      }
+      this.reset('project', projectId);
+      return result;
+    }
+
+    if (action === 'crearTareaAdhoc') {
+      result = await this.raw('createExtrTask', {
+        ...projectBody(),
+        title: body.titulo,
+        assigned_to_user_id: this.userIdFromEmailOrId(body.asignado_a),
+        due_date: body.fecha_esperada,
+        notes: body.notas,
+        category: body.categoria || 'Sin clasificar'
+      });
+      this.reset('project', projectId);
+      return { tarea_id: result.manual_task_id };
+    }
+    if (action === 'actualizarTareaAdhoc') {
+      result = await this.raw('updateExtrTask', {
+        ...projectBody(),
+        manual_task_id: body.tarea_id,
+        title: body.titulo,
+        assigned_to_user_id: this.userIdFromEmailOrId(body.asignado_a),
+        due_date: body.fecha_esperada,
+        notes: body.notas,
+        status: statusToNew(body.estatus)
+      });
+      this.reset('project', projectId);
+      return result;
+    }
+    if (action === 'borrarTareaAdhoc') {
+      result = await this.raw('deleteExtrTask', { ...projectBody(), manual_task_id: body.tarea_id });
+      this.reset('project', projectId);
+      return result;
+    }
+
+    if (action === 'crearEvergreenTarea') {
+      result = await this.raw('createBacklogTask', {
+        title: body.titulo,
+        owner_user_id: this.userIdFromEmailOrId(body.asignado_a),
+        due_date: body.fecha_esperada,
+        notes: body.notas
+      });
+      this.reset('backlog');
+      return { tarea_id: result.backlog_task_id };
+    }
+    if (action === 'actualizarEvergreenTarea') {
+      result = await this.raw('updateBacklogTask', {
+        backlog_task_id: body.tarea_id,
+        title: body.titulo,
+        owner_user_id: body.asignado_a ? this.userIdFromEmailOrId(body.asignado_a) : undefined,
+        due_date: body.fecha_esperada,
+        notes: body.notas,
+        status: statusToNew(body.estatus)
+      });
+      this.reset('backlog');
+      return result;
+    }
+    if (action === 'borrarEvergreenTarea') {
+      result = await this.raw('deleteBacklogTask', { backlog_task_id: body.tarea_id });
+      this.reset('backlog');
+      return result;
+    }
+
+    if (action === 'editarNota') {
+      result = await this.raw('editNote', {
+        ...projectBody(), note_id: body.entry_id,
+        title: body.titulo, note_type: body.tipo, description: body.contenido || body.nota
+      });
+      this.reset('project', projectId); return result;
+    }
+    if (action === 'borrarNota') {
+      result = await this.raw('deleteNote', { ...projectBody(), note_id: body.entry_id });
+      this.reset('project', projectId); return result;
+    }
+    if (action === 'appendCambioDetalle') {
+      result = await this.raw('createChange', {
+        ...projectBody(),
+        source_event_id: body.entry_id || '',
+        title: body.titulo || 'Cambio',
+        change_type: body.impacto_tipo,
+        change_origin: body.origen_cambio,
+        affected_project_task_ids: this.taskIdsFromLegacy(projectId, body.disciplinas_afectadas),
+        scope_description: body.alcance || body.descripcion || ''
+      });
+      this.reset('project', projectId); return { change_id: result.change_id };
+    }
+    if (action === 'editarCambioDetalle') {
+      result = await this.raw('editChange', {
+        ...projectBody(), change_id: body.entry_id,
+        title: body.titulo,
+        change_type: body.impacto_tipo,
+        change_origin: body.origen_cambio,
+        affected_project_task_ids: this.taskIdsFromLegacy(projectId, body.disciplinas_afectadas),
+        scope_description: body.alcance
+      });
+      this.reset('project', projectId); return result;
+    }
+    if (action === 'borrarCambio') {
+      result = await this.raw('deleteChange', { ...projectBody(), change_id: body.entry_id });
+      this.reset('project', projectId); return result;
+    }
+    if (action === 'crearDuda') {
+      result = await this.raw('createQuestion', {
+        ...projectBody(), title: body.titulo, question_text: body.texto || body.descripcion || ''
+      });
+      this.reset('project', projectId); return { entry_id: result.question_id };
+    }
+    if (action === 'responderDuda') {
+      result = await this.raw('answerQuestion', {
+        ...projectBody(), question_id: body.entry_id, answer_text: body.respuesta || body.texto
+      });
+      this.reset('project', projectId); return result;
+    }
+    if (action === 'actualizarEstatusDuda') {
+      result = await this.raw('updateQuestionStatus', {
+        ...projectBody(), question_id: body.entry_id, status: statusToNew(body.estatus)
+      });
+      this.reset('project', projectId); return result;
+    }
+    if (action === 'borrarDuda') {
+      result = await this.raw('deleteQuestion', { ...projectBody(), question_id: body.entry_id });
+      this.reset('project', projectId); return result;
+    }
+    if (action === 'crearRiesgo') {
+      result = await this.raw('createRisk', {
+        ...projectBody(), title: body.titulo, category: body.categoria,
+        description: body.descripcion || body.texto,
+        probability: body.probabilidad, impact: body.impacto,
+        mitigation_notes: body.notas_mitigacion,
+        review_date: body.fecha_revision,
+        milestone_catalog_id: body.hito_ref_id,
+        project_task_id: this.taskIdFromLegacy(projectId, body.disc_ref)
+      });
+      this.reset('project', projectId); return { riesgo_id: result.risk_id, entry_id: result.risk_id };
+    }
+    if (action === 'actualizarRiesgo') {
+      result = await this.raw('updateRisk', {
+        ...projectBody(), risk_id: body.riesgo_id,
+        title: body.titulo, category: body.categoria,
+        description: body.descripcion,
+        status: statusToNew(body.estatus),
+        probability: body.probabilidad, impact: body.impacto,
+        mitigation_notes: body.notas_mitigacion,
+        review_date: body.fecha_revision
+      });
+      this.reset('project', projectId); return result;
+    }
+    if (action === 'borrarRiesgo') {
+      result = await this.raw('deleteRisk', { ...projectBody(), risk_id: body.riesgo_id || body.entry_id });
+      this.reset('project', projectId); return result;
+    }
+    if (action === 'restaurarEntryEliminado') {
+      const typeMap = { nota:'note', cambio:'change', duda:'question', riesgo:'risk', evento:'project_event' };
+      result = await this.raw('restoreDeletedOperationalItem', {
+        entity_type: typeMap[body.tipo] || body.tipo,
+        record_id: body.entry_id,
+        project_id: projectId
+      });
+      this.reset('project', projectId); return result;
+    }
+    if (action === 'guardarSnapshot') {
+      result = await this.raw('saveSnapshot', {
+        ...projectBody(),
+        snapshot_type: 'delivery',
+        payload_json: body.snapshot_data || body.payload_json || {},
+        notes: body.entry_id || ''
+      });
+      this.reset('project', projectId); return { snapshot_id: result.snapshot_id };
+    }
+    if (action === 'crearNuevaEntrega') {
+      result = await this.raw('createNewDelivery', {
+        ...projectBody(),
+        delivery_number: body.numero_entrega,
+        change_ids: (body.cambios_causa || []).join ? body.cambios_causa.join(',') : body.cambios_causa
+      });
+      this.reset('project', projectId); return result;
+    }
+
+    return this.raw(action, body);
+  },
+
+  taskIdsFromLegacy(projectId, legacyList) {
+    const bundle = this.projectBundles[projectId];
+    const items = normalizeList(legacyList);
+    return items.map(k => this.taskIdFromLegacy(projectId, k)).filter(Boolean).join(',');
+  },
+
+  taskIdFromLegacy(projectId, legacyKey) {
+    const bundle = this.projectBundles[projectId];
+    if (!bundle || !legacyKey) return legacyKey || '';
+    const t = (bundle.std_tasks || []).find(x =>
+      x.project_task_id === legacyKey || this.taskKey(x) === legacyKey
+    );
+    return t ? t.project_task_id : legacyKey;
+  }
+};
+
+function normalizeText(s) {
+  return (s || '').toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+}
+
+function normalizeList(value) {
+  if (!value) return [];
+  if (Array.isArray(value)) return value.map(String).map(s => s.trim()).filter(Boolean);
+  return String(value).split(',').map(s => s.trim()).filter(Boolean);
+}
+
+function safeJson(value, fallback = {}) {
+  if (!value) return fallback;
+  if (typeof value === 'object') return value;
+  try { return JSON.parse(value); } catch(e) { return fallback; }
+}
+
+function statusToLegacy(status) {
+  const s = normalizeText(status);
+  if (s === 'completada' || s === 'completado' || s === 'respondida') return 'completada';
+  if (s === 'en proceso') return 'en-proceso';
+  if (s === 'pendiente') return 'pendiente';
+  if (s === 'bloqueada') return 'bloqueada';
+  if (s === 'pausada') return 'pausada';
+  if (s === 'cancelada') return 'cancelada';
+  if (s === 'abierta') return 'pendiente';
+  return status || '';
+}
+
+function statusToNew(status) {
+  const s = normalizeText(status);
+  if (!s) return '';
+  if (s === 'completada' || s === 'completada-vobo' || s === 'completado') return 'Completada';
+  if (s === 'en-proceso' || s === 'en proceso') return 'En proceso';
+  if (s === 'pendiente') return 'Pendiente';
+  if (s === 'bloqueada') return 'Bloqueada';
+  if (s === 'pausada') return 'Pausada';
+  if (s === 'cancelada') return 'Cancelada';
+  if (s === 'obsoleta') return 'Obsoleta';
+  return status;
+}
+
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
 
 // ── AUTH — Google Identity Services ──
 let tokenClient;
@@ -1234,15 +2126,7 @@ function handleLogout() {
 
 // ── API ──
 async function api(action, body = {}) {
-  const payload = { action, token: state.accessToken, ...body };
-  const res = await fetch(CONFIG.WEBAPP_URL, {
-    method: 'POST',
-    body: JSON.stringify(payload),
-    headers: { 'Content-Type': 'text/plain' }
-  });
-  const data = await res.json();
-  if (data && data.error) throw new Error(data.error);
-  return data;
+  return IS4TOptAdapter.legacyApi(action, body);
 }
 
 // ── DATA ──
@@ -1326,7 +2210,7 @@ async function restoreModalSnapshot() {
 // loadStaticData   — una sola vez al login: catálogos que no cambian
 // loadHomeData     — Home y post-acciones en Home: datos cross-proyecto
 // loadProyectoData — al abrir un proyecto y post-acciones dentro de él
-// loadEvergreenData— al abrir Evergreen y post-acciones dentro de él
+// loadEvergreenData— al abrir Backlog y post-acciones dentro de él
 // loadCriteriosData— vista Criterios y post-acciones dentro de ella
 // loadAllData      — compatibilidad: carga estática + home completo
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1348,11 +2232,10 @@ async function loadHomeData() {
   console.time('[PERF] loadHomeData total');
   try {
     console.time('[PERF] loadHomeData Promise.all');
-    const [proyectos, log, disciplinas, criterios, cambiosBorrados, historialArq] = await Promise.all([
+    const [proyectos, log, disciplinas, cambiosBorrados, historialArq] = await Promise.all([
       api('getProyectos'),
       api('getLogEventos'),
       api('getDisciplinasProyecto'),
-      api('getCriteriosPrograma'),
       api('getCambiosBorrados', {}),
       api('getHistorialArquitecto', {})
     ]);
@@ -1360,7 +2243,7 @@ async function loadHomeData() {
     state.proyectos       = proyectos     || [];
     state.logEventos      = log           || [];
     state.disciplinasProyecto = disciplinas || [];
-    state.criterios       = criterios     || [];
+    state.criterios       = [];
     state.cambiosBorrados = cambiosBorrados || [];
     state.historialArquitecto = historialArq || [];
 
@@ -1368,7 +2251,7 @@ async function loadHomeData() {
     console.time('[PERF] loadHomeData modulos');
     const [tareas, evergreen] = await Promise.all([
       api('getTareasAdhoc', {}).catch(e => { console.warn('[PERF] getTareasAdhoc error:', e.message); return []; }),
-      api('getEvergreen', {}).catch(e => { console.warn('[PERF] getEvergreen error:', e.message); return []; })
+      api('getBacklog', {}).catch(e => { console.warn('[PERF] getBacklog error:', e.message); return []; })
     ]);
     console.timeEnd('[PERF] loadHomeData modulos');
     state.tareasAdhoc     = tareas    || [];
@@ -1475,7 +2358,7 @@ async function loadEvergreenData() {
   console.time('[PERF] loadEvergreenData');
   try {
     const [evergreen, log] = await Promise.all([
-      api('getEvergreen', {}).catch(() => []),
+      api('getBacklog', {}).catch(() => []),
       api('getLogEventos').catch(() => [])
     ]);
     state.evergreenTareas = evergreen || [];
@@ -1487,11 +2370,8 @@ async function loadEvergreenData() {
 async function loadCriteriosData() {
   console.time('[PERF] loadCriteriosData');
   try {
-    const [criterios, proyectos] = await Promise.all([
-      api('getCriteriosPrograma'),
-      api('getProyectos')
-    ]);
-    state.criterios = criterios || [];
+    const proyectos = await api('getProyectos');
+    state.criterios = [];
     state.proyectos = proyectos || [];
   } catch(e) { console.error('[PERF] loadCriteriosData error:', e.message); }
   console.timeEnd('[PERF] loadCriteriosData');
@@ -1690,7 +2570,7 @@ function renderDashboard() {
     makeToggleHeader('tareas-prox-alert', `TAREAS PRÓX. 3 DÍAS — ${tareasProximas.length}`, true) +
     `<div id="tareas-prox-alert">${tareasProxHTML}</div>`;
 
-  // Evergreen alerts
+  // Backlog alerts
   const evContainer = document.getElementById('evergreen-dashboard');
   if (evContainer) {
     const hoyEv = new Date(); hoyEv.setHours(0,0,0,0);
@@ -1710,7 +2590,7 @@ function renderDashboard() {
     evVencidas.sort((a,b) => new Date(a.fecha) - new Date(b.fecha));
     evProximas.sort((a,b) => new Date(a.fecha) - new Date(b.fecha));
     const evVencHTML = evVencidas.length === 0
-      ? `<div style="color:var(--text3);font-family:var(--mono);font-size:12px;padding:4px 0 8px">Sin evergreen vencidos</div>`
+      ? `<div style="color:var(--text3);font-family:var(--mono);font-size:12px;padding:4px 0 8px">Sin backlog vencido</div>`
       : evVencidas.map(e => `<div class="hito-row retrasado">
           <div class="hito-fecha" style="color:#ff5050">${formatDate(e.fecha)}</div>
           <div class="hito-link">${e.titulo}</div>
@@ -1718,7 +2598,7 @@ function renderDashboard() {
           <div></div>
         </div>`).join('');
     const evProxHTML = evProximas.length === 0
-      ? `<div style="color:var(--text3);font-family:var(--mono);font-size:12px;padding:4px 0 8px">Sin evergreen en los próximos 7 días</div>`
+      ? `<div style="color:var(--text3);font-family:var(--mono);font-size:12px;padding:4px 0 8px">Sin backlog en los próximos 7 días</div>`
       : evProximas.map(e => `<div class="hito-row">
           <div class="hito-fecha">${formatDate(e.fecha)}</div>
           <div class="hito-link">${e.titulo}</div>
@@ -1793,6 +2673,8 @@ function toggleAlertSection(id) {
 
 function renderCriteriosBanner() {
   const container = document.getElementById('criterios-banner-container');
+  if (container) container.innerHTML = '';
+  return;
   if (!state.user) return;
   const pendientes = state.criterios.filter(c => {
     if (c.estado !== 'vigente') return false;
@@ -1884,7 +2766,7 @@ async function openProyecto(proyectoId) {
     document.getElementById('detail-tareas').innerHTML = renderTareasAdhoc(p);
 
     showView('proyecto-detail');
-    await evaluarHitos(proyectoId);
+    // Hitos se evalua server-side en AS v1.0.2.
 
   } finally {
     proyectoEnAperturaId = null;
@@ -1902,6 +2784,10 @@ async function refreshProyectoDetalle(estadoPaneles = null) {
 }
 
 function showView(view) {
+  if (view === 'criterios') {
+    showToast('Criterios del Programa no est\u00e1 disponible en IS4T-Opt v1.0.0', 'info');
+    view = 'dashboard';
+  }
   const fab = document.getElementById('fab-buscar');
   if (fab) {
     if (view === 'proyecto-detail') fab.classList.add('visible');
@@ -1967,6 +2853,48 @@ function renderGroups(proyecto) {
       </div>
     </div>`;
   }).join('');
+}
+
+function renderDeletedBacklog(ownerEmail) {
+  const deleted = IS4TOptAdapter.backlogDeleted();
+  const ownTasks = deleted.tasks.filter(t => t.asignado_a === ownerEmail);
+  const ownTaskIds = new Set([
+    ...state.evergreenTareas.filter(t => t.asignado_a === ownerEmail).map(t => t.tarea_id),
+    ...ownTasks.map(t => t.tarea_id)
+  ]);
+  const ownEvents = deleted.events.filter(e => ownTaskIds.has(e.tarea_id));
+  const total = ownTasks.length + ownEvents.length;
+  if (!total) return '';
+  const canRestore = state.rol === 'PM' || state.user?.email === ownerEmail;
+  const rows = [
+    ...ownTasks.map(t => ({ type:'backlog_task', id:t.tarea_id, title:t.titulo, meta:'Tarea Backlog eliminada', can_restore:canRestore })),
+    ...ownEvents.map(e => ({ type:'backlog_event', id:e.entry_id, title:e.titulo, meta:e.can_restore ? 'Evento Backlog eliminado' : 'Evento eliminado · restaura primero la tarea parent', can_restore:canRestore && e.can_restore }))
+  ];
+  return `<div style="margin-top:16px;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius)">
+    <button class="cambio-expand-btn" onclick="toggleCambioPanel('deleted-backlog-panel')">
+      <span id="chevron-deleted-backlog-panel" style="transition:transform 0.15s;display:inline-block">▶</span>
+      Elementos eliminados (${total})
+    </button>
+    <div class="cambio-detail-panel" id="deleted-backlog-panel" style="margin-top:8px">
+      ${rows.map(r => `<div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;opacity:${r.can_restore?1:.55}">
+        <div style="font-weight:500">${r.title || r.id}</div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--text3)">${r.meta}</div>
+        ${r.can_restore?`<button class="btn-ghost" style="font-size:11px;margin-top:4px" onclick="restaurarBacklogItem('${r.type}','${r.id}')">Restaurar</button>`:''}
+      </div>`).join('')}
+    </div>
+  </div>`;
+}
+
+async function restaurarBacklogItem(entityType, recordId) {
+  try {
+    await IS4TOptAdapter.raw('restoreDeletedOperationalItem', { entity_type: entityType, record_id: recordId });
+    IS4TOptAdapter.reset('backlog');
+    await loadEvergreenData();
+    showToast('Elemento restaurado', 'success');
+    if (state.currentEvergreenArq) openEvergreen(state.currentEvergreenArq);
+  } catch(e) {
+    showToast('Error: ' + e.message, 'error');
+  }
 }
 
 function renderEntriesGrupo(proyecto, grupoId) {
@@ -3405,7 +4333,7 @@ async function guardarEntry() {
     }
     closeModal('modal-entry');
     showToast('Evento registrado', 'success');
-    await evaluarHitos(state.currentProyecto.proyecto_id, state.logEventos);
+    // Hitos se evalua server-side en AS v1.0.2.
 await refreshProyectoDetalle(estadoPaneles);
   } catch(e) { stopSaving(false); showToast('Error: ' + e.message, 'error'); await restoreModalSnapshot(); }
   finally { btn.disabled = false; btn.textContent = 'Guardar Evento'; }
@@ -3413,6 +4341,8 @@ await refreshProyectoDetalle(estadoPaneles);
 
 // ── EVALUACIÓN DE HITOS ──
 async function evaluarHitos(proyectoId, logOverride) {
+  // IS4T-Opt v1.0.0: la evaluación y escritura de hitos vive server-side en AS v1.0.2.
+  return [];
   const log = (logOverride || state.logEventos).filter(e => e.proyecto_id === proyectoId);
 
   // Construir set de hitos vigentes — un hito es vigente si fue alcanzado Y no hay
@@ -3749,13 +4679,18 @@ function renderEntriesEliminados(proyecto) {
       : null;
     const titulo = nd.titulo || cd?.titulo || (e.tipo_entry === 'riesgo' || e.tipo_entry === 'riesgo_update' ? e.hito_id : '') || e.hito_id || '(sin título)';
     const pill = pillMap[e.tipo_entry] || pillMap['nota'];
+    const esCambioEliminado = e.tipo_entry === 'cambio_registrado';
+    const sinEfectoBadge = esCambioEliminado
+      ? `<span style="font-family:var(--mono);font-size:10px;padding:1px 6px;border-radius:3px;background:rgba(255,107,107,0.12);color:#ff6b6b">Sin efecto por cambio eliminado</span>`
+      : '';
     const fecha = e.fecha_borrado ? formatDate(e.fecha_borrado.toString().split('T')[0]) : '—';
     return `<div style="padding:10px 0;border-bottom:1px solid var(--border);font-size:12px">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
         ${pill}
+        ${sinEfectoBadge}
         <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${fecha}</span>
       </div>
-      <div style="font-weight:500;color:var(--text);margin-bottom:2px">${titulo}</div>
+      <div style="font-weight:500;color:var(--text);margin-bottom:2px;${esCambioEliminado?'opacity:.65;font-style:italic;text-decoration:line-through;text-decoration-thickness:1px;':''}">${titulo}</div>
       ${btnRestaurar(e.tipo_entry === 'cambio_registrado' ? 'cambio' : (e.tipo_entry === 'riesgo' || e.tipo_entry === 'riesgo_update' ? 'riesgo' : e.tipo_entry), e.entry_id)}
     </div>`;
   });
@@ -3782,7 +4717,7 @@ function renderEntriesEliminados(proyecto) {
   <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
     <button class="cambio-expand-btn" onclick="toggleCambioPanel('${panelId}')">
       <span id="chevron-${panelId}" style="transition:transform 0.15s;display:inline-block">▶</span>
-      eliminados (${total})
+      Elementos eliminados (${total})
     </button>
     <div class="cambio-detail-panel" id="${panelId}" style="margin-top:8px">
       ${filas}
@@ -4493,6 +5428,8 @@ function renderCriteriosList() {
 }
 
 function openNuevoCriterio() {
+  showToast('Criterios del Programa no est\u00e1 disponible en IS4T-Opt v1.0.0', 'info');
+  return;
   document.getElementById('c-descripcion').value = '';
   document.getElementById('c-concepto').value = '';
   const sel = document.getElementById('c-proyecto');
@@ -4502,6 +5439,8 @@ function openNuevoCriterio() {
 }
 
 async function guardarCriterio() {
+  showToast('Criterios del Programa no est\u00e1 disponible en IS4T-Opt v1.0.0', 'info');
+  return;
   const desc = document.getElementById('c-descripcion').value.trim();
   if (!desc) { showToast('La descripción es requerida', 'error'); return; }
   const btn = document.getElementById('btn-guardar-criterio');
@@ -4510,7 +5449,7 @@ async function guardarCriterio() {
   btn.disabled = true; btn.textContent = 'Guardando…';
   startSaving();
   try {
-    await api('crearCriterio', { concepto: document.getElementById('c-concepto').value, descripcion: desc, proyecto_detonador: document.getElementById('c-proyecto').value });
+    await api('criteriosDisabled', { concepto: document.getElementById('c-concepto').value, descripcion: desc, proyecto_detonador: document.getElementById('c-proyecto').value });
     stopSaving(true);
     showToast('Criterio propuesto — pendiente VoBo PM', 'success');
     await loadCriteriosData(); renderCriteriosList();
@@ -4519,16 +5458,22 @@ async function guardarCriterio() {
 }
 
 async function aprobarCriterio(id) {
+  showToast('Criterios del Programa no est\u00e1 disponible en IS4T-Opt v1.0.0', 'info');
+  return;
   startSaving();
-  try { await api('aprobarCriterio', { criterio_id: id }); stopSaving(true); showToast('Criterio aprobado', 'success'); await loadCriteriosData(); renderCriteriosList(); renderCriteriosBanner(); }
+  try { await api('criteriosDisabled', { criterio_id: id }); stopSaving(true); showToast('Criterio aprobado', 'success'); await loadCriteriosData(); renderCriteriosList(); renderCriteriosBanner(); }
   catch(e) { stopSaving(false); showToast('Error: ' + e.message, 'error'); }
 }
 async function confirmarLectura(id) {
+  showToast('Criterios del Programa no est\u00e1 disponible en IS4T-Opt v1.0.0', 'info');
+  return;
   startSaving();
-  try { await api('confirmarLecturaCriterio', { criterio_id: id }); stopSaving(true); showToast('Lectura confirmada', 'success'); await loadCriteriosData(); renderCriteriosList(); renderCriteriosBanner(); }
+  try { await api('criteriosDisabled', { criterio_id: id }); stopSaving(true); showToast('Lectura confirmada', 'success'); await loadCriteriosData(); renderCriteriosList(); renderCriteriosBanner(); }
   catch(e) { stopSaving(false); showToast('Error: ' + e.message, 'error'); }
 }
 function rechazarCriterio(id) {
+  showToast('Criterios del Programa no est\u00e1 disponible en IS4T-Opt v1.0.0', 'info');
+  return;
   confirmarBorrado({
     titulo: 'Rechazar criterio',
     mensaje: 'Vas a rechazar este criterio. Se marcará como obsoleto y dejará de ser visible para el equipo.',
@@ -4536,7 +5481,7 @@ function rechazarCriterio(id) {
     onConfirm: async () => {
   startSaving();
   try {
-        await api('obsoletarCriterio', { criterio_id: id });
+        await api('criteriosDisabled', { criterio_id: id });
         stopSaving(true); showToast('Criterio rechazado', 'success');
         await loadCriteriosData();
         renderCriteriosList();
@@ -4546,12 +5491,14 @@ function rechazarCriterio(id) {
 }
 
 function obsoletarCriterio(id) {
+  showToast('Criterios del Programa no est\u00e1 disponible en IS4T-Opt v1.0.0', 'info');
+  return;
   confirmarBorrado({
     titulo: 'Obsoletizar criterio',
     mensaje: 'Vas a marcar este criterio como obsoleto. Dejará de aparecer en la lista activa del equipo.',
     labelBoton: 'Obsoletizar',
     onConfirm: async () => {
-  startSaving(); try { await api('obsoletarCriterio', { criterio_id: id }); stopSaving(true); showToast('Criterio obsoletado', 'success'); await loadCriteriosData(); renderCriteriosList(); }
+  startSaving(); try { await api('criteriosDisabled', { criterio_id: id }); stopSaving(true); showToast('Criterio obsoletado', 'success'); await loadCriteriosData(); renderCriteriosList(); }
       catch(e) { stopSaving(false); showToast('Error: ' + e.message, 'error'); }
     }
   });
@@ -4940,7 +5887,7 @@ async function confirmarEntregaParcial() {
     await guardarSnapshotEntrega(proyectoId, res.entry_id, seleccion);
     closeModal('modal-entry');
     showToast('Entrega Parcial registrada', 'success');
-    await evaluarHitos(proyectoId, state.logEventos);
+    // Hitos se evalua server-side en AS v1.0.2.
     await loadProyectoData(proyectoId);
     if (state.currentProyecto) { await openProyecto(proyectoId); restaurarEstadoPaneles(estadoPaneles); }
   } catch(e) { showToast('Error: ' + e.message, 'error'); }
@@ -5166,9 +6113,58 @@ function renderTareasAdhoc(proyecto) {
       ${esPM?`<div style="padding:8px 16px;border:1px solid var(--border);border-top:none;border-bottom:none;background:var(--surface);display:flex;justify-content:flex-end"><button class="btn-ghost" style="font-size:11px" onclick="openNuevaTarea()">+ Tarea</button></div>`:''}
       <div style="background:var(--surface);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--radius) var(--radius)">
         ${tareasHTML}
+        ${renderDeletedTareasProyecto(proyecto)}
       </div>
     </div>
   </div>`;
+}
+
+function renderDeletedTareasProyecto(proyecto) {
+  const bundle = IS4TOptAdapter.projectBundles[proyecto.proyecto_id];
+  const d = bundle?.deleted_items || {};
+  const tasks = d.extr_tasks || [];
+  const events = d.extr_task_events || [];
+  const total = tasks.length + events.length;
+  if (!total || state.rol !== 'PM') return '';
+  const rows = [
+    ...tasks.map(t => ({
+      type: 'extr_task', id: t.manual_task_id, title: t.title || t.manual_task_id,
+      meta: 'Tarea eliminada', can_restore: true
+    })),
+    ...events.map(e => ({
+      type: 'extr_task_event', id: e.manual_task_event_id, title: e.title || e.manual_task_event_id,
+      meta: e.can_restore === false ? 'Evento eliminado · restaura primero la tarea parent' : 'Evento eliminado',
+      can_restore: e.can_restore !== false
+    }))
+  ];
+  return `<div style="padding:12px 16px;border-top:1px solid var(--border)">
+    <button class="cambio-expand-btn" onclick="toggleCambioPanel('deleted-extr-panel')">
+      <span id="chevron-deleted-extr-panel" style="transition:transform 0.15s;display:inline-block">▶</span>
+      Elementos eliminados (${total})
+    </button>
+    <div class="cambio-detail-panel" id="deleted-extr-panel" style="margin-top:8px">
+      ${rows.map(r => `<div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;opacity:${r.can_restore?1:.55}">
+        <div style="font-weight:500">${r.title}</div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--text3)">${r.meta}</div>
+        ${r.can_restore?`<button class="btn-ghost" style="font-size:11px;margin-top:4px" onclick="restaurarElementoOperativo('${r.type}','${r.id}','${proyecto.proyecto_id}')">Restaurar</button>`:''}
+      </div>`).join('')}
+    </div>
+  </div>`;
+}
+
+async function restaurarElementoOperativo(entityType, recordId, projectId) {
+  try {
+    await IS4TOptAdapter.raw('restoreDeletedOperationalItem', {
+      entity_type: entityType,
+      record_id: recordId,
+      project_id: projectId
+    });
+    IS4TOptAdapter.reset('project', projectId);
+    showToast('Elemento restaurado', 'success');
+    if (projectId && state.currentProyecto) await openProyecto(projectId);
+  } catch(e) {
+    showToast('Error: ' + e.message, 'error');
+  }
 }
 
 function toggleTareasSection() {
@@ -5410,17 +6406,16 @@ function borrarTareaEvento(entryId, tareaId) {
 // ── H11-03 EVERGREEN ──
 
 function renderEvergreenHome() {
-  if (state.rol !== 'PM' && state.rol !== 'Arquitecto') return '';
-
   const usuarioActual = state.usuarios.find(u => u.email === state.user?.email);
   let usuarios = [];
-  if (state.rol === 'Arquitecto') {
+  if (state.rol !== 'PM') {
     if (usuarioActual) usuarios = [usuarioActual];
   } else {
-    // PM ve: todos los arquitectos + el PM mismo
-    const arquitectos = state.usuarios.filter(u => u.rol === 'Arquitecto');
-    const pmUser = state.usuarios.find(u => u.email === state.user?.email);
-    usuarios = pmUser ? [...arquitectos, pmUser] : arquitectos;
+    usuarios = state.usuarios.filter(u => {
+      const rol = normalizeText(u.rol || u.role || '');
+      const esUsuarioActual = u.email === state.user?.email;
+      return rol === 'arquitecto' || rol === 'pm' || esUsuarioActual;
+    });
   }
   if (usuarios.length === 0) return '';
 
@@ -5437,7 +6432,7 @@ function renderEvergreenHome() {
     const label = vencidas > 0 ? `${vencidas}d vencida${vencidas>1?'s':''}` : abiertas > 0 ? 'Al día' : 'Sin tareas';
     return `<div class="project-card risk-${nivel}" onclick="openEvergreen('${u.email}')" style="cursor:pointer;border-left:3px solid ${colorBorde};border-radius:0 var(--radius) var(--radius) 0">
       <div>
-        <div class="project-name">Evergreen — ${u.nombre}</div>
+        <div class="project-name">Backlog — ${u.nombre}</div>
         <div class="progress-bar-wrap">
           <div class="progress-bar-track"><div class="progress-bar-fill" style="width:0%;background:${colorBorde}"></div></div>
           <div class="progress-label">
@@ -5465,7 +6460,7 @@ function openEvergreen(arquitectoEmail) {
   const arq = state.usuarios.find(u => u.email === arquitectoEmail);
   if (!arq) return;
   state.currentEvergreenArq = arquitectoEmail;
-  document.getElementById('ev-detail-title').textContent = `Evergreen — ${arq.nombre}`;
+  document.getElementById('ev-detail-title').textContent = `${state.rol === 'PM' ? 'Backlog — ' + arq.nombre : 'Mi Backlog'}`;
   const tareas = state.evergreenTareas.filter(t => t.asignado_a === arquitectoEmail);
   const hoy = new Date(); hoy.setHours(0,0,0,0);
   const abiertas   = tareas.filter(t => t.estatus !== 'completada' && t.estatus !== 'cancelada').length;
@@ -5492,7 +6487,7 @@ function openEvergreen(arquitectoEmail) {
 }
 
 function renderEvergreenDetail(arquitectoEmail) {
-  const log = state.logEventos.filter(e => e.proyecto_id === 'EVERGREEN');
+  const log = state.logEventos.filter(e => e.proyecto_id === 'BACKLOG' || e.proyecto_id === 'EVERGREEN');
   const tareas = state.evergreenTareas.filter(t => t.asignado_a === arquitectoEmail);
   const hoy = new Date(); hoy.setHours(0,0,0,0);
   const esPM = state.rol === 'PM';
@@ -5584,7 +6579,7 @@ function renderEvergreenDetail(arquitectoEmail) {
         ${filas}
       </div>
     </div>`;
-  }).join('');
+  }).join('') + renderDeletedBacklog(arquitectoEmail);
 }
 
 function toggleEvGrupo(key) {
@@ -5601,12 +6596,12 @@ function toggleEvGrupo(key) {
 function openNuevaEvergreenTarea() {
   state._editandoEvergreenId = null;
   state._modoEvergreen = true;
-  document.getElementById('modal-tarea-title').textContent = 'Nueva tarea Evergreen';
+  document.getElementById('modal-tarea-title').textContent = 'Nueva tarea Backlog';
   document.getElementById('btn-guardar-tarea').textContent = 'Crear tarea';
   document.getElementById('ta-titulo').value = '';
   document.getElementById('ta-fecha').value = '';
   document.getElementById('ta-notas').value = '';
-  // FIX-P1: ocultar selector — asignación automática al dueño del Evergreen
+  // FIX-P1: ocultar selector — asignación automática al dueño del Backlog
   document.getElementById('row-ta-asignado').style.display = 'none';
   const sel = document.getElementById('ta-asignado');
   sel.innerHTML = '';
@@ -5621,7 +6616,7 @@ function openEditarEvergreenTarea(tareaId) {
   if (!t) return;
   state._editandoEvergreenId = tareaId;
   state._modoEvergreen = true;
-  document.getElementById('modal-tarea-title').textContent = 'Editar tarea Evergreen';
+  document.getElementById('modal-tarea-title').textContent = 'Editar tarea Backlog';
   document.getElementById('btn-guardar-tarea').textContent = 'Guardar cambios';
   document.getElementById('ta-titulo').value = t.titulo || '';
   document.getElementById('ta-fecha').value = normalizarFechaParaInput(t.fecha_esperada);
@@ -5658,7 +6653,7 @@ async function guardarEvergreenTarea() {
         fecha_esperada: document.getElementById('ta-fecha').value || '',
         notas: document.getElementById('ta-notas').value
       });
-      showToast('Tarea Evergreen creada', 'success');
+      showToast('Tarea Backlog creada', 'success');
     }
     await loadEvergreenData();
   } catch(e) { stopSaving(false); showToast('Error: ' + e.message, 'error'); await restoreModalSnapshot(); }
@@ -5696,7 +6691,7 @@ function abrirEditarEvergreenEvento(entryId, tareaId) {
 function borrarEvergreenEvento(entryId, tareaId) {
   confirmarBorrado({
     titulo: 'Eliminar evento',
-    mensaje: 'Vas a eliminar este evento del log Evergreen.',
+    mensaje: 'Vas a eliminar este evento del Backlog.',
     labelBoton: 'Eliminar evento',
     onConfirm: async () => {
       try {
@@ -5723,7 +6718,7 @@ async function confirmarCierreEvergreen(tareaId) {
       nota: JSON.stringify({ titulo: 'Cierre confirmado', descripcion: '', estatus_nuevo: 'completada' }),
       version_timeline_activa: '1'
     });
-    stopSaving(true); showToast('Tarea Evergreen cerrada', 'success');
+    stopSaving(true); showToast('Tarea Backlog cerrada', 'success');
     await loadEvergreenData();
     const arqEmail = state.currentEvergreenArq;
     if (arqEmail) openEvergreen(arqEmail);
@@ -5733,7 +6728,7 @@ async function confirmarCierreEvergreen(tareaId) {
 function borrarEvergreenTarea(tareaId) {
   const t = state.evergreenTareas.find(x => x.tarea_id === tareaId);
   confirmarBorrado({
-    titulo: 'Eliminar tarea Evergreen',
+    titulo: 'Eliminar tarea Backlog',
     mensaje: `Vas a eliminar <strong>${t?.titulo || tareaId}</strong>. Esta acción no se puede deshacer.`,
     labelBoton: 'Eliminar tarea',
     onConfirm: async () => {
