@@ -3665,7 +3665,7 @@ function buildDisciplinasChecklist() {
     if (!grupos[gid]) grupos[gid] = { nombre: t.grupo_nombre || IS4TOptAdapter.groupName(gid), disciplinas: new Set() };
     grupos[gid].disciplinas.add(name);
   });
-  ['G8::Alarma SÃ­smica','G8::Puerta de Emergencia','G7::Proyector LÃ¡ser'].forEach(expected => {
+  ['G08::Alarma Sísmica','G08::Puerta de Emergencia','G07::Proyector Láser'].forEach(expected => {
     const [gid, name] = expected.split('::');
     const exists = catalogTasks.some(t =>
       normalizeText(t.grupo_id || t.group_id) === normalizeText(gid) &&
@@ -5893,9 +5893,9 @@ function getTareasOpcionalesActivas() {
 }
 function tareaOpcionalAplica(grupoId, disciplina) {
   const MAP = {
-    'G8::Alarma Sísmica':      'alarma_sismica',
-    'G8::Puerta de Emergencia':'puerta_emergencia',
-    'G7::Proyector Láser':     'proyector_laser',
+    'G08::Alarma Sísmica':      'alarma_sismica',
+    'G08::Puerta de Emergencia':'puerta_emergencia',
+    'G07::Proyector Láser':     'proyector_laser',
   };
   const key = MAP[`${grupoId}::${disciplina}`];
   if (!key) return true; // no es tarea opcional — siempre aplica
