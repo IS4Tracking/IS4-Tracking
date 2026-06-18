@@ -918,13 +918,12 @@
         </div>
       </div>
       <div class="form-group"><div class="form-toggle" onclick="toggleSettingsBubble()"><div class="toggle-switch" id="toggle-settings-bubble"></div><div class="toggle-label">Bubble Plan aplica</div></div></div>
-      ${state.rol === 'PM' ? `
-      <div class="form-group" style="border-top:1px solid var(--border);padding-top:12px;margin-top:4px">
+      <div class="form-group" id="settings-tareas-opcionales" style="display:none;border-top:1px solid var(--border);padding-top:12px;margin-top:4px">
         <label class="form-label" style="margin-bottom:8px">Tareas opcionales</label>
         <div class="form-toggle" onclick="toggleTareaOpcional('alarma_sismica')"><div class="toggle-switch" id="toggle-alarma-sismica"></div><div class="toggle-label">Alarma Sísmica (G8)</div></div>
         <div class="form-toggle" onclick="toggleTareaOpcional('puerta_emergencia')" style="margin-top:8px"><div class="toggle-switch" id="toggle-puerta-emergencia"></div><div class="toggle-label">Puerta de Emergencia (G8)</div></div>
         <div class="form-toggle" onclick="toggleTareaOpcional('proyector_laser')" style="margin-top:8px"><div class="toggle-switch" id="toggle-proyector-laser"></div><div class="toggle-label">Proyector Láser (G7)</div></div>
-      </div>` : ''}
+      </div>
       <div class="form-group" id="historial-arq-section" style="display:none">
         <label class="form-label">Historial de asignaciones</label>
         <div id="historial-arq-lista" style="margin-top:6px;display:flex;flex-direction:column;gap:4px"></div>
@@ -1255,6 +1254,23 @@ const IS4TOptAdapter = {
 
   taskKey(task) {
     return (task.group_id || '') + '::' + (task.task_name || task.title || '');
+  },
+
+  groupName(groupId) {
+    const groups = this.bootstrap?.catalogs?.groups || [];
+    const g = groups.find(x => x.group_id === groupId);
+    return g?.group_name || g?.name || g?.grupo_nombre || groupId;
+  },
+
+  catalogTasks() {
+    const tasks = this.bootstrap?.catalogs?.tasks || [];
+    return tasks.map(t => ({
+      ...t,
+      grupo_id: t.group_id,
+      grupo_nombre: this.groupName(t.group_id),
+      disciplina_nombre: t.task_name || t.title || '',
+      task_catalog_id: t.task_catalog_id
+    }));
   },
 
   taskByIds(bundle) {
@@ -1659,16 +1675,19 @@ const IS4TOptAdapter = {
       const selected = [...(state.disciplinasSeleccionadas || [])]
         .map(k => {
           const [g, d] = k.split('::');
-          const task = (this.bootstrap?.catalogs?.tasks || []).find(t => t.group_id === g && t.task_name === d);
+          const task = (this.bootstrap?.catalogs?.tasks || []).find(t =>
+            normalizeText(t.group_id) === normalizeText(g) &&
+            normalizeText(t.task_name || t.title || '') === normalizeText(d)
+          );
           return task ? task.task_catalog_id : '';
         }).filter(Boolean);
       result = await this.raw('createProject', {
         project_name: body.nombre,
-        project_code: body.clave,
-        project_type: body.tipo,
+        project_code: body.clave_innovasport ?? body.clave,
+        project_type: body.tipo_proyecto ?? body.tipo,
         approval_date: body.fecha_aprobacion,
         assigned_architect_user_id: this.userIdFromEmailOrId(body.arquitecto_id),
-        bubble_plan_applies: body.bubble_plan,
+        bubble_plan_applies: body.bubble_plan_aplica ?? body.bubble_plan,
         notes: body.notas,
         selected_task_catalog_ids: selected.join(',')
       });
@@ -1680,10 +1699,10 @@ const IS4TOptAdapter = {
       await this.raw('updateProject', {
         project_id: projectId,
         project_name: body.nombre,
-        project_code: body.clave,
-        project_type: body.tipo,
+        project_code: body.clave_innovasport ?? body.clave,
+        project_type: body.tipo_proyecto ?? body.tipo,
         approval_date: body.fecha_aprobacion,
-        bubble_plan_applies: body.bubble_plan,
+        bubble_plan_applies: body.bubble_plan_aplica ?? body.bubble_plan,
         notes: body.notas
       });
       if (body.estado) await this.raw('changeProjectStatus', { project_id: projectId, new_status: body.estado });
@@ -1843,6 +1862,18 @@ const IS4TOptAdapter = {
       result = await this.raw('deleteNote', { ...projectBody(), note_id: body.entry_id });
       this.reset('project', projectId); return result;
     }
+    if (action === 'crearNota') {
+      result = await this.raw('createNote', {
+        project_id: body.project_id,
+        title: body.title || body.titulo || '',
+        note_type: body.note_type || body.tipo || 'General',
+        description: body.description || body.contenido || '',
+        group_id: body.group_id || body.disc_ref || ''
+      });
+      const pid = body.project_id || projectId;
+      if (pid) this.reset('project', pid);
+      return result;
+    }
     if (action === 'appendCambioDetalle') {
       result = await this.raw('createChange', {
         ...projectBody(),
@@ -1853,7 +1884,7 @@ const IS4TOptAdapter = {
         affected_project_task_ids: this.taskIdsFromLegacy(projectId, body.disciplinas_afectadas),
         scope_description: body.alcance || body.descripcion || ''
       });
-      this.reset('project', projectId); return { change_id: result.change_id };
+      this.reset('project', projectId); return { change_id: result.change_id, change_code: result.change_code || '' };
     }
     if (action === 'editarCambioDetalle') {
       result = await this.raw('editChange', {
@@ -2231,31 +2262,19 @@ async function loadStaticData() {
 async function loadHomeData() {
   console.time('[PERF] loadHomeData total');
   try {
-    console.time('[PERF] loadHomeData Promise.all');
-    const [proyectos, log, disciplinas, cambiosBorrados, historialArq] = await Promise.all([
+    console.time('[PERF] loadHomeData core');
+    const [proyectos, evergreen] = await Promise.all([
       api('getProyectos'),
-      api('getLogEventos'),
-      api('getDisciplinasProyecto'),
-      api('getCambiosBorrados', {}),
-      api('getHistorialArquitecto', {})
-    ]);
-    console.timeEnd('[PERF] loadHomeData Promise.all');
-    state.proyectos       = proyectos     || [];
-    state.logEventos      = log           || [];
-    state.disciplinasProyecto = disciplinas || [];
-    state.criterios       = [];
-    state.cambiosBorrados = cambiosBorrados || [];
-    state.historialArquitecto = historialArq || [];
-
-    // Módulos adicionales en paralelo (IX-1: antes eran secuenciales)
-    console.time('[PERF] loadHomeData modulos');
-    const [tareas, evergreen] = await Promise.all([
-      api('getTareasAdhoc', {}).catch(e => { console.warn('[PERF] getTareasAdhoc error:', e.message); return []; }),
       api('getBacklog', {}).catch(e => { console.warn('[PERF] getBacklog error:', e.message); return []; })
     ]);
-    console.timeEnd('[PERF] loadHomeData modulos');
-    state.tareasAdhoc     = tareas    || [];
+    console.timeEnd('[PERF] loadHomeData core');
+    state.proyectos       = proyectos     || [];
+    state.criterios       = [];
+
+    // Módulos adicionales en paralelo (IX-1: antes eran secuenciales)
     state.evergreenTareas = evergreen || [];
+    const otrosLogs = (state.logEventos || []).filter(e => e.proyecto_id !== 'BACKLOG' && e.proyecto_id !== 'EVERGREEN');
+    state.logEventos = [...otrosLogs, ...IS4TOptAdapter.backlogEvents()];
   } catch(e) { showToast('Error cargando datos: ' + e.message, 'error'); console.error(e); }
   console.timeEnd('[PERF] loadHomeData total');
 }
@@ -2286,7 +2305,7 @@ async function loadProyectoData(proyectoId) {
       riesgosBorrados,
       entriesBorrados
     ] = await Promise.all([
-      api('getProyectos'),
+      Promise.resolve(state.proyectos || []),
       api('getLogEventos',             { proyecto_id: proyectoId }),
       api('getDisciplinasProyecto',    { proyecto_id: proyectoId }),
       api('getCambiosDetalle',         { proyecto_id: proyectoId }),
@@ -2302,6 +2321,13 @@ async function loadProyectoData(proyectoId) {
     promiseTimerStarted = false;
 
     state.proyectos = proyectos || [];
+    const projectBundle = IS4TOptAdapter.projectBundles[proyectoId];
+    if (projectBundle?.project) {
+      const projectRow = IS4TOptAdapter.projectRow(projectBundle.project);
+      const idx = state.proyectos.findIndex(p => p.proyecto_id === projectRow.proyecto_id);
+      if (idx >= 0) state.proyectos[idx] = projectRow;
+      else state.proyectos.push(projectRow);
+    }
 
     // IX-2: merge log filtrado en state.logEventos sin sobreescribir otros proyectos
     const otrosLogs = (state.logEventos || []).filter(e => e.proyecto_id !== proyectoId);
@@ -2357,12 +2383,10 @@ async function loadProyectoData(proyectoId) {
 async function loadEvergreenData() {
   console.time('[PERF] loadEvergreenData');
   try {
-    const [evergreen, log] = await Promise.all([
-      api('getBacklog', {}).catch(() => []),
-      api('getLogEventos').catch(() => [])
-    ]);
+    const evergreen = await api('getBacklog', {}).catch(() => []);
     state.evergreenTareas = evergreen || [];
-    state.logEventos      = log       || [];
+    const otrosLogs = (state.logEventos || []).filter(e => e.proyecto_id !== 'BACKLOG' && e.proyecto_id !== 'EVERGREEN');
+    state.logEventos = [...otrosLogs, ...IS4TOptAdapter.backlogEvents()];
   } catch(e) { console.error('[PERF] loadEvergreenData error:', e.message); }
   console.timeEnd('[PERF] loadEvergreenData');
 }
@@ -2810,7 +2834,7 @@ function renderGroups(proyecto) {
       .map(d => d.disciplina_id)
   );
   const grupos = getGruposUnicos().filter(g =>
-    state.eventosCatalogo.some(e => e.grupo_id === g.grupo_id && activasSet.has(`${e.grupo_id}::${e.disciplina_nombre}`))
+    [...activasSet].some(key => key.startsWith(`${g.grupo_id}::`))
   );
   document.getElementById('groups-container').innerHTML = grupos.map(g => {
     const disciplinas = getDisciplinasGrupo(g.grupo_id).filter(d => activasSet.has(`${g.grupo_id}::${d}`) && tareaOpcionalAplica(g.grupo_id, d));
@@ -3633,10 +3657,21 @@ function openNuevoProyecto() {
 
 function buildDisciplinasChecklist() {
   const grupos = {};
-  state.eventosCatalogo.forEach(e => {
-    if (!e.grupo_id || e.grupo_id === 'G0') return;
-    if (!grupos[e.grupo_id]) grupos[e.grupo_id] = { nombre: e.grupo_nombre, disciplinas: new Set() };
-    if (e.disciplina_nombre) grupos[e.grupo_id].disciplinas.add(e.disciplina_nombre);
+  const catalogTasks = IS4TOptAdapter.catalogTasks();
+  catalogTasks.forEach(t => {
+    const gid = t.grupo_id || t.group_id;
+    const name = t.disciplina_nombre || t.task_name || t.title;
+    if (!gid || gid === 'G0' || !name) return;
+    if (!grupos[gid]) grupos[gid] = { nombre: t.grupo_nombre || IS4TOptAdapter.groupName(gid), disciplinas: new Set() };
+    grupos[gid].disciplinas.add(name);
+  });
+  ['G8::Alarma SÃ­smica','G8::Puerta de Emergencia','G7::Proyector LÃ¡ser'].forEach(expected => {
+    const [gid, name] = expected.split('::');
+    const exists = catalogTasks.some(t =>
+      normalizeText(t.grupo_id || t.group_id) === normalizeText(gid) &&
+      normalizeText(t.disciplina_nombre || t.task_name || t.title || '') === normalizeText(name)
+    );
+    if (!exists) console.warn('[CATALOG] Tarea opcional no recibida desde catalog_tasks:', expected);
   });
 
   state.disciplinasSeleccionadas = new Set();
@@ -3666,10 +3701,12 @@ function buildDisciplinasChecklist() {
 
 function selectAllDisciplinas() {
   const grupos = {};
-  state.eventosCatalogo.forEach(e => {
-    if (!e.grupo_id || e.grupo_id === 'G0') return;
-    if (!grupos[e.grupo_id]) grupos[e.grupo_id] = new Set();
-    if (e.disciplina_nombre) grupos[e.grupo_id].add(e.disciplina_nombre);
+  IS4TOptAdapter.catalogTasks().forEach(t => {
+    const gid = t.grupo_id || t.group_id;
+    const name = t.disciplina_nombre || t.task_name || t.title;
+    if (!gid || gid === 'G0' || !name) return;
+    if (!grupos[gid]) grupos[gid] = new Set();
+    grupos[gid].add(name);
   });
   Object.entries(grupos).forEach(([gid, discs]) => {
     [...discs].forEach(d => {
@@ -3973,6 +4010,37 @@ function resetModalNotaCambio() {
   state.cambioDiscsSeleccionadas = new Set();
 }
 
+function cerrarFormNota() {
+  const f = document.getElementById('nota-form');
+  if (f) f.classList.remove('open');
+  const t = document.getElementById('nota-texto-input');
+  if (t) t.value = '';
+}
+
+async function guardarNota() {
+  const texto = (document.getElementById('nota-texto-input')?.value || '').trim();
+  if (!texto) { showToast('Escribe algo antes de guardar', 'error'); return; }
+  if (!state.currentProyecto) { showToast('Selecciona un proyecto primero', 'error'); return; }
+  const btn = document.getElementById('btn-guardar-nota');
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
+  try {
+    await api('crearNota', {
+      project_id: state.currentProyecto.proyecto_id,
+      title: texto.length > 60 ? texto.slice(0, 57) + '...' : texto,
+      note_type: 'General',
+      description: texto,
+      group_id: ''
+    });
+    cerrarFormNota();
+    showToast('Nota guardada', 'success');
+    await loadProyectoData(state.currentProyecto.proyecto_id);
+  } catch(e) {
+    showToast('Error: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Guardar nota'; }
+  }
+}
+
 async function guardarNotaCambio() {
   const tipo = state.entryTipo;
   const fecha = document.getElementById('nc-fecha').value;
@@ -4145,60 +4213,24 @@ if (nuevoEstatus === 'Cristalizado') {
       }
 
       if (esNota) {
-        const claveNota = await generarClaveNota();
-        // Entry principal de la nota
-        await api('appendLogEvento', {
-          proyecto_id: state.currentProyecto.proyecto_id,
-          fecha_real: fecha,
-          disciplina_id: '',
-          hito_id: claveNota,
-          tipo_entry: 'nota',
-          nota: JSON.stringify({ titulo, tipo: tipoNota, contenido: texto, disc_ref: notaDiscKey }),
-          version_timeline_activa: '1'
+        await api('crearNota', {
+          project_id: state.currentProyecto.proyecto_id,
+          title: titulo,
+          note_type: tipoNota || 'General',
+          description: texto,
+          group_id: notaDiscKey ? notaDiscKey.split('::')[0] : '',
+          project_task_id: ''
         });
-        // Si tiene referencia a disciplina — entry en log de esa disciplina
-        if (notaDiscKey) {
-          await api('appendLogEvento', {
-            proyecto_id: state.currentProyecto.proyecto_id,
-            fecha_real: fecha,
-            disciplina_id: notaDiscKey,
-            hito_id: claveNota,
-            tipo_entry: 'nota_ref',
-            nota: JSON.stringify({ titulo, tipo: tipoNota }),
-            version_timeline_activa: '1'
-          });
-        }
         await confirmBtn(btn, 'Guardar'); stopSaving(true);
         closeModal('modal-nota-cambio'); resetModalNotaCambio();
         showToast('Nota guardada', 'success');
       } else {
-        // Generar clave de cambio F1
-        const cambiosProyecto = state.logEventos.filter(e => e.proyecto_id === state.currentProyecto.proyecto_id && e.tipo_entry === 'cambio_registrado');
-        const numsActivos = cambiosProyecto.map(e => {
-          const cd = (state.cambiosDetalle || []).find(c => c.entry_id === e.entry_id);
-          return parseInt((cd?.clave_cambio || '').replace('C',''), 10);
-        }).filter(n => !isNaN(n));
-        const numsBorrados = (state.cambiosBorrados || [])
-          .filter(b => b.proyecto_id === state.currentProyecto.proyecto_id)
-          .map(b => parseInt((b.clave_cambio || '').replace('C',''), 10))
-          .filter(n => !isNaN(n));
-        const todos = [...numsActivos, ...numsBorrados];
-        const siguiente = todos.length > 0 ? Math.max(...todos) + 1 : 1;
-        const claveCambio = 'C' + String(siguiente).padStart(3, '0');
-
-        const res = await api('appendLogEvento', {
-          proyecto_id: state.currentProyecto.proyecto_id,
-          fecha_real: fecha, disciplina_id: '', hito_id: claveCambio,
-          tipo_entry: 'cambio_registrado', nota: texto, version_timeline_activa: '1'
-        });
         const discs = [...(state.cambioDiscsSeleccionadas || [])];
         const hitos = getHitosAfectados(discs);
         if (discs.length > 0 && hitos.length === 0) {
           showToast('Sin hitos vinculados a las disciplinas — puedes editarlo después', 'success');
         }
-        await api('appendCambioDetalle', {
-          entry_id: res.entry_id,
-          clave_cambio: claveCambio,
+        const res = await api('appendCambioDetalle', {
           titulo: tituloCambio,
           origen_cambio: document.getElementById('e-origen').value,
           disciplinas_afectadas: discs.join(','),
@@ -4206,6 +4238,7 @@ if (nuevoEstatus === 'Cristalizado') {
           impacto_tipo: document.getElementById('e-impacto-tipo').value,
           riesgo_ref_id: document.getElementById('nc-cambio-riesgo-ref')?.value || ''
         });
+        const claveCambio = res.data?.change_code || res.change_code || '';
 
         // Entry 1 + Entry 2 por cada disciplina afectada
         for (const discKey of discs) {
@@ -4232,7 +4265,7 @@ if (nuevoEstatus === 'Cristalizado') {
             proyecto_id: state.currentProyecto.proyecto_id,
             fecha_real: fecha,
             disciplina_id: discKey,
-            hito_id: res.entry_id,
+            hito_id: res.change_id,
             tipo_entry: 'cambio_aplicado',
             nota: '',
             version_timeline_activa: '1'
@@ -4514,6 +4547,8 @@ function openSettings() {
   document.getElementById('s-estado').value = p.estado || 'Activo';
   const bubbleOn = p.bubble_plan_aplica === true || p.bubble_plan_aplica === 'TRUE';
   document.getElementById('toggle-settings-bubble').classList.toggle('on', bubbleOn);
+  const optionalSection = document.getElementById('settings-tareas-opcionales');
+  if (optionalSection) optionalSection.style.display = state.rol === 'PM' ? '' : 'none';
   if (state.rol === 'PM') {
     const tareas = p.tareas_opcionales ? JSON.parse(p.tareas_opcionales) : {};
     ['alarma_sismica','puerta_emergencia','proyector_laser'].forEach(t => {
@@ -4615,9 +4650,10 @@ async function guardarSettings() {
     closeModal('modal-settings');
     const msgPausa = estadoNuevo === 'En pausa' ? ' · Proyecto en pausa' : estadoAnterior === 'En pausa' ? ' · Proyecto reactivado' : '';
     showToast('Proyecto actualizado' + msgPausa, 'success');
-    await loadHomeData();
-    const updated = state.proyectos.find(p => p.proyecto_id === state.currentProyecto.proyecto_id);
-    if (updated) { state.currentProyecto = updated; openProyecto(updated.proyecto_id); }
+    const projectId = state.currentProyecto.proyecto_id;
+    IS4TOptAdapter.reset('project', projectId);
+    IS4TOptAdapter.reset('home');
+    await openProyecto(projectId);
   } catch(e) { showToast('Error: ' + e.message, 'error'); }
   finally { btn.disabled = false; btn.textContent = 'Guardar cambios'; }
 }
@@ -5341,9 +5377,15 @@ async function confirmarBorrarCambio() {
   btn.disabled = true; btn.textContent = 'Eliminando…';
   const estadoPaneles = capturarEstadoPaneles();
   try {
-    await api('borrarCambio', { entry_id: entryId, motivo, usuario: state.user?.email || '', proyecto_id: state.currentProyecto?.proyecto_id || '' });
+    const borrarRes = await api('borrarCambio', { entry_id: entryId, motivo, usuario: state.user?.email || '', proyecto_id: state.currentProyecto?.proyecto_id || '' });
     state.logEventos = state.logEventos.filter(e => e.entry_id !== entryId);
     state.cambiosDetalle = (state.cambiosDetalle || []).filter(c => c.entry_id !== entryId);
+    const _deletedCode = borrarRes?.data?.change_code || borrarRes?.change_code || '';
+    state.cambiosBorrados = [...(state.cambiosBorrados || []), {
+      change_id: entryId,
+      change_code: _deletedCode,
+      proyecto_id: state.currentProyecto?.proyecto_id || ''
+    }];
     closeModal('modal-borrar-cambio');
     showToast('Cambio eliminado', 'success');
     if (state.currentProyecto) {
@@ -5582,6 +5624,67 @@ const HITOS_TIMELINE = [
 ];
 
 function renderTimeline(proyecto) {
+  const bundle = IS4TOptAdapter.projectBundles[proyecto.proyecto_id];
+  const bundleMilestones = bundle?.milestones || [];
+  if (bundleMilestones.length > 0) {
+    const statusClass = status => {
+      const s = normalizeText(status || '');
+      if (s === 'completado' || s === 'completada') return 'completado';
+      if (s === 'afectado') return 'en-riesgo';
+      if (s === 'retrasado' || s === 'vencido') return 'retrasado';
+      return 'pendiente';
+    };
+    const dateValue = (...values) => {
+      const val = values.find(v => v !== undefined && v !== null && String(v).trim() !== '');
+      return val ? formatDate(String(val).split('T')[0]) : '<span style="color:var(--text3)">—</span>';
+    };
+    const rows = bundleMilestones
+      .slice()
+      .sort((a,b) => {
+        const ao = Number(a.sort_order || a.milestone_order || 0);
+        const bo = Number(b.sort_order || b.milestone_order || 0);
+        if (ao || bo) return ao - bo;
+        return String(a.milestone_catalog_id || '').localeCompare(String(b.milestone_catalog_id || ''));
+      })
+      .map(m => {
+        const id = m.milestone_catalog_id || m.milestone_id || m.project_milestone_id || '—';
+        const name = m.milestone_name || m.name || m.title || id;
+        const planned = dateValue(m.baseline_date, m.planned_date);
+        const current = dateValue(m.current_target_date, m.current_date, m.target_date);
+        const actual = dateValue(m.actual_date, m.completed_at);
+        const status = m.status || 'Pendiente';
+        return `
+        <div class="timeline-row">
+          <div class="timeline-hito-id">${id}</div>
+          <div class="timeline-hito-nombre">${name}</div>
+          <div class="timeline-fecha">${planned}</div>
+          <div class="timeline-fecha">${current} / ${actual}</div>
+          <div class="timeline-estado ${statusClass(status)}">${status}</div>
+        </div>`;
+      });
+    return `
+    <div class="timeline-section">
+      <div class="timeline-header" id="timeline-toggle" onclick="toggleTimeline()">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-size:10px;color:var(--text3);transition:transform 0.15s" id="timeline-chevron">▶</span>
+          <span class="section-title" style="margin:0">Hitos del Proyecto</span>
+          <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${rows.length}</span>
+        </div>
+      </div>
+      <div class="timeline-body" id="timeline-body">
+      <div>
+        <div class="timeline-row header">
+          <div class="col-header">Hito</div>
+          <div class="col-header">Nombre</div>
+          <div class="col-header">Planeada</div>
+          <div class="col-header">Actual / real</div>
+          <div class="col-header">Estado</div>
+        </div>
+        ${rows.join('')}
+      </div>
+      </div>
+    </div>`;
+  }
   if (!proyecto.fecha_aprobacion) return '<div style="color:var(--text3);font-family:var(--mono);font-size:12px;padding:12px 0">Sin fecha de aprobación — no se puede calcular el timeline.</div>';
   const base = parseISODate(proyecto.fecha_aprobacion);
   if (!base) return '';
@@ -5747,10 +5850,42 @@ function addBusinessDays(startDate, days) {
 // ── HELPERS ──
 function getGruposUnicos() {
   const grupos = []; const seen = new Set();
+  const projectId = state.currentProyecto?.proyecto_id;
+  const projectTasks = projectId
+    ? (state.disciplinasProyecto || []).filter(d => d.proyecto_id === projectId && d.grupo_id)
+    : [];
+  projectTasks.forEach(t => {
+    if (!seen.has(t.grupo_id)) {
+      seen.add(t.grupo_id);
+      grupos.push({ grupo_id: t.grupo_id, grupo_nombre: IS4TOptAdapter.groupName(t.grupo_id) });
+    }
+  });
+  IS4TOptAdapter.catalogTasks().forEach(t => {
+    const gid = t.grupo_id || t.group_id;
+    if (gid && !seen.has(gid)) {
+      seen.add(gid);
+      grupos.push({ grupo_id: gid, grupo_nombre: t.grupo_nombre || IS4TOptAdapter.groupName(gid) });
+    }
+  });
   state.eventosCatalogo.forEach(e => { if (!seen.has(e.grupo_id)) { seen.add(e.grupo_id); grupos.push({ grupo_id: e.grupo_id, grupo_nombre: e.grupo_nombre }); } });
   return grupos;
 }
-function getDisciplinasGrupo(gid) { return [...new Set(state.eventosCatalogo.filter(e => e.grupo_id === gid).map(e => e.disciplina_nombre))]; }
+function getDisciplinasGrupo(gid) {
+  const projectId = state.currentProyecto?.proyecto_id;
+  const projectDiscs = projectId
+    ? [...new Set((state.disciplinasProyecto || [])
+        .filter(d => d.proyecto_id === projectId && d.grupo_id === gid && d.aplica !== 'FALSE' && d.applies !== 'FALSE' && d.is_effective !== false)
+        .map(d => d.task_name || d.disciplina_nombre || (d.disciplina_id || '').split('::')[1])
+        .filter(Boolean))]
+    : [];
+  if (projectDiscs.length) return projectDiscs;
+  const catalogDiscs = [...new Set(IS4TOptAdapter.catalogTasks()
+    .filter(t => (t.grupo_id || t.group_id) === gid)
+    .map(t => t.disciplina_nombre || t.task_name || t.title)
+    .filter(Boolean))];
+  if (catalogDiscs.length) return catalogDiscs;
+  return [...new Set(state.eventosCatalogo.filter(e => e.grupo_id === gid).map(e => e.disciplina_nombre).filter(Boolean))];
+}
 function getTareasOpcionalesActivas() {
   const p = state.currentProyecto;
   if (!p) return {};
