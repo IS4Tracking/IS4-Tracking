@@ -4550,10 +4550,10 @@ function openSettings() {
   const optionalSection = document.getElementById('settings-tareas-opcionales');
   if (optionalSection) optionalSection.style.display = state.rol === 'PM' ? '' : 'none';
   if (state.rol === 'PM') {
-    const tareas = p.tareas_opcionales ? JSON.parse(p.tareas_opcionales) : {};
+    const tareas = getTareasOpcionalesActivas();
     ['alarma_sismica','puerta_emergencia','proyector_laser'].forEach(t => {
       const el = document.getElementById(`toggle-${t.replace(/_/g,'-')}`);
-      if (el) el.classList.toggle('on', tareas[t] === true || tareas[t] === 'true');
+      if (el) el.classList.toggle('on', tareas[t] === true);
     });
   }
   const sel = document.getElementById('s-arquitecto');
@@ -4638,14 +4638,17 @@ async function guardarSettings() {
       estado: estadoNuevo,
       bubble_plan_aplica: document.getElementById('toggle-settings-bubble').classList.contains('on'),
       notas: document.getElementById('s-notas').value,
-      tareas_opcionales: state.rol === 'PM' ? JSON.stringify({
-        alarma_sismica:    document.getElementById('toggle-alarma-sismica')?.classList.contains('on') || false,
-        puerta_emergencia: document.getElementById('toggle-puerta-emergencia')?.classList.contains('on') || false,
-        proyector_laser:   document.getElementById('toggle-proyector-laser')?.classList.contains('on') || false,
-      }) : (state.currentProyecto.tareas_opcionales || '{}'),
       fecha_pausa,
       fecha_reactivacion
     });
+
+    if (state.rol === 'PM') {
+      await guardarTareasOpcionalesSettings(state.currentProyecto.proyecto_id, {
+        alarma_sismica:    document.getElementById('toggle-alarma-sismica')?.classList.contains('on') || false,
+        puerta_emergencia: document.getElementById('toggle-puerta-emergencia')?.classList.contains('on') || false,
+        proyector_laser:   document.getElementById('toggle-proyector-laser')?.classList.contains('on') || false,
+      });
+    }
 
     closeModal('modal-settings');
     const msgPausa = estadoNuevo === 'En pausa' ? ' · Proyecto en pausa' : estadoAnterior === 'En pausa' ? ' · Proyecto reactivado' : '';
@@ -5872,35 +5875,131 @@ function getGruposUnicos() {
 }
 function getDisciplinasGrupo(gid) {
   const projectId = state.currentProyecto?.proyecto_id;
+  const gidNorm = normalizarGrupoId(gid);
+
   const projectDiscs = projectId
     ? [...new Set((state.disciplinasProyecto || [])
-        .filter(d => d.proyecto_id === projectId && d.grupo_id === gid && d.aplica !== 'FALSE' && d.applies !== 'FALSE' && d.is_effective !== false)
+        .filter(d =>
+          d.proyecto_id === projectId &&
+          normalizarGrupoId(d.grupo_id || d.group_id) === gidNorm &&
+          !boolTrue(d.is_deleted) &&
+          !boolTrue(d.is_effective === false) &&
+          !['FALSE', false].includes(d.aplica) &&
+          !['FALSE', false].includes(d.applies)
+        )
         .map(d => d.task_name || d.disciplina_nombre || (d.disciplina_id || '').split('::')[1])
         .filter(Boolean))]
     : [];
+
   if (projectDiscs.length) return projectDiscs;
+
   const catalogDiscs = [...new Set(IS4TOptAdapter.catalogTasks()
-    .filter(t => (t.grupo_id || t.group_id) === gid)
+    .filter(t => normalizarGrupoId(t.grupo_id || t.group_id) === gidNorm)
     .map(t => t.disciplina_nombre || t.task_name || t.title)
     .filter(Boolean))];
+
   if (catalogDiscs.length) return catalogDiscs;
-  return [...new Set(state.eventosCatalogo.filter(e => e.grupo_id === gid).map(e => e.disciplina_nombre).filter(Boolean))];
+
+  return [...new Set(state.eventosCatalogo
+    .filter(e => normalizarGrupoId(e.grupo_id) === gidNorm)
+    .map(e => e.disciplina_nombre)
+    .filter(Boolean))];
 }
+const TAREAS_OPCIONALES_MAP = {
+  alarma_sismica: {
+    groupIds: ['G8', 'G08'],
+    taskName: 'Alarma Sísmica'
+  },
+  puerta_emergencia: {
+    groupIds: ['G8', 'G08'],
+    taskName: 'Puerta de Emergencia'
+  },
+  proyector_laser: {
+    groupIds: ['G7', 'G07'],
+    taskName: 'Proyector Láser'
+  }
+};
+
+function boolTrue(value) {
+  return value === true || value === 'TRUE' || value === 'true' || value === 1 || value === '1';
+}
+
+function normalizarGrupoId(id) {
+  const raw = (id || '').toString().trim().toUpperCase();
+  const m = raw.match(/^G0?(\d+)$/);
+  return m ? `G${parseInt(m[1], 10)}` : raw;
+}
+
+function normalizarNombreTarea(nombre) {
+  return normalizeText(nombre || '');
+}
+
+function getTareaOpcionalDefByKey(key) {
+  return TAREAS_OPCIONALES_MAP[key] || null;
+}
+
+function getTareaOpcionalKey(grupoId, disciplina) {
+  const grupoNorm = normalizarGrupoId(grupoId);
+  const tareaNorm = normalizarNombreTarea(disciplina);
+
+  return Object.keys(TAREAS_OPCIONALES_MAP).find(key => {
+    const def = TAREAS_OPCIONALES_MAP[key];
+    const grupos = (def.groupIds || []).map(normalizarGrupoId);
+    return grupos.includes(grupoNorm) && normalizarNombreTarea(def.taskName) === tareaNorm;
+  }) || '';
+}
+
+function getProjectStdTaskByOptionalKey(key, projectId = state.currentProyecto?.proyecto_id) {
+  const def = getTareaOpcionalDefByKey(key);
+  if (!def || !projectId) return null;
+
+  const grupos = (def.groupIds || []).map(normalizarGrupoId);
+  const tareaNorm = normalizarNombreTarea(def.taskName);
+
+  return (state.disciplinasProyecto || []).find(t =>
+    t.proyecto_id === projectId &&
+    grupos.includes(normalizarGrupoId(t.grupo_id || t.group_id)) &&
+    normalizarNombreTarea(t.task_name || t.disciplina_nombre || (t.disciplina_id || '').split('::')[1]) === tareaNorm &&
+    !boolTrue(t.is_deleted)
+  ) || null;
+}
+
 function getTareasOpcionalesActivas() {
-  const p = state.currentProyecto;
-  if (!p) return {};
-  try { return JSON.parse(p.tareas_opcionales || '{}'); } catch(e) { return {}; }
+  const out = {};
+  Object.keys(TAREAS_OPCIONALES_MAP).forEach(key => {
+    const task = getProjectStdTaskByOptionalKey(key);
+    out[key] = !!task && boolTrue(task.applies ?? task.aplica);
+  });
+  return out;
 }
+
 function tareaOpcionalAplica(grupoId, disciplina) {
-  const MAP = {
-    'G08::Alarma Sísmica':      'alarma_sismica',
-    'G08::Puerta de Emergencia':'puerta_emergencia',
-    'G07::Proyector Láser':     'proyector_laser',
-  };
-  const key = MAP[`${grupoId}::${disciplina}`];
+  const key = getTareaOpcionalKey(grupoId, disciplina);
   if (!key) return true; // no es tarea opcional — siempre aplica
-  const activas = getTareasOpcionalesActivas();
-  return activas[key] === true || activas[key] === 'true';
+  const task = getProjectStdTaskByOptionalKey(key);
+  return !!task && boolTrue(task.applies ?? task.aplica);
+}
+
+async function guardarTareasOpcionalesSettings(projectId, nextState) {
+  const updates = [];
+
+  Object.keys(TAREAS_OPCIONALES_MAP).forEach(key => {
+    const task = getProjectStdTaskByOptionalKey(key, projectId);
+    if (!task || !task.project_task_id) return;
+
+    const actual = boolTrue(task.applies ?? task.aplica);
+    const nuevo = !!nextState[key];
+
+    if (actual !== nuevo) {
+      updates.push(IS4TOptAdapter.raw('updateStandardTask', {
+        project_id: projectId,
+        project_task_id: task.project_task_id,
+        applies: nuevo ? 'TRUE' : 'FALSE'
+      }));
+    }
+  });
+
+  if (updates.length) await Promise.all(updates);
 }
 function isDisciplinaCompleta(disciplina, grupoId, log) {
   const discKey = `${grupoId}::${disciplina}`;
