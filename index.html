@@ -1107,10 +1107,12 @@ let state = {
   bubblePlan: false, disciplinasSeleccionadas: new Set(),
   cambioDiscsSeleccionadas: new Set(), editandoCambioId: null,
   cambiosBorrados: [], cambiosEliminados: [], borrandoCambioId: null,
+  cambiosDetalle: [], cambios: [], snapshotsEntrega: [],
   tareasAdhoc: [],
   evergreenTareas: [],
   dudasDetalle: [],
-  riesgosDetalle: [],
+  riesgosDetalle: [], riesgosBorrados: [], riesgosDetalleBorrados: [],
+  entriesBorrados: [],
   diasPausaAcumulados: {},
   _editandoEntryId: null, editandoNotaId: null,
   _confirmarBorradoFn: null,
@@ -1121,6 +1123,7 @@ const IS4TOptAdapter = {
   bootstrap: null,
   home: null,
   projectBundles: {},
+  projectBundlePromises: {},
   backlog: null,
 
   async raw(action, body = {}) {
@@ -1139,8 +1142,13 @@ const IS4TOptAdapter = {
     if (!scope || scope === 'home') this.home = null;
     if (!scope || scope === 'backlog') this.backlog = null;
     if (!scope || scope === 'project') {
-      if (projectId) delete this.projectBundles[projectId];
-      else this.projectBundles = {};
+      if (projectId) {
+        delete this.projectBundles[projectId];
+        delete this.projectBundlePromises[projectId];
+      } else {
+        this.projectBundles = {};
+        this.projectBundlePromises = {};
+      }
     }
   },
 
@@ -1156,10 +1164,29 @@ const IS4TOptAdapter = {
 
   async ensureProject(projectId) {
     if (!projectId) return null;
-    if (!this.projectBundles[projectId]) {
-      this.projectBundles[projectId] = await this.raw('getProjectBundle', { project_id: projectId });
+    if (this.projectBundles[projectId]) return this.projectBundles[projectId];
+    if (!this.projectBundlePromises[projectId]) {
+      const request = this.raw('getProjectBundle', { project_id: projectId })
+        .then(bundle => {
+          if (this.projectBundlePromises[projectId] === request) {
+            this.projectBundles[projectId] = bundle;
+          }
+          return bundle;
+        })
+        .catch(err => {
+          if (this.projectBundlePromises[projectId] === request) {
+            delete this.projectBundlePromises[projectId];
+          }
+          throw err;
+        });
+      this.projectBundlePromises[projectId] = request;
     }
-    return this.projectBundles[projectId];
+    const pending = this.projectBundlePromises[projectId];
+    const bundle = await pending;
+    if (this.projectBundlePromises[projectId] === pending) {
+      delete this.projectBundlePromises[projectId];
+    }
+    return bundle;
   },
 
   async ensureBacklog() {
@@ -2118,7 +2145,6 @@ function handleLogin() {
 }
 
 async function completeSignIn() {
-  console.log('[B3-diag] completeSignIn iniciado, token:', state.accessToken ? 'presente' : 'ausente');
   try {
     const usuarios = await api('getUsuarios');
     const u = usuarios.find(x => x.email.toLowerCase() === state.user.email.toLowerCase());
@@ -2130,7 +2156,7 @@ async function completeSignIn() {
     state.rol = u.rol;
     state.usuarios = usuarios;
   } catch(e) {
-    console.error('[B3-diag] Error en getUsuarios:', e.message);
+    console.error('Error en getUsuarios:', e.message);
     showToast('Error verificando acceso: ' + e.message, 'error');
     showLoginScreen();
     return;
@@ -2282,46 +2308,40 @@ async function loadHomeData() {
 async function loadProyectoData(proyectoId) {
   if (!proyectoId) return;
 
-  const runId = `${proyectoId} · ${Date.now()} · ${Math.random().toString(36).slice(2, 7)}`;
-  const timerTotal = `[PERF] loadProyectoData total · ${runId}`;
-  const timerPromise = `[PERF] loadProyectoData Promise.all · ${runId}`;
-  let promiseTimerStarted = false;
+  const runId = `${proyectoId} - ${Date.now()} - ${Math.random().toString(36).slice(2, 7)}`;
+  const timerTotal = `[PERF] loadProyectoData total - ${runId}`;
+  const timerBundle = `[PERF] loadProyectoData bundle - ${runId}`;
+  let bundleTimerStarted = false;
 
   console.time(timerTotal);
 
   try {
-    console.time(timerPromise);
-    promiseTimerStarted = true;
+    console.time(timerBundle);
+    bundleTimerStarted = true;
 
-    const [
-      proyectos,
-      log,
-      disciplinas,
-      cambiosDetalle,
-      snapshots,
-      tareas,
-      dudas,
-      riesgos,
-      riesgosBorrados,
-      entriesBorrados
-    ] = await Promise.all([
-      Promise.resolve(state.proyectos || []),
-      api('getLogEventos',             { proyecto_id: proyectoId }),
-      api('getDisciplinasProyecto',    { proyecto_id: proyectoId }),
-      api('getCambiosDetalle',         { proyecto_id: proyectoId }),
-      api('getSnapshotsEntrega',       { proyecto_id: proyectoId }),
-      api('getTareasAdhoc',            { proyecto_id: proyectoId }).catch(e => { console.error('[API-ERROR] getTareasAdhoc', e); return []; }),
-      api('getDudasDetalle',           { proyecto_id: proyectoId }).catch(e => { console.error('[API-ERROR] getDudasDetalle', e); return []; }),
-      api('getRiesgosDetalle',         { proyecto_id: proyectoId }).catch(e => { console.error('[API-ERROR] getRiesgosDetalle', e); return []; }),
-      api('getRiesgosDetalleBorrados', { proyecto_id: proyectoId }).catch(e => { console.error('[API-ERROR] getRiesgosDetalleBorrados', e); return []; }),
-      api('getEntriesBorrados',        { proyecto_id: proyectoId }).catch(e => { console.error('[API-ERROR] getEntriesBorrados', e); return []; })
-    ]);
+    const projectBundle = await IS4TOptAdapter.ensureProject(proyectoId);
 
-    console.timeEnd(timerPromise);
-    promiseTimerStarted = false;
+    console.timeEnd(timerBundle);
+    bundleTimerStarted = false;
 
-    state.proyectos = proyectos || [];
-    const projectBundle = IS4TOptAdapter.projectBundles[proyectoId];
+    const log = [
+      ...IS4TOptAdapter.projectEvents(projectBundle),
+      ...IS4TOptAdapter.notes(projectBundle),
+      ...IS4TOptAdapter.changes(projectBundle),
+      ...IS4TOptAdapter.questions(projectBundle),
+      ...IS4TOptAdapter.risks(projectBundle),
+      ...IS4TOptAdapter.extrEvents(projectBundle)
+    ];
+    const disciplinas = IS4TOptAdapter.disciplinas(projectBundle);
+    const cambiosDetalle = IS4TOptAdapter.cambiosDetalle(projectBundle);
+    const snapshots = IS4TOptAdapter.snapshots(projectBundle);
+    const tareas = IS4TOptAdapter.extrTasks(projectBundle);
+    const dudas = IS4TOptAdapter.dudasDetalle(projectBundle);
+    const riesgos = IS4TOptAdapter.riesgosDetalle(projectBundle);
+    const riesgosBorrados = IS4TOptAdapter.deletedRisks(projectBundle);
+    const entriesBorrados = IS4TOptAdapter.deletedEntries(projectBundle);
+
+    state.proyectos = state.proyectos || [];
     if (projectBundle?.project) {
       const projectRow = IS4TOptAdapter.projectRow(projectBundle.project);
       const idx = state.proyectos.findIndex(p => p.proyecto_id === projectRow.proyecto_id);
@@ -2341,6 +2361,7 @@ async function loadProyectoData(proyectoId) {
     const entryIdsProyecto = new Set((log || []).map(e => e.entry_id));
     const otrosCambios = (state.cambiosDetalle || []).filter(c => !entryIdsProyecto.has(c.entry_id));
     state.cambiosDetalle = [...otrosCambios, ...(cambiosDetalle || [])];
+    state.cambios = state.cambiosDetalle;
 
     // merge snapshots filtrados
     const otrosSnaps = (state.snapshotsEntrega || []).filter(s => s.proyecto_id !== proyectoId);
@@ -2362,20 +2383,17 @@ async function loadProyectoData(proyectoId) {
     // merge riesgos borrados
     const otrosRiesgosBorrados = (state.riesgosDetalleBorrados || []).filter(r => r.proyecto_id !== proyectoId);
     state.riesgosDetalleBorrados = [...otrosRiesgosBorrados, ...(riesgosBorrados || [])];
+    state.riesgosBorrados = state.riesgosDetalleBorrados;
 
     // merge entries borrados
     const otrosEntriesBorrados = (state.entriesBorrados || []).filter(e => e.proyecto_id !== proyectoId);
     state.entriesBorrados = [...otrosEntriesBorrados, ...(entriesBorrados || [])];
 
-    console.log('[DEBUG-EB] entriesBorrados RAW desde AS:', JSON.stringify(entriesBorrados));
-    console.log('[DEBUG-EB] entriesBorrados length:', (entriesBorrados || []).length);
-    console.log('[DEBUG-EB] state.entriesBorrados total:', state.entriesBorrados.length);
-
   } catch(e) {
     showToast('Error cargando proyecto: ' + e.message, 'error');
     console.error(e);
   } finally {
-    if (promiseTimerStarted) console.timeEnd(timerPromise);
+    if (bundleTimerStarted) console.timeEnd(timerBundle);
     console.timeEnd(timerTotal);
   }
 }
@@ -4691,10 +4709,6 @@ function renderEntriesEliminados(proyecto) {
   // Riesgos borrados vía soft-delete en riesgos_detalle (modelo propio)
   const riesgosBorrados = (state.riesgosDetalleBorrados || []).filter(r => r.proyecto_id === pid);
   const total = entriesBorrados.length + riesgosBorrados.length;
-  console.log('[DEBUG-EB] renderEntriesEliminados — pid:', pid);
-  console.log('[DEBUG-EB] entriesBorrados para este proyecto:', entriesBorrados.length, entriesBorrados);
-  console.log('[DEBUG-EB] riesgosBorrados para este proyecto:', riesgosBorrados.length, riesgosBorrados);
-  console.log('[DEBUG-EB] total:', total);
   if (total === 0) return '';
 
   const panelId = 'entries-borrados-panel';
