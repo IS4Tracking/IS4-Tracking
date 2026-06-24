@@ -737,8 +737,8 @@
         <div class="form-group cambio-disc-section">
 <div class="cambio-disc-label">Referencia <span>opcional</span></div>
           <div class="form-row" style="gap:8px">
-            <select class="form-select" id="nc-riesgo-grupo" onchange="updateRiesgoGrupo()" style="flex:1"><option value="">Grupo…</option></select>
-            <select class="form-select" id="nc-riesgo-disciplina" style="flex:1"><option value="">Tarea…</option></select>
+            <select class="form-select" id="nc-nota-grupo" onchange="updateNotaGrupo()" style="flex:1"><option value="">Grupo…</option></select>
+            <select class="form-select" id="nc-nota-disciplina" style="flex:1"><option value="">Tarea…</option></select>
           </div>
         </div>
       </div>
@@ -1244,6 +1244,17 @@ const IS4TOptAdapter = {
     return u ? u.email : value;
   },
 
+  displayNameForUser(value) {
+    if (!value) return '';
+    const users = this.users();
+    const normalized = String(value).toLowerCase();
+    const user = users.find(x =>
+      String(x.user_id || '').toLowerCase() === normalized ||
+      String(x.email || '').toLowerCase() === normalized
+    );
+    return user?.nombre || user?.name || user?.email || value;
+  },
+
   catalogs() {
     const catalogs = this.bootstrap?.catalogs || {};
     const groups = catalogs.groups || [];
@@ -1478,20 +1489,23 @@ const IS4TOptAdapter = {
       timestamp: r.created_at,
       nota: JSON.stringify({
         riesgo_id: r.risk_id,
+        risk_code: r.risk_code || r.risk_id,
         titulo: r.title,
         descripcion: r.description,
         probabilidad: r.probability,
         impacto: r.impact
       }),
-      registrado_por: r.created_by,
+      registrado_por: this.displayNameForUser(r.created_by),
       arquitecto_id: r.created_by
     }));
   },
 
   riesgosDetalle(bundle) {
+    const taskMap = this.taskByIds(bundle);
     return (bundle?.risks || []).map(r => ({
       ...r,
       riesgo_id: r.risk_id,
+      risk_code: r.risk_code || r.risk_id,
       entry_id: r.risk_id,
       proyecto_id: r.project_id,
       titulo: r.title,
@@ -1499,10 +1513,24 @@ const IS4TOptAdapter = {
       estatus: r.status,
       probabilidad: r.probability,
       impacto: r.impact,
-      fecha_revision: r.review_date,
+      fecha_revision: this.isoDate(r.review_date),
       notas_mitigacion: r.mitigation_notes,
       hito_ref_id: r.milestone_catalog_id,
-      disc_ref: r.project_task_id
+      project_task_id: r.project_task_id || '',
+      disc_ref: taskMap[r.project_task_id] ? this.taskKey(taskMap[r.project_task_id]) : '',
+      registrado_por: this.displayNameForUser(r.created_by)
+    }));
+  },
+
+  assignmentHistory(bundle) {
+    return (bundle?.assignment_history || []).map(h => ({
+      ...h,
+      ha_id: h.assignment_history_id || h.ha_id,
+      assignment_history_id: h.assignment_history_id || h.ha_id,
+      arquitecto_id: this.emailFromUserId(h.assigned_architect_user_id || h.arquitecto_id),
+      nombre_arquitecto: h.assigned_architect_name || this.displayNameForUser(h.assigned_architect_user_id || h.arquitecto_id),
+      timestamp: h.assigned_at || h.timestamp || h.created_at,
+      assigned_by_name: this.displayNameForUser(h.assigned_by || h.created_by)
     }));
   },
 
@@ -1736,7 +1764,7 @@ const IS4TOptAdapter = {
       if (action === 'getRiesgosDetalle') return this.riesgosDetalle(bundle);
       if (action === 'getRiesgosDetalleBorrados') return this.deletedRisks(bundle);
       if (action === 'getEntriesBorrados') return this.deletedEntries(bundle);
-      if (action === 'getHistorialArquitecto') return bundle?.assignment_history || [];
+      if (action === 'getHistorialArquitecto') return this.assignmentHistory(bundle);
     }
 
     return this.legacyWrite(action, body);
@@ -1834,11 +1862,14 @@ const IS4TOptAdapter = {
       }
       result = await this.raw('addProjectEvent', {
         ...projectBody(),
+        project_task_id: body.project_task_id || '',
+        task_catalog_id: body.task_catalog_id || '',
         group_id: this.canonicalGroupId(body.grupo_id || (body.disciplina_id || '').split('::')[0]),
         task_name: (body.disciplina_id || '').split('::')[1] || body.disciplina_nombre || '',
         event_name: body.hito_id || body.evento_nombre,
         event_date: body.fecha_real || todayISO(),
         event_time: body.hora || '',
+        event_datetime: body.fecha_hora || '',
         notes: body.nota || ''
       });
       this.reset('project', projectId);
@@ -2017,9 +2048,12 @@ const IS4TOptAdapter = {
         mitigation_notes: body.notas_mitigacion,
         review_date: body.fecha_revision,
         milestone_catalog_id: body.hito_ref_id,
-        project_task_id: this.taskIdFromLegacy(projectId, body.disc_ref)
+        group_id: body.group_id || '',
+        project_task_id: body.project_task_id || this.taskIdFromLegacy(projectId, body.disc_ref),
+        status: statusToNew(body.estatus || 'Activo')
       });
-      this.reset('project', projectId); return { riesgo_id: result.risk_id, entry_id: result.risk_id };
+      this.reset('project', projectId);
+      return { riesgo_id: result.risk_id, risk_code: result.risk_code, entry_id: result.risk_id };
     }
     if (action === 'actualizarRiesgo') {
       result = await this.raw('updateRisk', {
@@ -2139,6 +2173,7 @@ function dateToISO(date) {
 // ── AUTH — Google Identity Services ──
 let tokenClient;
 let tokenRenewalTimer = null;
+let silentSignInPending = false;
 
 function initGoogleAPI() {
   tokenClient = google.accounts.oauth2.initTokenClient({
@@ -2146,20 +2181,29 @@ function initGoogleAPI() {
     scope: CONFIG.SCOPES,
     callback: async (tokenResponse) => {
       if (tokenResponse.error) {
-        // Si falla renovación silenciosa, pedir login explícito
+        silentSignInPending = false;
+        document.getElementById('login-screen')?.classList.remove('restoring');
+        // Si falla renovación silenciosa, mostrar login sin olvidar al usuario.
         if (tokenResponse.error === 'user_logged_out' || tokenResponse.error === 'interaction_required') {
-          showLoginScreen();
+          showLoginScreen(false);
         } else {
           showToast('Error al iniciar sesión', 'error');
+          showLoginScreen(false);
         }
         return;
       }
+      silentSignInPending = false;
       state.accessToken = tokenResponse.access_token;
       localStorage.setItem('is4_token', tokenResponse.access_token);
-      // Programar renovación automática antes de que expire (55 min)
-      scheduleTokenRenewal();
+      const expiresIn = Number(tokenResponse.expires_in || 3600);
+      localStorage.setItem('is4_token_expires_at', String(Date.now() + expiresIn * 1000));
+      scheduleTokenRenewal(expiresIn);
       // Si ya estamos en la app, no re-inicializar — solo actualizar el token
       if (document.getElementById('app').style.display === 'flex') return;
+      if (state.user?.email) {
+        await completeSignIn();
+        return;
+      }
       // Primera vez — obtener perfil y entrar
       try {
         const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
@@ -2172,28 +2216,35 @@ function initGoogleAPI() {
     }
   });
 
-  // Auto-restore: usar token guardado directamente
-  const savedToken = localStorage.getItem('is4_token');
+  // Auto-restore: el token guardado puede estar vencido; pedir uno nuevo silenciosamente.
   const savedUser = localStorage.getItem('is4_user');
-  if (savedToken && savedUser) {
-    state.accessToken = savedToken;
-    state.user = JSON.parse(savedUser);
-    document.getElementById('login-screen').classList.add('restoring');
-    completeSignIn().catch(() => showLoginScreen());
+  if (savedUser) {
+    try {
+      state.user = JSON.parse(savedUser);
+      silentSignInPending = true;
+      document.getElementById('login-screen').classList.add('restoring');
+      tokenClient.requestAccessToken({ prompt: '' });
+    } catch(e) {
+      showLoginScreen(true);
+    }
   }
 }
 
-function scheduleTokenRenewal() {
+function scheduleTokenRenewal(expiresInSeconds = 3600) {
   if (tokenRenewalTimer) clearTimeout(tokenRenewalTimer);
-  // Renovar a los 55 minutos (token dura 60)
+  const renewInMs = Math.max(60000, (Number(expiresInSeconds) - 300) * 1000);
   tokenRenewalTimer = setTimeout(() => {
+    silentSignInPending = true;
     tokenClient.requestAccessToken({ prompt: '' });
-  }, 55 * 60 * 1000);
+  }, renewInMs);
 }
 
-function showLoginScreen() {
-  localStorage.removeItem('is4_token');
-  localStorage.removeItem('is4_user');
+function showLoginScreen(clearSession = false) {
+  if (clearSession) {
+    localStorage.removeItem('is4_token');
+    localStorage.removeItem('is4_token_expires_at');
+    localStorage.removeItem('is4_user');
+  }
   state.accessToken = null; state.user = null; state.rol = null;
   if (tokenRenewalTimer) clearTimeout(tokenRenewalTimer);
   const ls = document.getElementById('login-screen');
@@ -2203,12 +2254,8 @@ function showLoginScreen() {
 }
 
 function handleLogin() {
-  const savedToken = localStorage.getItem('is4_token');
-  if (savedToken) {
-    tokenClient.requestAccessToken({ prompt: '' });
-  } else {
-    tokenClient.requestAccessToken({ prompt: 'select_account' });
-  }
+  silentSignInPending = false;
+  tokenClient.requestAccessToken({ prompt: 'select_account' });
 }
 
 async function completeSignIn() {
@@ -2217,7 +2264,7 @@ async function completeSignIn() {
     const u = usuarios.find(x => x.email.toLowerCase() === state.user.email.toLowerCase());
     if (!u) {
       showToast('Acceso no autorizado. Contacta al PM.', 'error');
-      showLoginScreen();
+      showLoginScreen(true);
       return;
     }
     state.rol = u.rol;
@@ -2225,7 +2272,7 @@ async function completeSignIn() {
   } catch(e) {
     console.error('Error en getUsuarios:', e.message);
     showToast('Error verificando acceso: ' + e.message, 'error');
-    showLoginScreen();
+    showLoginScreen(false);
     return;
   }
 
@@ -2245,7 +2292,7 @@ async function completeSignIn() {
 function handleLogout() {
   if (tokenRenewalTimer) clearTimeout(tokenRenewalTimer);
   google.accounts.oauth2.revoke(state.accessToken, () => {});
-  showLoginScreen();
+  showLoginScreen(true);
 }
 
 // ── API ──
@@ -2256,17 +2303,26 @@ async function api(action, body = {}) {
 // ── DATA ──
 // ── IX-8: SAVING FEEDBACK ─────────────────────────────────────────────────────
 
+let saveFeedbackTimer = null;
+
 function startSaving() {
   const bar = document.getElementById('top-save-bar');
   if (!bar) return;
+  if (saveFeedbackTimer) clearTimeout(saveFeedbackTimer);
   bar.classList.remove('running','done');
   void bar.offsetWidth;
   bar.classList.add('running');
+  saveFeedbackTimer = setTimeout(() => {
+    bar.classList.remove('running');
+    showToast('La operación sigue tardando más de lo esperado. Verifica antes de reintentar.', 'error');
+  }, 45000);
 }
 
 function stopSaving(success) {
   const bar = document.getElementById('top-save-bar');
   if (!bar) return;
+  if (saveFeedbackTimer) clearTimeout(saveFeedbackTimer);
+  saveFeedbackTimer = null;
   bar.classList.remove('running');
   if (success) {
     bar.classList.add('done');
@@ -2459,6 +2515,7 @@ async function loadProyectoData(proyectoId) {
   } catch(e) {
     showToast('Error cargando proyecto: ' + e.message, 'error');
     console.error(e);
+    throw e;
   } finally {
     if (bundleTimerStarted) console.timeEnd(timerBundle);
     console.timeEnd(timerTotal);
@@ -2840,6 +2897,21 @@ function renderScoreboard(proyectoId, inline = false) {
 // ── PROYECTO DETAIL ──
 let proyectoEnAperturaId = null;
 
+function renderProyectoDetalleActual(proyectoId) {
+  const p = state.proyectos.find(x => x.proyecto_id === proyectoId) || state.currentProyecto;
+  if (!p) return;
+  state.currentProyecto = p;
+  document.getElementById('detail-title').textContent = p.nombre;
+  document.getElementById('detail-meta').textContent =
+    `${p.clave_innovasport ? p.clave_innovasport + ' · ' : ''}${p.tipo_proyecto || '—'} · Aprobación: ${formatDate(p.fecha_aprobacion)} · Entrega estimada: ${p.fecha_entrega ? formatDate(p.fecha_entrega) : calcFechaEntrega(p.fecha_aprobacion)}`;
+  document.getElementById('detail-scoreboard').innerHTML = renderScoreboard(proyectoId, true);
+  renderGroups(p);
+  document.getElementById('detail-timeline').innerHTML = renderTimeline(p);
+  document.getElementById('detail-notas').innerHTML = renderNotas(p);
+  document.getElementById('detail-tareas').innerHTML = renderTareasAdhoc(p);
+  showView('proyecto-detail');
+}
+
 async function openProyecto(proyectoId) {
   if (!proyectoId) return;
 
@@ -2860,21 +2932,7 @@ async function openProyecto(proyectoId) {
 
     await loadProyectoData(proyectoId);
 
-    // Releer el proyecto después del refresh, por si cambió nombre, estado, arquitecto, etc.
-    p = state.proyectos.find(x => x.proyecto_id === proyectoId) || p;
-    state.currentProyecto = p;
-
-    document.getElementById('detail-title').textContent = p.nombre;
-    document.getElementById('detail-meta').textContent =
-      `${p.clave_innovasport ? p.clave_innovasport + ' · ' : ''}${p.tipo_proyecto || '—'} · Aprobación: ${formatDate(p.fecha_aprobacion)} · Entrega estimada: ${p.fecha_entrega ? formatDate(p.fecha_entrega) : calcFechaEntrega(p.fecha_aprobacion)}`;
-
-    document.getElementById('detail-scoreboard').innerHTML = renderScoreboard(proyectoId, true);
-    renderGroups(p);
-    document.getElementById('detail-timeline').innerHTML = renderTimeline(p);
-    document.getElementById('detail-notas').innerHTML = renderNotas(p);
-    document.getElementById('detail-tareas').innerHTML = renderTareasAdhoc(p);
-
-    showView('proyecto-detail');
+    renderProyectoDetalleActual(proyectoId);
     // Hitos se evalua server-side en AS v1.1.0.
 
   } finally {
@@ -2884,8 +2942,10 @@ async function openProyecto(proyectoId) {
 
 async function refreshProyectoDetalle(estadoPaneles = null) {
   if (!state.currentProyecto?.proyecto_id) return;
-
-  await openProyecto(state.currentProyecto.proyecto_id);
+  const projectId = state.currentProyecto.proyecto_id;
+  IS4TOptAdapter.reset('project', projectId);
+  await loadProyectoData(projectId);
+  renderProyectoDetalleActual(projectId);
 
   if (estadoPaneles) {
     restaurarEstadoPaneles(estadoPaneles);
@@ -2927,7 +2987,7 @@ function renderGroups(proyecto) {
     const EVENTOS_BLOQUEANTES_GRP = new Set(['Solicitud Enviada','Ajustes Solicitados SP','Vobo Solicitado','Revisión Enviada']);
     const bloqueadas = disciplinas.filter(d => {
       if (isDisciplinaCompleta(d, g.grupo_id, log)) return false;
-      const evs = log.filter(e => e.disciplina_id === `${g.grupo_id}::${d}` && e.tipo_entry === 'evento').sort((a,b) => new Date(a.timestamp||a.fecha_real) - new Date(b.timestamp||b.fecha_real));
+      const evs = log.filter(e => e.disciplina_id === `${g.grupo_id}::${d}` && e.tipo_entry === 'evento').sort(compareLogEntriesChronologically);
       const ult = evs[evs.length - 1];
       return ult && EVENTOS_BLOQUEANTES_GRP.has(ult.hito_id);
     }).length;
@@ -3022,11 +3082,7 @@ function renderEntriesGrupo(proyecto, grupoId) {
     return discRef.startsWith(grupoId + '::') || discRef === grupoId;
   });
   if (entries.length === 0) return '';
-  const filas = entries.sort((a,b) => {
-    const ta = a.timestamp ? new Date(a.timestamp) : new Date((a.fecha_real||'')+'T12:00:00');
-    const tb = b.timestamp ? new Date(b.timestamp) : new Date((b.fecha_real||'')+'T12:00:00');
-    return ta - tb;
-  }).map(e => {
+  const filas = entries.sort(compareLogEntriesChronologically).map(e => {
     let data = {}; try { data = JSON.parse(e.nota||'{}'); } catch(err) {}
     const cd = e.tipo_entry === 'cambio_registrado' ? (state.cambiosDetalle||[]).find(c => c.entry_id === e.entry_id) : null;
     const titulo = cd?.titulo || data.titulo || e.hito_id || '—';
@@ -3055,11 +3111,7 @@ function renderDisciplina(proyecto, grupo, disciplina, log) {
   const completa = isDisciplinaCompleta(disciplina, grupo.grupo_id, log);
   const ultimoEvento = (() => {
     const evs = log.filter(e => e.disciplina_id === discKey && e.tipo_entry === 'evento')
-      .sort((a,b) => {
-        const ta = a.timestamp ? new Date(a.timestamp) : new Date(a.fecha_real + 'T12:00:00Z');
-        const tb = b.timestamp ? new Date(b.timestamp) : new Date(b.fecha_real + 'T12:00:00Z');
-        return ta - tb;
-      });
+      .sort(compareLogEntriesChronologically);
     return evs.length > 0 ? evs[evs.length - 1] : null;
   })();
   const afectado = !completa && ultimoEvento && ultimoEvento.hito_id && ultimoEvento.hito_id.startsWith('Afectado por Cambio');
@@ -3087,11 +3139,7 @@ function renderDisciplina(proyecto, grupo, disciplina, log) {
     </div>
     <div class="log-panel" id="log_${safeId}">
       ${eventos.length === 0 ? '<div class="log-empty">Sin eventos registrados</div>'
-        : eventos.sort((a,b) => {
-            const ta = a.timestamp ? new Date(a.timestamp) : new Date(a.fecha_real + 'T12:00:00Z');
-            const tb = b.timestamp ? new Date(b.timestamp) : new Date(b.fecha_real + 'T12:00:00Z');
-            return ta - tb;
-          }).map(e => {
+        : eventos.sort(compareLogEntriesChronologically).map(e => {
             const esNotaRef = e.tipo_entry === 'nota_ref';
             let notaRef = null;
             if (esNotaRef) { try { notaRef = JSON.parse(e.nota || '{}'); } catch(x) {} }
@@ -3179,9 +3227,9 @@ async function confirmarEditarEntry() {
     if (idx >= 0) { state.logEventos[idx].fecha_real = fecha; state.logEventos[idx].nota = nota; }
     closeModal('modal-editar-entry');
     showToast('Entrada actualizada', 'success');
+    stopSaving(true);
     if (state.currentProyecto) {
-      await openProyecto(state.currentProyecto.proyecto_id);
-      restaurarEstadoPaneles(estadoPaneles);
+      await refreshProyectoDetalle(estadoPaneles);
     }
   } catch(e) { stopSaving(false); showToast('Error: ' + e.message, 'error'); await restoreModalSnapshot(); }
   finally { btn.disabled = false; btn.textContent = 'Guardar cambios'; }
@@ -3200,10 +3248,7 @@ function borrarEntry(entryId) {
         await api('borrarLogEvento', { entry_id: entryId });
         state.logEventos = state.logEventos.filter(x => x.entry_id !== entryId);
         showToast('Entrada eliminada', 'success');
-        if (state.currentProyecto) {
-          await openProyecto(state.currentProyecto.proyecto_id);
-          restaurarEstadoPaneles(estadoPaneles);
-        }
+        if (state.currentProyecto) await refreshProyectoDetalle(estadoPaneles);
       } catch(e) { showToast('Error: ' + e.message, 'error'); }
     }
   });
@@ -3213,11 +3258,11 @@ function toggleGroup(id) { document.getElementById(`group-${id}`)?.classList.tog
 function toggleLogPanel(id) { document.getElementById(id)?.classList.toggle('open'); }
 function openEntryForDisciplina(grupoId, disciplina) {
   openNuevoEntry();
-  setTimeout(() => {
-    document.getElementById('e-grupo').value = grupoId;
-    updateDisciplinas();
-    setTimeout(() => { document.getElementById('e-disciplina').value = disciplina; updateEventos(); }, 60);
-  }, 60);
+  document.getElementById('e-grupo').value = grupoId;
+  updateDisciplinas();
+  document.getElementById('e-disciplina').value = disciplina;
+  syncEntryTaskIdentity();
+  updateEventos();
 }
 
 // Mapa hito → disciplinas bloqueantes (para navegación desde dashboard)
@@ -3886,6 +3931,8 @@ function openNuevoEntry() {
   document.getElementById('e-grupo').value = '';
   document.getElementById('e-disciplina').innerHTML = '<option value="">Seleccionar tarea…</option>';
   document.getElementById('e-evento').innerHTML = '<option value="">Seleccionar evento…</option>';
+  state._entryProjectTaskId = '';
+  state._entryTaskCatalogId = '';
   const sel = document.getElementById('e-grupo');
   sel.innerHTML = '<option value="">Seleccionar grupo…</option>';
   const grupos = {};
@@ -4058,8 +4105,31 @@ function updateDisciplinas() {
   const gid = document.getElementById('e-grupo').value;
   const sel = document.getElementById('e-disciplina');
   sel.innerHTML = '<option value="">Seleccionar disciplina…</option>';
+  state._entryProjectTaskId = '';
+  state._entryTaskCatalogId = '';
   if (!gid) return;
-  [...new Set(state.eventosCatalogo.filter(e => e.grupo_id === gid).map(e => e.disciplina_nombre))].forEach(d => sel.innerHTML += `<option value="${d}">${d}</option>`);
+  const tasks = (state.disciplinasProyecto || [])
+    .filter(t =>
+      t.proyecto_id === state.currentProyecto?.proyecto_id &&
+      IS4TOptAdapter.canonicalGroupId(t.grupo_id || t.group_id) === IS4TOptAdapter.canonicalGroupId(gid) &&
+      t.is_effective !== false &&
+      ![false, 'FALSE'].includes(t.aplica ?? t.applies)
+    )
+    .sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0));
+  tasks.forEach(t => {
+    const option = document.createElement('option');
+    option.value = t.task_name || t.disciplina_nombre || (t.disciplina_id || '').split('::')[1] || '';
+    option.textContent = option.value;
+    option.dataset.projectTaskId = t.project_task_id || '';
+    option.dataset.taskCatalogId = t.task_catalog_id || '';
+    sel.appendChild(option);
+  });
+}
+
+function syncEntryTaskIdentity() {
+  const option = document.getElementById('e-disciplina')?.selectedOptions?.[0];
+  state._entryProjectTaskId = option?.dataset?.projectTaskId || '';
+  state._entryTaskCatalogId = option?.dataset?.taskCatalogId || '';
 }
 
 const VOBO_AREA_LABEL = {
@@ -4074,8 +4144,13 @@ function updateEventos() {
   const sel = document.getElementById('e-evento');
   sel.innerHTML = '<option value="">Seleccionar evento…</option>';
   if (!gid || !disc) return;
+  syncEntryTaskIdentity();
   state.eventosCatalogo
-    .filter(e => e.grupo_id === gid && e.disciplina_nombre === disc && e.evento_nombre !== 'Afectado por Cambio')
+    .filter(e =>
+      e.grupo_id === gid &&
+      (state._entryTaskCatalogId ? e.task_catalog_id === state._entryTaskCatalogId : e.disciplina_nombre === disc) &&
+      e.evento_nombre !== 'Afectado por Cambio'
+    )
     .forEach(e => {
       const areaLabel = VOBO_AREA_LABEL[gid];
       let label = e.evento_nombre;
@@ -4211,7 +4286,7 @@ async function guardarNotaCambio() {
     } else {
       if (state.entryTipo === 'duda') {
         const tituloDuda = document.getElementById('nc-duda-titulo').value.trim();
-        if (!tituloDuda) { showToast('El título de la duda es requerido', 'error'); btn.disabled=false; btn.textContent='Guardar'; return; }
+        if (!tituloDuda) { stopSaving(false); showToast('El título de la duda es requerido', 'error'); btn.disabled=false; btn.textContent='Guardar'; return; }
         const dudaGrupo = document.getElementById('nc-duda-grupo').value;
         const dudaDisc  = document.getElementById('nc-duda-disciplina').value;
         const dudaDiscKey = (dudaGrupo && dudaDisc) ? `${dudaGrupo}::${dudaDisc}` : '';
@@ -4234,15 +4309,14 @@ async function guardarNotaCambio() {
         const modo = state._riesgoModo || 'nuevo';
         if (modo === 'nuevo') {
           const tituloRiesgo = document.getElementById('nc-riesgo-titulo').value.trim();
-          if (!tituloRiesgo) { showToast('El título del riesgo es requerido', 'error'); btn.disabled=false; btn.textContent='Guardar'; return; }
+          if (!tituloRiesgo) { stopSaving(false); showToast('El título del riesgo es requerido', 'error'); btn.disabled=false; btn.textContent='Guardar'; return; }
           const cat = document.getElementById('nc-riesgo-categoria').value;
-          if (!cat) { showToast('La categoría es requerida', 'error'); btn.disabled=false; btn.textContent='Guardar'; return; }
+          if (!cat) { stopSaving(false); showToast('La categoría es requerida', 'error'); btn.disabled=false; btn.textContent='Guardar'; return; }
           const prob = state._riesgoProb || 0;
           const imp  = state._riesgoImp  || 0;
-          if (!prob || !imp) { showToast('Probabilidad e impacto son requeridos', 'error'); btn.disabled=false; btn.textContent='Guardar'; return; }
+          if (!prob || !imp) { stopSaving(false); showToast('Probabilidad e impacto son requeridos', 'error'); btn.disabled=false; btn.textContent='Guardar'; return; }
           const riesgoGrupo = document.getElementById('nc-riesgo-grupo').value;
-          const riesgoDisc  = document.getElementById('nc-riesgo-disciplina').value;
-          const riesgoDiscKey = (riesgoGrupo && riesgoDisc) ? `${riesgoGrupo}::${riesgoDisc}` : '';
+          const riesgoProjectTaskId = document.getElementById('nc-riesgo-disciplina').value;
           const res = await api('crearRiesgo', {
             proyecto_id:      state.currentProyecto.proyecto_id,
             titulo:           tituloRiesgo,
@@ -4253,15 +4327,16 @@ async function guardarNotaCambio() {
             estatus:          document.getElementById('nc-riesgo-estatus-nuevo').value || 'Activo',
             fecha_revision:   document.getElementById('nc-riesgo-fecha-revision').value || '',
             hito_ref_id:      document.getElementById('nc-riesgo-hito-ref').value || '',
-            disc_ref:         riesgoDiscKey,
+            group_id:         riesgoGrupo,
+            project_task_id:  riesgoProjectTaskId,
             notas_mitigacion: document.getElementById('nc-riesgo-mitigacion').value || '',
             fecha_real:       fecha
           });
           closeModal('modal-nota-cambio'); resetModalNotaCambio();
-          showToast(`Riesgo ${res.riesgo_id} registrado`, 'success');
+          showToast(`Riesgo ${res.risk_code || res.riesgo_id} registrado`, 'success');
         } else {
           const riesgoId = document.getElementById('nc-riesgo-update-ref').value;
-          if (!riesgoId) { showToast('Selecciona el riesgo a actualizar', 'error'); btn.disabled=false; btn.textContent='Guardar'; return; }
+          if (!riesgoId) { stopSaving(false); showToast('Selecciona el riesgo a actualizar', 'error'); btn.disabled=false; btn.textContent='Guardar'; return; }
           const nuevoEstatus = document.getElementById('nc-riesgo-update-estatus').value || undefined;
           const updateBody = {
             riesgo_id:        riesgoId,
@@ -4374,8 +4449,9 @@ if (nuevoEstatus === 'Cristalizado') {
       }
     }
 
-await refreshProyectoDetalle(estadoPaneles);
-  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+    stopSaving(true);
+    await refreshProyectoDetalle(estadoPaneles);
+  } catch(e) { stopSaving(false); showToast('Error: ' + e.message, 'error'); }
   finally { btn.disabled = false; btn.textContent = 'Guardar'; }
 }
 
@@ -4414,7 +4490,11 @@ async function guardarEntry() {
 
   // ── Intercepción Entrega Parcial — requiere selección de disciplinas ──
   if (grupo === 'G15' && evento === 'Entrega Parcial') {
-    _pendingEntregaParcialData = { fecha, grupo, disciplina, proyectoId };
+    _pendingEntregaParcialData = {
+      fecha, grupo, disciplina, proyectoId,
+      projectTaskId: state._entryProjectTaskId || '',
+      taskCatalogId: state._entryTaskCatalogId || ''
+    };
     const logP = state.logEventos.filter(e => e.proyecto_id === proyectoId);
     const activasSet = new Set(
       state.disciplinasProyecto.filter(d => d.proyecto_id === proyectoId && d.aplica === 'TRUE').map(d => d.disciplina_id)
@@ -4437,8 +4517,10 @@ async function guardarEntry() {
   startSaving();
   try {
     const res = await api('appendLogEvento', {
-      proyecto_id: proyectoId, fecha_real: fecha, fecha_hora: fechaTimestamp,
+      proyecto_id: proyectoId, fecha_real: fecha, fecha_hora: fechaTimestamp, hora,
       disciplina_id: discKey, hito_id: evento,
+      project_task_id: state._entryProjectTaskId || '',
+      task_catalog_id: state._entryTaskCatalogId || '',
       tipo_entry: 'evento', nota: document.getElementById('e-nota').value, version_timeline_activa: '1'
     });
 
@@ -4462,8 +4544,9 @@ async function guardarEntry() {
     }
     closeModal('modal-entry');
     showToast('Evento registrado', 'success');
+    stopSaving(true);
     // Hitos se evalua server-side en AS v1.1.0.
-await refreshProyectoDetalle(estadoPaneles);
+    await refreshProyectoDetalle(estadoPaneles);
   } catch(e) { stopSaving(false); showToast('Error: ' + e.message, 'error'); await restoreModalSnapshot(); }
   finally { btn.disabled = false; btn.textContent = 'Guardar Evento'; }
 }
@@ -4670,9 +4753,8 @@ async function cargarHistorialArquitecto(proyectoId) {
     seccion.style.display = 'block';
     lista.innerHTML = historial.map(h => `
       <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--surface2);border-radius:var(--radius);font-size:12px">
-        <span style="flex:1;font-weight:500">${h.nombre_arquitecto || h.arquitecto_id}</span>
-        <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${h.timestamp ? new Date(h.timestamp).toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}) + ' ' + new Date(h.timestamp).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}) : '—'}</span>
-        <button style="background:none;border:none;color:var(--text3);font-size:11px;cursor:pointer;padding:2px 6px;font-family:var(--mono);transition:color 0.15s" onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--text3)'" onclick="borrarEntryHistorial('${h.ha_id}','${proyectoId}')">✕</button>
+        <span style="flex:1;font-weight:500">${h.nombre_arquitecto || h.arquitecto_id || 'Arquitecto sin nombre'}</span>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${formatDate(h.timestamp)}${h.assigned_by_name ? ` · asignó ${h.assigned_by_name}` : ''}</span>
       </div>`).join('');
   } catch(e) { seccion.style.display = 'none'; }
 }
@@ -4705,6 +4787,7 @@ async function guardarSettings() {
   if (!nombre) { showToast('El nombre es requerido', 'error'); return; }
   const btn = document.getElementById('btn-guardar-settings');
   btn.disabled = true; btn.textContent = 'Guardando…';
+  startSaving();
   try {
     const estadoAnterior = state.currentProyecto.estado || 'Activo';
     const estadoNuevo = document.getElementById('s-estado').value;
@@ -4750,10 +4833,10 @@ async function guardarSettings() {
     const msgPausa = estadoNuevo === 'En pausa' ? ' · Proyecto en pausa' : estadoAnterior === 'En pausa' ? ' · Proyecto reactivado' : '';
     showToast('Proyecto actualizado' + msgPausa, 'success');
     const projectId = state.currentProyecto.proyecto_id;
-    IS4TOptAdapter.reset('project', projectId);
     IS4TOptAdapter.reset('home');
-    await openProyecto(projectId);
-  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+    stopSaving(true);
+    await refreshProyectoDetalle();
+  } catch(e) { stopSaving(false); showToast('Error: ' + e.message, 'error'); }
   finally { btn.disabled = false; btn.textContent = 'Guardar cambios'; }
 }
 
@@ -4827,7 +4910,7 @@ function renderEntriesEliminados(proyecto) {
   });
 
   const filasRiesgos = riesgosBorrados.map(r => {
-    const riesgoIdDisplay = r.riesgo_id ? r.riesgo_id.split('-').slice(1).join('-') || r.riesgo_id : '—';
+    const riesgoIdDisplay = r.risk_code || (r.riesgo_id ? r.riesgo_id.split('-').slice(1).join('-') || r.riesgo_id : '—');
     const fechaBorrado = r.fecha_borrado ? formatDate(r.fecha_borrado.toString().split('T')[0]) : '—';
     // Intentar obtener título desde log si existe
     const entryLog = (state.logEventos||[]).find(ev => ev.entry_id === r.entry_id);
@@ -4856,6 +4939,8 @@ function renderEntriesEliminados(proyecto) {
   </div>`;
 }
 function stripRiesgoPrefix(riesgoId) {
+  const detail = (state.riesgosDetalle || []).find(r => r.riesgo_id === riesgoId);
+  if (detail?.risk_code) return detail.risk_code;
   if (!riesgoId || !riesgoId.includes('-')) return riesgoId;
   return riesgoId.split('-').slice(1).join('-') || riesgoId;
 }
@@ -4884,11 +4969,7 @@ function renderNotas(proyecto) {
     todosEntries;
   const notasHTML = notas.length === 0
     ? '<div style="color:var(--text3);font-family:var(--mono);font-size:12px;padding:4px 0">Sin entradas registradas.</div>'
-    : notas.sort((a,b) => {
-        const ta = a.timestamp ? new Date(a.timestamp) : new Date((a.fecha_real || '') + 'T12:00:00');
-        const tb = b.timestamp ? new Date(b.timestamp) : new Date((b.fecha_real || '') + 'T12:00:00');
-        return ta - tb;
-      }).map(n => {
+    : notas.sort(compareLogEntriesChronologically).map(n => {
         const esCambio = n.tipo_entry === 'cambio_registrado';
         const esRiesgo = n.tipo_entry === 'riesgo';
         const esRiesgoUpdate = n.tipo_entry === 'riesgo_update';
@@ -4902,7 +4983,7 @@ function renderNotas(proyecto) {
           let riesgoData = {}; try { riesgoData = JSON.parse(n.nota||'{}'); } catch(e) {}
           const rd = esRiesgo ? getRiesgoDetalleByEntry(n.entry_id) : getRiesgoDetalle(riesgoData.riesgo_id);
           const riesgoId = riesgoData.riesgo_id || n.hito_id || '—';
-          const riesgoIdDisplay = stripRiesgoPrefix(riesgoId);
+          const riesgoIdDisplay = riesgoData.risk_code || rd?.risk_code || stripRiesgoPrefix(riesgoId);
           const titulo = riesgoData.titulo || riesgoIdDisplay;
           const estatus = rd?.estatus || 'Activo';
           const score = rd?.score || (riesgoData.probabilidad && riesgoData.impacto ? riesgoData.probabilidad * riesgoData.impacto : 0);
@@ -4934,11 +5015,11 @@ function renderNotas(proyecto) {
             </button>
             <div class="cambio-detail-panel" id="${panelId}">
               ${descripcionRiesgo ? `<div class="cambio-detail-alcance" style="margin-bottom:8px">${descripcionRiesgo}</div>` : '<div style="color:var(--text3);font-family:var(--mono);font-size:12px;margin-bottom:8px">Sin descripción registrada.</div>'}
-              ${rd && (rd.hito_ref_id || rd.disc_ref || rd.fecha_revision || rd.notas_mitigacion) ? `
+              ${rd ? `
                 <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:6px">
                   ${rd.hito_ref_id?`<span style="font-size:11px;font-family:var(--mono);color:var(--text3)">Hito: <span style="color:var(--text2)">${rd.hito_ref_id}</span></span>`:''}
                   ${rd.disc_ref?`<span style="font-size:11px;font-family:var(--mono);color:var(--text3)">Ref: <span style="color:var(--text2)">${rd.disc_ref.split('::')[1]||rd.disc_ref}</span></span>`:''}
-                  ${rd.fecha_revision?`<span style="font-size:11px;font-family:var(--mono);color:var(--text3)">Revisión: <span style="color:var(--accent)">${formatDate(rd.fecha_revision)}</span></span>`:''}
+                  <span style="font-size:11px;font-family:var(--mono);color:var(--text3)">Revisión: <span style="color:${rd.fecha_revision?'var(--accent)':'var(--text2)'}">${formatDate(rd.fecha_revision)}</span></span>
                 </div>
                 ${rd.notas_mitigacion?`<div style="font-size:12px;color:var(--text2);font-style:italic;margin-bottom:6px">Mitigación: ${rd.notas_mitigacion}</div>`:''}
               ` : ''}
@@ -5103,8 +5184,8 @@ function abrirHistorialRiesgo(riesgoId) {
       try { return JSON.parse(e.nota||'{}').riesgo_id === riesgoId; } catch(err) { return false; }
     }
     return false;
-  }).sort((a,b) => new Date(a.timestamp||a.fecha_real) - new Date(b.timestamp||b.fecha_real));
-  document.getElementById('historial-riesgo-titulo').textContent = `${stripRiesgoPrefix(riesgoId)} — ${getRiesgoTitulo(entries[0]?.entry_id || '')}`;
+  }).sort(compareLogEntriesChronologically);
+  document.getElementById('historial-riesgo-titulo').textContent = `${rd?.risk_code || stripRiesgoPrefix(riesgoId)} — ${getRiesgoTitulo(entries[0]?.entry_id || '')}`;
   state._historialRiesgoId = riesgoId;
   const PROB_L = ['','Muy improbable','Poco probable','Posible','Probable','Casi seguro'];
   const IMP_L  = ['','Insignificante','Menor','Moderado','Mayor','Crítico'];
@@ -5150,7 +5231,7 @@ function abrirMatrizRiesgo(prob, imp, riesgoId) {
   const IMP_L  = ['','Insignificante','Menor','Moderado','Mayor','Crítico'];
   const score = prob * imp;
   const cls = score >= 15 ? 'riesgo-score-red' : score >= 7 ? 'riesgo-score-yellow' : 'riesgo-score-green';
-  document.getElementById('matriz-riesgo-titulo').textContent = `${riesgoId} · Exposición al riesgo`;
+  document.getElementById('matriz-riesgo-titulo').textContent = `${stripRiesgoPrefix(riesgoId)} · Exposición al riesgo`;
   const cellColor = (p, i) => {
     const s = p * i;
     return s >= 15 ? 'rgba(226,75,74,0.15)' : s >= 7 ? 'rgba(186,117,23,0.18)' : 'rgba(99,153,34,0.15)';
@@ -5229,7 +5310,7 @@ function borrarRiesgoEntry(entryId, riesgoId) {
         });
         if (scope === 'completo') state.riesgosDetalle = (state.riesgosDetalle || []).filter(r => r.riesgo_id !== riesgoId);
         showToast(scope === 'completo' ? `Riesgo ${riesgoId} eliminado` : 'Entry eliminado', 'success');
-        if (state.currentProyecto) { await openProyecto(state.currentProyecto.proyecto_id); restaurarEstadoPaneles(estadoPaneles); }
+        if (state.currentProyecto) await refreshProyectoDetalle(estadoPaneles);
       } catch(e) { showToast('Error: ' + e.message, 'error'); }
     }
   });
@@ -5247,7 +5328,7 @@ function borrarDudaEntry(entryId, tituloDuda) {
         state.logEventos = state.logEventos.filter(e => e.entry_id !== entryId);
         state.dudasDetalle = (state.dudasDetalle || []).filter(d => d.entry_id !== entryId);
         showToast('Duda eliminada', 'success');
-        if (state.currentProyecto) { await openProyecto(state.currentProyecto.proyecto_id); restaurarEstadoPaneles(estadoPaneles); }
+        if (state.currentProyecto) await refreshProyectoDetalle(estadoPaneles);
       } catch(e) { showToast('Error: ' + e.message, 'error'); }
     }
   });
@@ -5308,9 +5389,7 @@ async function restaurarEntry(tipo, entryId) {
       try {
         await api('restaurarEntryEliminado', { tipo, entry_id: entryId, proyecto_id: proyectoId });
         showToast('Entrada restaurada', 'success');
-        await loadProyectoData(proyectoId);
-        await openProyecto(proyectoId);
-        restaurarEstadoPaneles(estadoPaneles);
+        await refreshProyectoDetalle(estadoPaneles);
       } catch(e) { showToast('Error: ' + e.message, 'error'); }
     }
   });
@@ -5355,10 +5434,7 @@ function borrarNota(entryId, hitoId, proyectoId) {
         await api('borrarNota', { entry_id: entryId, hito_id: hitoId, proyecto_id: proyectoId });
         state.logEventos = state.logEventos.filter(e => e.entry_id !== entryId && !(e.hito_id === hitoId && e.tipo_entry === 'nota_ref'));
         showToast('Nota eliminada', 'success');
-        if (state.currentProyecto) {
-          await openProyecto(state.currentProyecto.proyecto_id);
-          restaurarEstadoPaneles(estadoPaneles);
-        }
+        if (state.currentProyecto) await refreshProyectoDetalle(estadoPaneles);
       } catch(e) { showToast('Error: ' + e.message, 'error'); }
     }
   });
@@ -5483,10 +5559,7 @@ async function confirmarBorrarCambio() {
     }];
     closeModal('modal-borrar-cambio');
     showToast('Cambio eliminado', 'success');
-    if (state.currentProyecto) {
-      await openProyecto(state.currentProyecto.proyecto_id);
-      restaurarEstadoPaneles(estadoPaneles);
-    }
+    if (state.currentProyecto) await refreshProyectoDetalle(estadoPaneles);
   } catch(e) { showToast('Error: ' + e.message, 'error'); }
   finally { btn.disabled = false; btn.textContent = 'Eliminar cambio'; }
 }
@@ -6023,11 +6096,7 @@ function isDisciplinaCompleta(disciplina, grupoId, log) {
   // Lógica genérica — último evento === evento de cierre del catálogo
   const cierre = state.eventosCatalogo.find(e => e.grupo_id === grupoId && e.disciplina_nombre === disciplina && (e.es_cierre === 'TRUE' || e.es_cierre === 'true' || e.es_cierre === true));
   if (!cierre) return false;
-  const eventos = eventosDisc.sort((a, b) => {
-    const ta = a.timestamp ? new Date(a.timestamp) : new Date(a.fecha_real + 'T12:00:00Z');
-    const tb = b.timestamp ? new Date(b.timestamp) : new Date(b.fecha_real + 'T12:00:00Z');
-    return ta - tb;
-  });
+  const eventos = eventosDisc.sort(compareLogEntriesChronologically);
   if (eventos.length === 0) return false;
   return eventos[eventos.length - 1].hito_id === cierre.evento_nombre;
 }
@@ -6091,7 +6160,7 @@ async function guardarSnapshotEntrega(proyectoId, entryId, seleccionManual) {
     const [gid, dNombre] = dk.split('::');
     const completa = isDisciplinaCompleta(dNombre, gid, logP);
     const evs = logP.filter(e => e.disciplina_id === dk && e.tipo_entry === 'evento')
-      .sort((a,b) => new Date(a.timestamp||a.fecha_real+'T12:00:00Z') - new Date(b.timestamp||b.fecha_real+'T12:00:00Z'));
+      .sort(compareLogEntriesChronologically);
     const ultimo = evs.length > 0 ? evs[evs.length-1].hito_id : null;
     snapshot[dk] = { completa, ultimo_evento: ultimo, total_eventos: evs.length };
   }
@@ -6102,7 +6171,7 @@ async function guardarSnapshotEntrega(proyectoId, entryId, seleccionManual) {
 
 async function confirmarEntregaParcial() {
   if (!_pendingEntregaParcialData) return;
-  const { fecha, grupo, disciplina, proyectoId } = _pendingEntregaParcialData;
+  const { fecha, grupo, disciplina, proyectoId, projectTaskId, taskCatalogId } = _pendingEntregaParcialData;
   const checkboxes = document.querySelectorAll('#ep-disciplinas-list input[type=checkbox]:checked');
   const seleccion = [...checkboxes].map(cb => cb.value);
   closeModal('modal-entrega-parcial');
@@ -6113,14 +6182,14 @@ async function confirmarEntregaParcial() {
     const res = await api('appendLogEvento', {
       proyecto_id: proyectoId, fecha_real: fecha,
       disciplina_id: `${grupo}::${disciplina}`, hito_id: 'Entrega Parcial',
+      project_task_id: projectTaskId || '', task_catalog_id: taskCatalogId || '',
       tipo_entry: 'evento', nota: document.getElementById('e-nota').value, version_timeline_activa: '1'
     });
     await guardarSnapshotEntrega(proyectoId, res.entry_id, seleccion);
     closeModal('modal-entry');
     showToast('Entrega Parcial registrada', 'success');
     // Hitos se evalua server-side en AS v1.1.0.
-    await loadProyectoData(proyectoId);
-    if (state.currentProyecto) { await openProyecto(proyectoId); restaurarEstadoPaneles(estadoPaneles); }
+    if (state.currentProyecto) await refreshProyectoDetalle(estadoPaneles);
   } catch(e) { showToast('Error: ' + e.message, 'error'); }
   finally { btn.disabled = false; btn.textContent = 'Guardar Evento'; _pendingEntregaParcialData = null; }
 }
@@ -6252,6 +6321,25 @@ function formatDate(d) {
   const m = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
   return `${dt.getDate()} ${m[dt.getMonth()]} ${dt.getFullYear()}`;
 }
+
+function compareLogEntriesChronologically(a, b) {
+  const sortValue = entry => {
+    const date = IS4TOptAdapter.isoDate(entry.fecha_real || entry.event_date || entry.timestamp);
+    const timestamp = String(entry.timestamp || entry.event_datetime || entry.created_at || '');
+    const timeMatch = timestamp.match(/T(\d{2}:\d{2})(?::(\d{2}))?/);
+    const time = timeMatch ? `${timeMatch[1]}:${timeMatch[2] || '00'}` : '12:00:00';
+    const primary = date ? Date.parse(`${date}T${time}`) : Date.parse(timestamp);
+    const created = Date.parse(entry.created_at || timestamp);
+    return {
+      primary: Number.isFinite(primary) ? primary : 0,
+      created: Number.isFinite(created) ? created : 0,
+      id: String(entry.entry_id || entry.project_event_id || '')
+    };
+  };
+  const av = sortValue(a);
+  const bv = sortValue(b);
+  return av.primary - bv.primary || av.created - bv.created || av.id.localeCompare(bv.id);
+}
 function showToast(msg, type = 'success') {
   const el = document.getElementById('toast');
   el.textContent = msg; el.className = `show ${type}`;
@@ -6281,7 +6369,7 @@ function renderTareasAdhoc(proyecto) {
     : tareas.map(t => {
         const safeId = t.tarea_id.replace(/[^a-zA-Z0-9_]/g,'_');
         const eventos = logTareas.filter(e => e.disciplina_id === `ADHOC::${t.tarea_id}`)
-          .sort((a,b) => new Date(a.timestamp||a.fecha_real+'T12:00:00Z') - new Date(b.timestamp||b.fecha_real+'T12:00:00Z'));
+          .sort(compareLogEntriesChronologically);
         const estatus = t.estatus || 'pendiente';
         const asignadoNombre = (state.usuarios.find(u => u.email === t.asignado_a)?.nombre) || t.asignado_a;
         const esAsignado = state.user?.email === t.asignado_a;
@@ -6392,7 +6480,7 @@ async function restaurarElementoOperativo(entityType, recordId, projectId) {
     });
     IS4TOptAdapter.reset('project', projectId);
     showToast('Elemento restaurado', 'success');
-    if (projectId && state.currentProyecto) await openProyecto(projectId);
+    if (projectId && state.currentProyecto) await refreshProyectoDetalle();
   } catch(e) {
     showToast('Error: ' + e.message, 'error');
   }
@@ -6475,6 +6563,7 @@ async function guardarTareaAdhoc() {
       showToast('Tarea creada', 'success');
     }
     closeModal('modal-tarea-adhoc');
+    stopSaving(true);
     await refreshProyectoDetalle(estadoPaneles);
   } catch(e) { stopSaving(false); showToast('Error: ' + e.message, 'error'); await restoreModalSnapshot(); }
   finally { btn.disabled = false; btn.textContent = state._editandoTareaId ? 'Guardar cambios' : 'Crear tarea'; }
@@ -6521,6 +6610,7 @@ async function guardarTareaEvento() {
       }
 closeModal('modal-tarea-evento');
 showToast('Evento actualizado', 'success');
+stopSaving(true);
 
 if (state._modoEvergreen) {
   const arqEmail = state.currentEvergreenArq;
@@ -6529,8 +6619,8 @@ if (state._modoEvergreen) {
 } else if (state.currentProyecto) {
   await refreshProyectoDetalle(estadoPaneles);
 }
-    } catch(e) { showToast('Error: ' + e.message, 'error'); }
-    finally { stopSaving(false); btn.disabled = false; btn.textContent = 'Guardar evento'; state._editandoTareaEventoId = null; }
+    } catch(e) { stopSaving(false); showToast('Error: ' + e.message, 'error'); }
+    finally { btn.disabled = false; btn.textContent = 'Guardar evento'; state._editandoTareaEventoId = null; }
     return;
   }
   try {
@@ -6553,6 +6643,7 @@ if (state._modoEvergreen) {
     }
     closeModal('modal-tarea-evento');
     showToast('Evento registrado', 'success');
+    stopSaving(true);
     if (state._modoEvergreen) {
       await loadEvergreenData();
       const arqEmail = state.currentEvergreenArq;
@@ -6752,7 +6843,7 @@ function renderEvergreenDetail(arquitectoEmail) {
     const filas = lista.map(t => {
       const safeId = t.tarea_id.replace(/[^a-zA-Z0-9_]/g,'_');
       const logTarea = log.filter(e => e.disciplina_id === `EV::${t.tarea_id}`)
-        .sort((a,b) => new Date(a.timestamp||a.fecha_real+'T12:00:00Z') - new Date(b.timestamp||b.fecha_real+'T12:00:00Z'));
+        .sort(compareLogEntriesChronologically);
       const esTerminada = t.estatus === 'completada' || t.estatus === 'cancelada';
 
       const logHTML = logTarea.length === 0
@@ -6886,6 +6977,7 @@ async function guardarEvergreenTarea() {
       });
       showToast('Tarea Backlog creada', 'success');
     }
+    stopSaving(true);
     await loadEvergreenData();
   } catch(e) { stopSaving(false); showToast('Error: ' + e.message, 'error'); await restoreModalSnapshot(); }
   finally { btn.disabled = false; state._modoEvergreen = false; }
@@ -7052,7 +7144,7 @@ function buildCambioRiesgoRefSelector() {
     r.estatus === 'Cristalizado'
   );
   sel.innerHTML = '<option value="">Sin referencia</option>' +
-    riesgos.map(r => `<option value="${r.riesgo_id}">${stripRiesgoPrefix(r.riesgo_id)} — ${getRiesgoTitulo(r.entry_id)}</option>`).join('');
+      riesgos.map(r => `<option value="${r.riesgo_id}">${r.risk_code || stripRiesgoPrefix(r.riesgo_id)} — ${getRiesgoTitulo(r.entry_id)}</option>`).join('');
 }
 
 function getRiesgoTitulo(entryId) {
@@ -7076,16 +7168,17 @@ function buildRiesgoSelectors() {
     selHito.innerHTML = '<option value="">Sin referencia</option>' +
       HITOS_TIMELINE.map(h => `<option value="${h.id}">${h.id} — ${h.nombre}</option>`).join('');
   }
-  const activasSet = new Set(
-    state.disciplinasProyecto
-      .filter(d => d.proyecto_id === state.currentProyecto.proyecto_id)
-      .map(d => d.disciplina_id)
+  const projectTasks = (state.disciplinasProyecto || []).filter(t =>
+    t.proyecto_id === state.currentProyecto.proyecto_id &&
+    t.project_task_id &&
+    t.is_effective !== false &&
+    ![false, 'FALSE'].includes(t.aplica ?? t.applies)
   );
   const grupos = {};
-  state.eventosCatalogo.forEach(e => {
-    if (!e.grupo_id || e.grupo_id === 'G0') return;
-    if (!activasSet.has(`${e.grupo_id}::${e.disciplina_nombre}`)) return;
-    if (!grupos[e.grupo_id]) grupos[e.grupo_id] = e.grupo_nombre;
+  projectTasks.forEach(t => {
+    const groupId = IS4TOptAdapter.canonicalGroupId(t.grupo_id || t.group_id);
+    if (!groupId) return;
+    if (!grupos[groupId]) grupos[groupId] = IS4TOptAdapter.groupName(groupId);
   });
   const selGrupo = document.getElementById('nc-riesgo-grupo');
   if (selGrupo) {
@@ -7100,7 +7193,7 @@ function buildRiesgoSelectors() {
   const selUpdate = document.getElementById('nc-riesgo-update-ref');
   if (selUpdate) {
     selUpdate.innerHTML = '<option value="">Seleccionar riesgo…</option>' +
-      riesgosActivos.map(r => `<option value="${r.riesgo_id}">${r.riesgo_id} — ${getRiesgoTitulo(r.entry_id)} (${r.estatus})</option>`).join('');
+      riesgosActivos.map(r => `<option value="${r.riesgo_id}">${r.risk_code || r.riesgo_id} — ${getRiesgoTitulo(r.entry_id)} (${r.estatus})</option>`).join('');
   }
   setRiesgoModo('nuevo');
 }
@@ -7143,17 +7236,21 @@ function updateRiesgoGrupo() {
   const sel = document.getElementById('nc-riesgo-disciplina');
   sel.innerHTML = '<option value="">—</option>';
   if (!gid || !state.currentProyecto) return;
-  const activasSet = new Set(
-    state.disciplinasProyecto
-      .filter(d => d.proyecto_id === state.currentProyecto.proyecto_id)
-      .map(d => d.disciplina_id)
-  );
-  const discs = [...new Set(
-    state.eventosCatalogo
-      .filter(e => e.grupo_id === gid && activasSet.has(`${gid}::${e.disciplina_nombre}`))
-      .map(e => e.disciplina_nombre)
-  )];
-  discs.forEach(d => sel.innerHTML += `<option value="${d}">${d}</option>`);
+  const tasks = (state.disciplinasProyecto || [])
+    .filter(t =>
+      t.proyecto_id === state.currentProyecto.proyecto_id &&
+      IS4TOptAdapter.canonicalGroupId(t.grupo_id || t.group_id) === IS4TOptAdapter.canonicalGroupId(gid) &&
+      t.project_task_id &&
+      t.is_effective !== false &&
+      ![false, 'FALSE'].includes(t.aplica ?? t.applies)
+    )
+    .sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0));
+  tasks.forEach(t => {
+    const option = document.createElement('option');
+    option.value = t.project_task_id;
+    option.textContent = t.task_name || t.disciplina_nombre || (t.disciplina_id || '').split('::')[1] || t.project_task_id;
+    sel.appendChild(option);
+  });
 }
 
 const RIESGO_PROB_LABELS = ['','Muy improbable','Poco probable','Posible','Probable','Casi seguro'];
