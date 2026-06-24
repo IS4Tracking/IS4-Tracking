@@ -207,14 +207,14 @@
   .group-row { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; transition:box-shadow 0.2s; }
 
   /* Glow por grupo — identidad temática, siempre activo */
-  .group-row[data-grupo="G2"]  { border-color:rgba(127,119,221,0.45); box-shadow: inset 3px 0 12px -4px rgba(127,119,221,0.4), -1px 0 8px -2px rgba(127,119,221,0.25); }
-  .group-row[data-grupo="G3"]  { border-color:rgba(83,74,183,0.45);   box-shadow: inset 3px 0 12px -4px rgba(83,74,183,0.4),   -1px 0 8px -2px rgba(83,74,183,0.25); }
-  .group-row[data-grupo="G4"]  { border-color:rgba(55,138,221,0.45);  box-shadow: inset 3px 0 12px -4px rgba(55,138,221,0.4),  -1px 0 8px -2px rgba(55,138,221,0.25); }
-  .group-row[data-grupo="G5"]  { border-color:rgba(24,95,165,0.45);   box-shadow: inset 3px 0 12px -4px rgba(24,95,165,0.4),   -1px 0 8px -2px rgba(24,95,165,0.25); }
-  .group-row[data-grupo="G6"]  { border-color:rgba(29,158,117,0.45);  box-shadow: inset 3px 0 12px -4px rgba(29,158,117,0.4),  -1px 0 8px -2px rgba(29,158,117,0.25); }
-  .group-row[data-grupo="G7"]  { border-color:rgba(15,110,86,0.45);   box-shadow: inset 3px 0 12px -4px rgba(15,110,86,0.4),   -1px 0 8px -2px rgba(15,110,86,0.25); }
-  .group-row[data-grupo="G8"]  { border-color:rgba(8,80,65,0.6);      box-shadow: inset 3px 0 12px -4px rgba(8,80,65,0.5),     -1px 0 8px -2px rgba(8,80,65,0.3); }
-  .group-row[data-grupo="G9"]  { border-color:rgba(216,90,48,0.45);   box-shadow: inset 3px 0 12px -4px rgba(216,90,48,0.4),   -1px 0 8px -2px rgba(216,90,48,0.25); }
+  .group-row[data-grupo="G02"]  { border-color:rgba(127,119,221,0.45); box-shadow: inset 3px 0 12px -4px rgba(127,119,221,0.4), -1px 0 8px -2px rgba(127,119,221,0.25); }
+  .group-row[data-grupo="G03"]  { border-color:rgba(83,74,183,0.45);   box-shadow: inset 3px 0 12px -4px rgba(83,74,183,0.4),   -1px 0 8px -2px rgba(83,74,183,0.25); }
+  .group-row[data-grupo="G04"]  { border-color:rgba(55,138,221,0.45);  box-shadow: inset 3px 0 12px -4px rgba(55,138,221,0.4),  -1px 0 8px -2px rgba(55,138,221,0.25); }
+  .group-row[data-grupo="G05"]  { border-color:rgba(24,95,165,0.45);   box-shadow: inset 3px 0 12px -4px rgba(24,95,165,0.4),   -1px 0 8px -2px rgba(24,95,165,0.25); }
+  .group-row[data-grupo="G06"]  { border-color:rgba(29,158,117,0.45);  box-shadow: inset 3px 0 12px -4px rgba(29,158,117,0.4),  -1px 0 8px -2px rgba(29,158,117,0.25); }
+  .group-row[data-grupo="G07"]  { border-color:rgba(15,110,86,0.45);   box-shadow: inset 3px 0 12px -4px rgba(15,110,86,0.4),   -1px 0 8px -2px rgba(15,110,86,0.25); }
+  .group-row[data-grupo="G08"]  { border-color:rgba(8,80,65,0.6);      box-shadow: inset 3px 0 12px -4px rgba(8,80,65,0.5),     -1px 0 8px -2px rgba(8,80,65,0.3); }
+  .group-row[data-grupo="G09"]  { border-color:rgba(216,90,48,0.45);   box-shadow: inset 3px 0 12px -4px rgba(216,90,48,0.4),   -1px 0 8px -2px rgba(216,90,48,0.25); }
   .group-row[data-grupo="G10"] { border-color:rgba(186,117,23,0.45);  box-shadow: inset 3px 0 12px -4px rgba(186,117,23,0.4),  -1px 0 8px -2px rgba(186,117,23,0.25); }
   .group-row[data-grupo="G11"] { border-color:rgba(99,153,34,0.45);   box-shadow: inset 3px 0 12px -4px rgba(99,153,34,0.4),   -1px 0 8px -2px rgba(99,153,34,0.25); }
   .group-row[data-grupo="G12"] { border-color:rgba(212,83,126,0.45);  box-shadow: inset 3px 0 12px -4px rgba(212,83,126,0.4),  -1px 0 8px -2px rgba(212,83,126,0.25); }
@@ -271,7 +271,7 @@
   .timeline-body { display:none; }
   .timeline-body.open { display:block; }
   .timeline-table { width:100%; border-collapse:collapse; }
-  .timeline-row { display:grid; grid-template-columns:80px 1fr 130px 150px 90px; gap:12px; align-items:center; padding:9px 16px; border-bottom:1px solid var(--border); font-size:13px; }
+  .timeline-row { display:grid; grid-template-columns:80px minmax(220px,1fr) 120px 120px 80px 90px; gap:12px; align-items:center; padding:9px 16px; border-bottom:1px solid var(--border); font-size:13px; }
   .timeline-row:last-child { border-bottom:none; }
   .timeline-row.header { background:var(--surface2); border-radius:var(--radius) var(--radius) 0 0; border:1px solid var(--border); border-bottom:1px solid var(--border); }
   .timeline-row:not(.header) { background:var(--surface); border-left:1px solid var(--border); border-right:1px solid var(--border); }
@@ -1134,8 +1134,35 @@ const IS4TOptAdapter = {
       headers: { 'Content-Type': 'text/plain' }
     });
     const data = await res.json();
-    if (data && data.error) throw new Error(data.error);
+    if (!res.ok) throw new Error(`Error HTTP ${res.status}`);
+    if (data && (data.error || data.ok === false)) throw new Error(data.error || 'La operaciÃ³n no fue aplicada');
     return data;
+  },
+
+  canonicalGroupId(value) {
+    const raw = String(value || '').trim().toUpperCase();
+    const match = raw.match(/^G0?(\d{1,2})$/);
+    if (!match) return raw;
+    const number = Number(match[1]);
+    if (number < 1 || number > 15) return raw;
+    return `G${String(number).padStart(2, '0')}`;
+  },
+
+  canonicalTaskKey(value) {
+    const raw = String(value || '');
+    const separator = raw.indexOf('::');
+    if (separator < 0) return raw;
+    return `${this.canonicalGroupId(raw.slice(0, separator))}::${raw.slice(separator + 2)}`;
+  },
+
+  isoDate(value) {
+    if (!value) return '';
+    const match = String(value).trim().match(/^(\d{4}-\d{2}-\d{2})/);
+    return match ? match[1] : '';
+  },
+
+  booleanValue(value) {
+    return value === true || value === 1 || value === '1' || String(value).toUpperCase() === 'TRUE';
   },
 
   reset(scope, projectId) {
@@ -1196,7 +1223,7 @@ const IS4TOptAdapter = {
 
   users() {
     const rows = (this.bootstrap?.users || []);
-    return rows.map(u => ({
+    return rows.filter(u => this.booleanValue(u.active)).map(u => ({
       ...u,
       nombre: u.name || u.nombre || u.email,
       rol: u.role || u.rol,
@@ -1224,14 +1251,15 @@ const IS4TOptAdapter = {
     const events = catalogs.events || [];
     const groupById = {};
     const taskById = {};
-    groups.forEach(g => { groupById[g.group_id] = g; });
+    groups.forEach(g => { groupById[this.canonicalGroupId(g.group_id)] = g; });
     tasks.forEach(t => { taskById[t.task_catalog_id] = t; });
     return events.map(e => {
       const task = taskById[e.task_catalog_id] || {};
-      const gid = e.group_id || task.group_id || '';
+      const gid = this.canonicalGroupId(e.group_id || task.group_id || '');
       const group = groupById[gid] || {};
       return {
         ...e,
+        group_id: gid,
         grupo_id: gid,
         grupo_nombre: group.group_name || group.name || group.grupo_nombre || gid,
         disciplina_nombre: task.task_name || e.task_name || e.disciplina_nombre || '',
@@ -1244,19 +1272,29 @@ const IS4TOptAdapter = {
   projectRow(p) {
     if (!p) return null;
     const owner = p.assigned_architect_user_id || p.arquitecto_id || '';
+    const projectCode = p.project_code ?? p.project_code_cache ?? p.clave_innovasport ?? p.clave ?? '';
+    const projectType = p.project_type ?? p.tipo_proyecto ?? p.tipo ?? '';
+    const approvalDate = this.isoDate(p.approval_date ?? p.fecha_aprobacion);
+    const deliveryDate = this.isoDate(p.target_delivery_date ?? p.fecha_entrega);
+    const bubblePlanApplies = this.booleanValue(p.bubble_plan_applies ?? p.bubble_plan_aplica ?? p.bubble_plan);
     return {
       ...p,
       proyecto_id: p.project_id || p.proyecto_id,
       nombre: p.project_name || p.project_name_cache || p.project_name || p.nombre,
-      clave: p.project_code || p.project_code_cache || p.clave || '',
-      tipo: p.project_type || p.tipo || '',
+      clave: projectCode,
+      clave_innovasport: projectCode,
+      tipo: projectType,
+      tipo_proyecto: projectType,
       estado: p.status || p.estado || 'Activo',
       arquitecto_id: this.emailFromUserId(owner),
       arquitecto_user_id: owner,
-      fecha_aprobacion: p.approval_date || p.fecha_aprobacion || '',
-      fecha_entrega: p.target_delivery_date || p.fecha_entrega || '',
-      fecha_apertura: p.opening_date || '',
-      bubble_plan: p.bubble_plan_applies || p.bubble_plan || '',
+      approval_date: approvalDate,
+      fecha_aprobacion: approvalDate,
+      target_delivery_date: deliveryDate,
+      fecha_entrega: deliveryDate,
+      fecha_apertura: this.isoDate(p.opening_date),
+      bubble_plan: bubblePlanApplies,
+      bubble_plan_aplica: bubblePlanApplies,
       notas: p.notes || p.notas || '',
       readiness_score: p.readiness_score,
       health_score: p.health_score,
@@ -1280,24 +1318,29 @@ const IS4TOptAdapter = {
   },
 
   taskKey(task) {
-    return (task.group_id || '') + '::' + (task.task_name || task.title || '');
+    return this.canonicalGroupId(task.group_id || task.grupo_id) + '::' + (task.task_name || task.title || '');
   },
 
   groupName(groupId) {
+    const canonicalId = this.canonicalGroupId(groupId);
     const groups = this.bootstrap?.catalogs?.groups || [];
-    const g = groups.find(x => x.group_id === groupId);
-    return g?.group_name || g?.name || g?.grupo_nombre || groupId;
+    const g = groups.find(x => this.canonicalGroupId(x.group_id) === canonicalId);
+    return g?.group_name || g?.name || g?.grupo_nombre || canonicalId;
   },
 
   catalogTasks() {
     const tasks = this.bootstrap?.catalogs?.tasks || [];
-    return tasks.map(t => ({
+    return tasks.map(t => {
+      const groupId = this.canonicalGroupId(t.group_id);
+      return ({
       ...t,
-      grupo_id: t.group_id,
-      grupo_nombre: this.groupName(t.group_id),
+      group_id: groupId,
+      grupo_id: groupId,
+      grupo_nombre: this.groupName(groupId),
       disciplina_nombre: t.task_name || t.title || '',
       task_catalog_id: t.task_catalog_id
-    }));
+    });
+    });
   },
 
   taskByIds(bundle) {
@@ -1310,19 +1353,23 @@ const IS4TOptAdapter = {
   },
 
   disciplinas(bundle) {
-    return (bundle?.std_tasks || []).map(t => ({
+    return (bundle?.std_tasks || []).map(t => {
+      const groupId = this.canonicalGroupId(t.group_id);
+      return ({
       ...t,
+      group_id: groupId,
       proyecto_id: t.project_id,
       project_task_id: t.project_task_id,
       task_catalog_id: t.task_catalog_id,
       disciplina_id: this.taskKey(t),
-      grupo_id: t.group_id,
+      grupo_id: groupId,
       aplica: t.applies,
       estatus: t.status,
       fecha_esperada: t.current_due_date,
       is_effective: t.is_effective !== false,
       inactive_reason: t.inactive_reason || ''
-    }));
+    });
+    });
   },
 
   projectEvents(bundle) {
@@ -1330,15 +1377,17 @@ const IS4TOptAdapter = {
     const rows = [];
     (bundle?.events || []).forEach(e => {
       const task = taskMap[e.project_task_id] || taskMap[e.task_catalog_id] || {};
+      const groupId = this.canonicalGroupId(task.group_id || e.group_id);
       rows.push({
         ...e,
+        group_id: groupId,
         entry_id: e.project_event_id,
         project_event_id: e.project_event_id,
         proyecto_id: e.project_id,
-        disciplina_id: task.group_id ? this.taskKey(task) : ((e.group_id || '') + '::' + (e.task_name || '')),
+        disciplina_id: task.group_id ? this.taskKey(task) : this.canonicalTaskKey(`${groupId}::${e.task_name || ''}`),
         tipo_entry: 'evento',
         hito_id: e.event_name,
-        fecha_real: e.event_date,
+        fecha_real: this.isoDate(e.event_date),
         timestamp: e.event_datetime,
         nota: e.notes || '',
         arquitecto_id: e.registered_by,
@@ -1703,7 +1752,7 @@ const IS4TOptAdapter = {
         .map(k => {
           const [g, d] = k.split('::');
           const task = (this.bootstrap?.catalogs?.tasks || []).find(t =>
-            normalizeText(t.group_id) === normalizeText(g) &&
+            this.canonicalGroupId(t.group_id) === this.canonicalGroupId(g) &&
             normalizeText(t.task_name || t.title || '') === normalizeText(d)
           );
           return task ? task.task_catalog_id : '';
@@ -1723,6 +1772,7 @@ const IS4TOptAdapter = {
     }
 
     if (action === 'actualizarProyecto') {
+      const currentProject = state.currentProyecto || {};
       await this.raw('updateProject', {
         project_id: projectId,
         project_name: body.nombre,
@@ -1732,11 +1782,15 @@ const IS4TOptAdapter = {
         bubble_plan_applies: body.bubble_plan_aplica ?? body.bubble_plan,
         notes: body.notas
       });
-      if (body.estado) await this.raw('changeProjectStatus', { project_id: projectId, new_status: body.estado });
-      if (body.arquitecto_id) {
+      if (body.estado && body.estado !== currentProject.estado) {
+        await this.raw('changeProjectStatus', { project_id: projectId, new_status: body.estado });
+      }
+      const nextArchitectId = body.arquitecto_id ? this.userIdFromEmailOrId(body.arquitecto_id) : '';
+      const currentArchitectId = currentProject.arquitecto_user_id || this.userIdFromEmailOrId(currentProject.arquitecto_id);
+      if (nextArchitectId && nextArchitectId !== currentArchitectId) {
         await this.raw('reassignArchitect', {
           project_id: projectId,
-          assigned_architect_user_id: this.userIdFromEmailOrId(body.arquitecto_id)
+          assigned_architect_user_id: nextArchitectId
         });
       }
       this.reset('project', projectId); this.reset('home');
@@ -1775,10 +1829,12 @@ const IS4TOptAdapter = {
         this.reset('project', projectId);
         return { entry_id: result.manual_task_event_id };
       }
-      if (body.tipo_entry === 'hito_alcanzado') return { ok: true };
+      if (body.tipo_entry === 'hito_alcanzado') {
+        throw new Error('Los hitos se actualizan únicamente por el motor de fechas y eventos del servidor');
+      }
       result = await this.raw('addProjectEvent', {
         ...projectBody(),
-        group_id: body.grupo_id || (body.disciplina_id || '').split('::')[0],
+        group_id: this.canonicalGroupId(body.grupo_id || (body.disciplina_id || '').split('::')[0]),
         task_name: (body.disciplina_id || '').split('::')[1] || body.disciplina_nombre || '',
         event_name: body.hito_id || body.evento_nombre,
         event_date: body.fecha_real || todayISO(),
@@ -1792,7 +1848,10 @@ const IS4TOptAdapter = {
     if (action === 'editarLogEvento') {
       const entry = (state.logEventos || []).find(e => e.entry_id === body.entry_id);
       if (entry?.tipo_entry === 'tarea_evento') {
-        return { ok: true, warning: 'Edición de evento de Tarea de Proyecto no soportada por AS v1.0.2' };
+        throw new Error('La edición de eventos de Tarea de Proyecto no está disponible en Fase 1; no se guardó ningún cambio');
+      }
+      if (entry?.tipo_entry === 'evergreen_evento') {
+        throw new Error('La edición de eventos de Backlog no está disponible en Fase 1; no se guardó ningún cambio');
       }
       result = await this.raw('editProjectEvent', {
         project_id: projectId,
@@ -1895,7 +1954,7 @@ const IS4TOptAdapter = {
         title: body.title || body.titulo || '',
         note_type: body.note_type || body.tipo || 'General',
         description: body.description || body.contenido || '',
-        group_id: body.group_id || body.disc_ref || ''
+        group_id: this.canonicalGroupId(String(body.group_id || body.disc_ref || '').split('::')[0])
       });
       const pid = body.project_id || projectId;
       if (pid) this.reset('project', pid);
@@ -2067,6 +2126,14 @@ function statusToNew(status) {
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
+}
+
+function dateToISO(date) {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 // ── AUTH — Google Identity Services ──
@@ -2471,7 +2538,7 @@ function renderDashboard() {
           ${p.clave_innovasport ? `<div class="meta-item"><span class="label">Clave&nbsp;</span>${p.clave_innovasport}</div>` : ''}
           <div class="meta-item"><span class="label">Tipo&nbsp;</span>${p.tipo_proyecto || '—'}</div>
           <div class="meta-item"><span class="label">Aprobación&nbsp;</span>${formatDate(p.fecha_aprobacion)}</div>
-          <div class="meta-item"><span class="label">Entrega est.&nbsp;</span>${calcFechaEntrega(p.fecha_aprobacion)}</div>
+          <div class="meta-item"><span class="label">Entrega est.&nbsp;</span>${p.fecha_entrega ? formatDate(p.fecha_entrega) : calcFechaEntrega(p.fecha_aprobacion)}</div>
           ${p.arquitecto_id ? `<div class="meta-item"><span class="label">Arq.&nbsp;</span>${(state.usuarios.find(u => u.email === p.arquitecto_id)?.nombre) || p.arquitecto_id}</div>` : ''}
         </div>
       </div>
@@ -2799,7 +2866,7 @@ async function openProyecto(proyectoId) {
 
     document.getElementById('detail-title').textContent = p.nombre;
     document.getElementById('detail-meta').textContent =
-      `${p.clave_innovasport ? p.clave_innovasport + ' · ' : ''}${p.tipo_proyecto || '—'} · Aprobación: ${formatDate(p.fecha_aprobacion)} · Entrega estimada: ${calcFechaEntrega(p.fecha_aprobacion)}`;
+      `${p.clave_innovasport ? p.clave_innovasport + ' · ' : ''}${p.tipo_proyecto || '—'} · Aprobación: ${formatDate(p.fecha_aprobacion)} · Entrega estimada: ${p.fecha_entrega ? formatDate(p.fecha_entrega) : calcFechaEntrega(p.fecha_aprobacion)}`;
 
     document.getElementById('detail-scoreboard').innerHTML = renderScoreboard(proyectoId, true);
     renderGroups(p);
@@ -2808,7 +2875,7 @@ async function openProyecto(proyectoId) {
     document.getElementById('detail-tareas').innerHTML = renderTareasAdhoc(p);
 
     showView('proyecto-detail');
-    // Hitos se evalua server-side en AS v1.0.2.
+    // Hitos se evalua server-side en AS v1.1.0.
 
   } finally {
     proyectoEnAperturaId = null;
@@ -2827,7 +2894,7 @@ async function refreshProyectoDetalle(estadoPaneles = null) {
 
 function showView(view) {
   if (view === 'criterios') {
-    showToast('Criterios del Programa no est\u00e1 disponible en IS4T-Opt v1.0.0', 'info');
+    showToast('Criterios del Programa no est\u00e1 disponible en IS4T-Opt v1.1.0', 'info');
     view = 'dashboard';
   }
   const fab = document.getElementById('fab-buscar');
@@ -3070,7 +3137,7 @@ function renderDisciplina(proyecto, grupo, disciplina, log) {
               </div>
               ${(() => {
                 const esVoboAR = e.tipo_entry === 'vobo_ar';
-                const esTareaVoboAR = ['G11::Iluminación','G6::HVAC'].includes(e.disciplina_id);
+                const esTareaVoboAR = ['G11::Iluminación','G06::HVAC'].includes(e.disciplina_id);
                 const puedeEditar =
                   state.rol === 'PM' ||
                   (state.rol === 'Arquitecto' && !esVoboAR) ||
@@ -3155,13 +3222,13 @@ function openEntryForDisciplina(grupoId, disciplina) {
 
 // Mapa hito → disciplinas bloqueantes (para navegación desde dashboard)
 const HITO_DISCIPLINAS = {
-  'H02': [{ g:'G3', d:'Requerimientos Comercial' }, { g:'G3', d:'Requerimientos Operaciones' }],
-  'H08': [{ g:'G3', d:'Validación Módulos de Cobro' }, { g:'G3', d:'Validación Servicios en Tienda' }, { g:'G3', d:'Validación Caja Rotor' }, { g:'G3', d:'Validación C&R' }, { g:'G3', d:'Validación SFS' }],
-  'H22': [{ g:'G5', d:'Zonificación' }, { g:'G5', d:'Mueble de Gorras' }],
-  'H23': [{ g:'G6', d:'HVAC' }, { g:'G6', d:'Proyecto Eléctrico' }],
-  'H24': [{ g:'G7', d:'Pantallas' }, { g:'G7', d:'Antenas WiFi' }, { g:'G7', d:'Bocinas' }, { g:'G7', d:'Contador de Personas' }, { g:'G7', d:'Validación Contactos' }, { g:'G7', d:'Validación Voz y Datos' }, { g:'G7', d:'Validación Site' }, { g:'G7', d:'Validación Cámaras' }],
-  'H25': [{ g:'G8', d:'Cámaras de Seguridad' }, { g:'G8', d:'Antenas de Seguridad' }, { g:'G8', d:'Detección de Humos' }, { g:'G8', d:'Alarmas' }, { g:'G8', d:'Protección Contra Incendios' }, { g:'G8', d:'Lámparas de Emergencia' }, { g:'G8', d:'Señalética de Emergencia + Extintores' }, { g:'G8', d:'Alarma Sísmica' }],
-  'H26': [{ g:'G9', d:'Aromas' }, { g:'G9', d:'Validación Pantallas' }, { g:'G9', d:'Validación Bocinas' }],
+  'H02': [{ g:'G03', d:'Requerimientos Comercial' }, { g:'G03', d:'Requerimientos Operaciones' }],
+  'H08': [{ g:'G03', d:'Validación Módulos de Cobro' }, { g:'G03', d:'Validación Servicios en Tienda' }, { g:'G03', d:'Validación Caja Rotor' }, { g:'G03', d:'Validación C&R' }, { g:'G03', d:'Validación SFS' }],
+  'H22': [{ g:'G05', d:'Zonificación' }, { g:'G05', d:'Mueble de Gorras' }],
+  'H23': [{ g:'G06', d:'HVAC' }, { g:'G06', d:'Proyecto Eléctrico' }],
+  'H24': [{ g:'G07', d:'Pantallas' }, { g:'G07', d:'Antenas WiFi' }, { g:'G07', d:'Bocinas' }, { g:'G07', d:'Contador de Personas' }, { g:'G07', d:'Validación Contactos' }, { g:'G07', d:'Validación Voz y Datos' }, { g:'G07', d:'Validación Site' }, { g:'G07', d:'Validación Cámaras' }],
+  'H25': [{ g:'G08', d:'Cámaras de Seguridad' }, { g:'G08', d:'Antenas de Seguridad' }, { g:'G08', d:'Detección de Humos' }, { g:'G08', d:'Alarmas' }, { g:'G08', d:'Protección Contra Incendios' }, { g:'G08', d:'Lámparas de Emergencia' }, { g:'G08', d:'Señalética de Emergencia + Extintores' }, { g:'G08', d:'Alarma Sísmica' }],
+  'H26': [{ g:'G09', d:'Aromas' }, { g:'G09', d:'Validación Pantallas' }, { g:'G09', d:'Validación Bocinas' }],
   'H27': [{ g:'G10', d:'Caminadora' }, { g:'G10', d:'Mueble de Servicios' }],
   'H28': [{ g:'G11', d:'Iluminación' }, { g:'G11', d:'Estantería' }, { g:'G11', d:'Mezzanine' }],
   'H29': [{ g:'G12', d:'Insumos' }],
@@ -3171,51 +3238,62 @@ const HITO_DISCIPLINAS = {
 // Mapa disciplina → hitos que se "abren" si esa disciplina recibe un cambio
 // Formato: 'GRUPO_ID::DISCIPLINA_NOMBRE' → [hitoIds]
 const DISCIPLINA_HITOS = {
-  'G2::Plano de Conjunto':           ['H04','H09','H11'],
-  'G2::Huella del Local':            ['H04','H09','H11'],
-  'G2::Fachada':                     ['H04','H09','H11'],
-  'G2::Manual de Adaptaciones':      ['H04','H09','H11'],
-  'G2::Levantamiento':               ['H04','H09','H11'],
-  'G2::Reporte de Levantamiento':    ['H05','H09','H11'],
-  'G3::Requerimientos Comercial':    ['H07','H09','H11'],
-  'G3::Requerimientos Operaciones':  ['H07','H09','H11'],
-  'G3::Validación Módulos de Cobro': ['H08','H09','H11'],
-  'G3::Validación Servicios en Tienda':['H08','H09','H11'],
-  'G3::Validación Caja Rotor':       ['H08','H09','H11'],
-  'G3::Validación C&R':              ['H08','H09','H11'],
-  'G3::Validación SFS':              ['H08','H09','H11'],
-  'G4::Validación de Dirección':     ['H09'],
-  'G4::Proyecto Arquitectónico':     ['H13'],
-  'G4::Layout - Validación de Dirección': ['H09'],
-  'G5::Zonificación':                ['H22'],
-  'G5::Mueble de Gorras':            ['H22'],
-  'G6::HVAC':                        ['H23','H30','H34'],
-  'G6::Proyecto Eléctrico':          ['H23','H30','H34'],
-  'G7::Pantallas':                   ['H24','H31','H34'],
-  'G7::Antenas WiFi':                ['H24','H31','H34'],
-  'G7::Bocinas':                     ['H24','H31','H34'],
-  'G7::Contador de Personas':        ['H24','H31','H34'],
-  'G7::Validación Contactos':        ['H24','H31','H34'],
-  'G7::Validación Voz y Datos':      ['H24','H31','H34'],
-  'G7::Validación Site':             ['H24','H31','H34'],
-  'G7::Validación Cámaras':          ['H24','H31','H34'],
-  'G8::Cámaras de Seguridad':        ['H25','H32','H34'],
-  'G8::Antenas de Seguridad':        ['H25','H32','H34'],
-  'G8::Detección de Humos':          ['H25','H32','H34'],
-  'G8::Alarmas':                     ['H25','H32','H34'],
-  'G8::Protección Contra Incendios': ['H25','H32','H34'],
-  'G8::Lámparas de Emergencia':      ['H25','H32','H34'],
-  'G8::Señalética de Emergencia + Extintores': ['H25','H32','H34'],
-  'G8::Alarma Sísmica':              ['H25','H32','H34'],
-  'G9::Aromas':                      ['H26','H33','H34'],
-  'G9::Validación Pantallas':        ['H26','H33','H34'],
-  'G9::Validación Bocinas':          ['H26','H33','H34'],
+  'G01::Bubble Plan':                 ['H0B'],
+  'G02::Plano de Conjunto':           ['H04','H09','H11'],
+  'G02::Huella del Local':            ['H04','H09','H11'],
+  'G02::Fachada':                     ['H04','H09','H11'],
+  'G02::Manual de Adaptaciones':      ['H04','H09','H11'],
+  'G02::Levantamiento':               ['H04','H09','H11'],
+  'G02::Reporte de Levantamiento':    ['H05','H09','H11'],
+  'G03::Requerimientos Comercial':    ['H07','H09','H11'],
+  'G03::Requerimientos Operaciones':  ['H07','H09','H11'],
+  'G03::Validación Módulos de Cobro': ['H08','H09','H11'],
+  'G03::Validación Servicios en Tienda':['H08','H09','H11'],
+  'G03::Validación Caja Rotor':       ['H08','H09','H11'],
+  'G03::Validación C&R':              ['H08','H09','H11'],
+  'G03::Validación SFS':              ['H08','H09','H11'],
+  'G04::Validación de Dirección':     ['H09'],
+  'G04::Proyecto Arquitectónico':     ['H13'],
+  'G04::Layout - Validación de Dirección': ['H09'],
+  'G04::Fachada - Validación de Dirección': ['H10'],
+  'G04::Layout - Validación Operaciones + Comercial': ['H11'],
+  'G05::Zonificación':                ['H22'],
+  'G05::Mueble de Gorras':            ['H22'],
+  'G06::HVAC':                        ['H23','H30','H34'],
+  'G06::Proyecto Eléctrico':          ['H23','H30','H34'],
+  'G07::Pantallas':                   ['H24','H31','H34'],
+  'G07::Antenas WiFi':                ['H24','H31','H34'],
+  'G07::Bocinas':                     ['H24','H31','H34'],
+  'G07::Contador de Personas':        ['H24','H31','H34'],
+  'G07::Validación Contactos':        ['H24','H31','H34'],
+  'G07::Validación Voz y Datos':      ['H24','H31','H34'],
+  'G07::Validación Site':             ['H24','H31','H34'],
+  'G07::Validación Cámaras':          ['H24','H31','H34'],
+  'G07::Proyector Láser':             ['H24','H31','H34'],
+  'G08::Cámaras de Seguridad':        ['H25','H32','H34'],
+  'G08::Antenas de Seguridad':        ['H25','H32','H34'],
+  'G08::Detección de Humos':          ['H25','H32','H34'],
+  'G08::Alarmas':                     ['H25','H32','H34'],
+  'G08::Protección Contra Incendios': ['H25','H32','H34'],
+  'G08::Lámparas de Emergencia':      ['H25','H32','H34'],
+  'G08::Señalética de Emergencia + Extintores': ['H25','H32','H34'],
+  'G08::Alarma Sísmica':              ['H25','H32','H34'],
+  'G08::Puerta de Emergencia':        ['H25','H32','H34'],
+  'G09::Aromas':                      ['H26','H33','H34'],
+  'G09::Validación Pantallas':        ['H26','H33','H34'],
+  'G09::Validación Bocinas':          ['H26','H33','H34'],
   'G10::Caminadora':                 ['H27'],
   'G10::Mueble de Servicios':        ['H27'],
   'G11::Iluminación':                ['H28'],
   'G11::Estantería':                 ['H28'],
   'G11::Mezzanine':                  ['H28'],
   'G12::Insumos':                    ['H29'],
+  'G13::Cruce General':              ['H34'],
+  'G14::Solicitud de Cotización':    ['H12'],
+  'G14::Definición de Proveedor':    ['H13'],
+  'G14::Arquitectónico Entrega N':   ['H13'],
+  'G14::Catálogo Entrega N':         ['H13'],
+  'G15::Ejecutivo Entrega N':        ['H36'],
   'G15::Proyecto Ejecutivo':         ['H15','H36'],
 };
 
@@ -3245,7 +3323,7 @@ function abrirInsights() {
   const p = state.currentProyecto;
   if (!p) return;
   document.getElementById('insights-title').textContent = p.nombre;
-  document.getElementById('insights-meta').textContent = `${p.clave_innovasport ? p.clave_innovasport + ' · ' : ''}${p.tipo_proyecto || '—'} · Aprobación: ${formatDate(p.fecha_aprobacion)} · Entrega est.: ${calcFechaEntrega(p.fecha_aprobacion)}`;
+  document.getElementById('insights-meta').textContent = `${p.clave_innovasport ? p.clave_innovasport + ' · ' : ''}${p.tipo_proyecto || '—'} · Aprobación: ${formatDate(p.fecha_aprobacion)} · Entrega est.: ${p.fecha_entrega ? formatDate(p.fecha_entrega) : calcFechaEntrega(p.fecha_aprobacion)}`;
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById('view-insights').classList.add('active');
   document.getElementById('fab-buscar')?.classList.remove('visible');
@@ -3253,35 +3331,35 @@ function abrirInsights() {
 }
 
 // ── RUTA CRÍTICA ──
-const RC_IDS = new Set(['G4','G6','G13','G14','G15']);
-const SLACK_IDS = new Set(['G5','G7','G8','G9']);
+const RC_IDS = new Set(['G04','G06','G13','G14','G15']);
+const SLACK_IDS = new Set(['G05','G07','G08','G09']);
 
 // ── VISTAS DE AGRUPACIÓN ──
 const INS_VISTAS = {
   A:[
-    {label:'Inputs',    ids:['G0','G1','G2','G3']},
-    {label:'Diseño',    ids:['G4']},
-    {label:'Int / Ext', ids:['G5','G6','G7','G8','G9','G10','G11','G12']},
+    {label:'Inputs',    ids:['G01','G02','G03']},
+    {label:'Diseño',    ids:['G04']},
+    {label:'Int / Ext', ids:['G05','G06','G07','G08','G09','G10','G11','G12']},
     {label:'Cruces',    ids:['G13']},
     {label:'Entregas',  ids:['G14','G15']},
   ],
   B:[
-    {label:'Interno Store Planning',   ids:['G1','G4','G13']},
-    {label:'Validadores',              ids:['G0','G2','G3']},
-    {label:'Mobiliario',               ids:['G5']},
-    {label:'Instalaciones',            ids:['G6']},
-    {label:'Redes y sistemas',         ids:['G7']},
-    {label:'Prevención',               ids:['G8']},
-    {label:'Marketing sensorial',      ids:['G9']},
+    {label:'Interno Store Planning',   ids:['G01','G04','G13']},
+    {label:'Validadores',              ids:['G02','G03']},
+    {label:'Mobiliario',               ids:['G05']},
+    {label:'Instalaciones',            ids:['G06']},
+    {label:'Redes y sistemas',         ids:['G07']},
+    {label:'Prevención',               ids:['G08']},
+    {label:'Marketing sensorial',      ids:['G09']},
     {label:'Excelencia operativa',     ids:['G10']},
     {label:'Precios unitarios',        ids:['G11']},
     {label:'Control de proyectos',     ids:['G12']},
     {label:'Proveedor arquitectónico', ids:['G14','G15']},
   ],
   C:[
-    {label:'Ruta crítica', ids:['G4','G6','G13','G14','G15'], tipo:'critica'},
-    {label:'Con slack',    ids:['G5','G7','G8','G9'],         tipo:'slack'},
-    {label:'De soporte',   ids:['G0','G1','G2','G3','G10','G11','G12'], tipo:'soporte'},
+    {label:'Ruta crítica', ids:['G04','G06','G13','G14','G15'], tipo:'critica'},
+    {label:'Con slack',    ids:['G05','G07','G08','G09'],         tipo:'slack'},
+    {label:'De soporte',   ids:['G01','G02','G03','G10','G11','G12'], tipo:'soporte'},
   ],
 };
 
@@ -3695,11 +3773,11 @@ function buildDisciplinasChecklist() {
   state.disciplinasSeleccionadas = new Set();
   Object.entries(grupos).forEach(([gid, g]) => {
     [...g.disciplinas].forEach(d => {
-      if (gid === 'G1') return; // G1 lo controla el toggle — no se auto-selecciona
+      if (gid === 'G01') return; // G1 lo controla el toggle — no se auto-selecciona
       state.disciplinasSeleccionadas.add(`${gid}::${d}`);
     });
   });
-  if (state.bubblePlan) state.disciplinasSeleccionadas.add('G1::Bubble Plan');
+  if (state.bubblePlan) state.disciplinasSeleccionadas.add('G01::Bubble Plan');
 
   document.getElementById('disciplinas-checklist').innerHTML = `
     <div style="display:flex;gap:8px;margin-bottom:12px">
@@ -3734,8 +3812,8 @@ function selectAllDisciplinas() {
   });
   state.bubblePlan = true;
   document.getElementById('toggle-bubble').classList.add('on');
-  state.disciplinasSeleccionadas.add('G1::Bubble Plan');
-  document.getElementById('chip_G1_Bubble_Plan')?.classList.add('selected');
+  state.disciplinasSeleccionadas.add('G01::Bubble Plan');
+  document.getElementById('chip_G01_Bubble_Plan')?.classList.add('selected');
 }
 
 function deselectAllDisciplinas() {
@@ -3749,14 +3827,14 @@ function toggleDisciplina(gid, d, cid) {
   if (state.disciplinasSeleccionadas.has(key)) {
     state.disciplinasSeleccionadas.delete(key);
     chip.classList.remove('selected');
-    if (gid === 'G1' && d === 'Bubble Plan') {
+    if (gid === 'G01' && d === 'Bubble Plan') {
       state.bubblePlan = false;
       document.getElementById('toggle-bubble').classList.remove('on');
     }
   } else {
     state.disciplinasSeleccionadas.add(key);
     chip.classList.add('selected');
-    if (gid === 'G1' && d === 'Bubble Plan') {
+    if (gid === 'G01' && d === 'Bubble Plan') {
       state.bubblePlan = true;
       document.getElementById('toggle-bubble').classList.add('on');
     }
@@ -3766,11 +3844,11 @@ function toggleDisciplina(gid, d, cid) {
 function toggleBubblePlan() {
   state.bubblePlan = !state.bubblePlan;
   document.getElementById('toggle-bubble').classList.toggle('on', state.bubblePlan);
-  const cid = 'chip_G1_Bubble_Plan';
+  const cid = 'chip_G01_Bubble_Plan';
   const chip = document.getElementById(cid);
   if (chip) {
-    if (state.bubblePlan) { chip.classList.add('selected'); state.disciplinasSeleccionadas.add('G1::Bubble Plan'); }
-    else { chip.classList.remove('selected'); state.disciplinasSeleccionadas.delete('G1::Bubble Plan'); }
+    if (state.bubblePlan) { chip.classList.add('selected'); state.disciplinasSeleccionadas.add('G01::Bubble Plan'); }
+    else { chip.classList.remove('selected'); state.disciplinasSeleccionadas.delete('G01::Bubble Plan'); }
   }
 }
 
@@ -3985,8 +4063,8 @@ function updateDisciplinas() {
 }
 
 const VOBO_AREA_LABEL = {
-  'G5': 'Mobiliario', 'G6': 'Instalaciones', 'G7': 'Redes / Sistemas',
-  'G8': 'Prevención', 'G9': 'Mkt Sensorial', 'G10': 'Excelencia Operativa',
+  'G05': 'Mobiliario', 'G06': 'Instalaciones', 'G07': 'Redes / Sistemas',
+  'G08': 'Prevención', 'G09': 'Mkt Sensorial', 'G10': 'Excelencia Operativa',
   'G11': 'Precios Unitarios', 'G14': 'SP'
 };
 
@@ -4384,7 +4462,7 @@ async function guardarEntry() {
     }
     closeModal('modal-entry');
     showToast('Evento registrado', 'success');
-    // Hitos se evalua server-side en AS v1.0.2.
+    // Hitos se evalua server-side en AS v1.1.0.
 await refreshProyectoDetalle(estadoPaneles);
   } catch(e) { stopSaving(false); showToast('Error: ' + e.message, 'error'); await restoreModalSnapshot(); }
   finally { btn.disabled = false; btn.textContent = 'Guardar Evento'; }
@@ -4392,7 +4470,7 @@ await refreshProyectoDetalle(estadoPaneles);
 
 // ── EVALUACIÓN DE HITOS ──
 async function evaluarHitos(proyectoId, logOverride) {
-  // IS4T-Opt v1.0.0: la evaluación y escritura de hitos vive server-side en AS v1.0.2.
+  // IS4T-Opt v1.1.0: la evaluación y escritura de hitos vive server-side en AS v1.1.0.
   return [];
   const log = (logOverride || state.logEventos).filter(e => e.proyecto_id === proyectoId);
 
@@ -4465,11 +4543,11 @@ async function evaluarHitos(proyectoId, logOverride) {
       }
       return true; // nunca alcanzado — disparar
     },
-    'H22': () => todasCierran('G5', ['Zonificación','Mueble de Gorras']),
-    'H23': () => todasCierran('G6', ['HVAC','Proyecto Eléctrico']),
-    'H24': () => todasCierran('G7', ['Pantallas','Antenas WiFi','Bocinas','Contador de Personas','Validación Contactos','Validación Voz y Datos','Validación Site','Validación Cámaras'].filter(d => tareaOpcionalAplica('G7', d))),
-    'H25': () => todasCierran('G8', state.eventosCatalogo.filter(e => e.grupo_id === 'G8').map(e => e.disciplina_nombre).filter((v,i,a) => a.indexOf(v) === i).filter(d => tareaOpcionalAplica('G8', d))),
-    'H26': () => todasCierran('G9', ['Aromas','Validación Pantallas','Validación Bocinas']),
+    'H22': () => todasCierran('G05', ['Zonificación','Mueble de Gorras']),
+    'H23': () => todasCierran('G06', ['HVAC','Proyecto Eléctrico']),
+    'H24': () => todasCierran('G07', ['Pantallas','Antenas WiFi','Bocinas','Contador de Personas','Validación Contactos','Validación Voz y Datos','Validación Site','Validación Cámaras'].filter(d => tareaOpcionalAplica('G07', d))),
+    'H25': () => todasCierran('G08', state.eventosCatalogo.filter(e => e.grupo_id === 'G08').map(e => e.disciplina_nombre).filter((v,i,a) => a.indexOf(v) === i).filter(d => tareaOpcionalAplica('G08', d))),
+    'H26': () => todasCierran('G09', ['Aromas','Validación Pantallas','Validación Bocinas']),
     'H27': () => todasCierran('G10', ['Caminadora','Mueble de Servicios']),
     'H28': () => todasCierran('G11', state.eventosCatalogo.filter(e => e.grupo_id === 'G11').map(e => e.disciplina_nombre).filter((v,i,a) => a.indexOf(v) === i)),
     'H29': () => tieneCierre('G12', 'Insumos'),
@@ -5487,7 +5565,7 @@ function renderCriteriosList() {
 }
 
 function openNuevoCriterio() {
-  showToast('Criterios del Programa no est\u00e1 disponible en IS4T-Opt v1.0.0', 'info');
+  showToast('Criterios del Programa no est\u00e1 disponible en IS4T-Opt v1.1.0', 'info');
   return;
   document.getElementById('c-descripcion').value = '';
   document.getElementById('c-concepto').value = '';
@@ -5498,7 +5576,7 @@ function openNuevoCriterio() {
 }
 
 async function guardarCriterio() {
-  showToast('Criterios del Programa no est\u00e1 disponible en IS4T-Opt v1.0.0', 'info');
+  showToast('Criterios del Programa no est\u00e1 disponible en IS4T-Opt v1.1.0', 'info');
   return;
   const desc = document.getElementById('c-descripcion').value.trim();
   if (!desc) { showToast('La descripción es requerida', 'error'); return; }
@@ -5517,21 +5595,21 @@ async function guardarCriterio() {
 }
 
 async function aprobarCriterio(id) {
-  showToast('Criterios del Programa no est\u00e1 disponible en IS4T-Opt v1.0.0', 'info');
+  showToast('Criterios del Programa no est\u00e1 disponible en IS4T-Opt v1.1.0', 'info');
   return;
   startSaving();
   try { await api('criteriosDisabled', { criterio_id: id }); stopSaving(true); showToast('Criterio aprobado', 'success'); await loadCriteriosData(); renderCriteriosList(); renderCriteriosBanner(); }
   catch(e) { stopSaving(false); showToast('Error: ' + e.message, 'error'); }
 }
 async function confirmarLectura(id) {
-  showToast('Criterios del Programa no est\u00e1 disponible en IS4T-Opt v1.0.0', 'info');
+  showToast('Criterios del Programa no est\u00e1 disponible en IS4T-Opt v1.1.0', 'info');
   return;
   startSaving();
   try { await api('criteriosDisabled', { criterio_id: id }); stopSaving(true); showToast('Lectura confirmada', 'success'); await loadCriteriosData(); renderCriteriosList(); renderCriteriosBanner(); }
   catch(e) { stopSaving(false); showToast('Error: ' + e.message, 'error'); }
 }
 function rechazarCriterio(id) {
-  showToast('Criterios del Programa no est\u00e1 disponible en IS4T-Opt v1.0.0', 'info');
+  showToast('Criterios del Programa no est\u00e1 disponible en IS4T-Opt v1.1.0', 'info');
   return;
   confirmarBorrado({
     titulo: 'Rechazar criterio',
@@ -5550,7 +5628,7 @@ function rechazarCriterio(id) {
 }
 
 function obsoletarCriterio(id) {
-  showToast('Criterios del Programa no est\u00e1 disponible en IS4T-Opt v1.0.0', 'info');
+  showToast('Criterios del Programa no est\u00e1 disponible en IS4T-Opt v1.1.0', 'info');
   return;
   confirmarBorrado({
     titulo: 'Obsoletizar criterio',
@@ -5642,176 +5720,82 @@ const HITOS_TIMELINE = [
 
 function renderTimeline(proyecto) {
   const bundle = IS4TOptAdapter.projectBundles[proyecto.proyecto_id];
-  const bundleMilestones = bundle?.milestones || [];
-  if (bundleMilestones.length > 0) {
-    const statusClass = status => {
-      const s = normalizeText(status || '');
-      if (s === 'completado' || s === 'completada') return 'completado';
-      if (s === 'afectado') return 'en-riesgo';
-      if (s === 'retrasado' || s === 'vencido') return 'retrasado';
-      return 'pendiente';
-    };
-    const dateValue = (...values) => {
-      const val = values.find(v => v !== undefined && v !== null && String(v).trim() !== '');
-      return val ? formatDate(String(val).split('T')[0]) : '<span style="color:var(--text3)">—</span>';
-    };
-    const rows = bundleMilestones
-      .slice()
-      .sort((a,b) => {
-        const ao = Number(a.sort_order || a.milestone_order || 0);
-        const bo = Number(b.sort_order || b.milestone_order || 0);
-        if (ao || bo) return ao - bo;
-        return String(a.milestone_catalog_id || '').localeCompare(String(b.milestone_catalog_id || ''));
-      })
-      .map(m => {
-        const id = m.milestone_catalog_id || m.milestone_id || m.project_milestone_id || '—';
-        const name = m.milestone_name || m.name || m.title || id;
-        const planned = dateValue(m.baseline_date, m.planned_date);
-        const current = dateValue(m.current_target_date, m.current_date, m.target_date);
-        const actual = dateValue(m.actual_date, m.completed_at);
-        const status = m.status || 'Pendiente';
-        return `
-        <div class="timeline-row">
-          <div class="timeline-hito-id">${id}</div>
-          <div class="timeline-hito-nombre">${name}</div>
-          <div class="timeline-fecha">${planned}</div>
-          <div class="timeline-fecha">${current} / ${actual}</div>
-          <div class="timeline-estado ${statusClass(status)}">${status}</div>
-        </div>`;
-      });
-    return `
-    <div class="timeline-section">
-      <div class="timeline-header" id="timeline-toggle" onclick="toggleTimeline()">
-        <div style="display:flex;align-items:center;gap:10px">
-          <span style="font-size:10px;color:var(--text3);transition:transform 0.15s" id="timeline-chevron">▶</span>
-          <span class="section-title" style="margin:0">Hitos del Proyecto</span>
-          <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${rows.length}</span>
-        </div>
-      </div>
-      <div class="timeline-body" id="timeline-body">
-      <div>
-        <div class="timeline-row header">
-          <div class="col-header">Hito</div>
-          <div class="col-header">Nombre</div>
-          <div class="col-header">Planeada</div>
-          <div class="col-header">Actual / real</div>
-          <div class="col-header">Estado</div>
-        </div>
-        ${rows.join('')}
-      </div>
-      </div>
-    </div>`;
-  }
-  if (!proyecto.fecha_aprobacion) return '<div style="color:var(--text3);font-family:var(--mono);font-size:12px;padding:12px 0">Sin fecha de aprobación — no se puede calcular el timeline.</div>';
-  const base = parseISODate(proyecto.fecha_aprobacion);
-  if (!base) return '';
-  const hoy = new Date();
-  const log = state.logEventos.filter(e => e.proyecto_id === proyecto.proyecto_id);
+  let milestones = (bundle?.milestones || []).slice();
 
-  // Helper: días hábiles entre dos fechas (positivo = retraso, negativo = anticipación)
+  // Fallback de presentación para proyectos antiguos sin hitos instanciados.
+  // La identidad persistida sigue viviendo únicamente en project_milestones.
+  if (!milestones.length) {
+    const base = parseISODate(proyecto.fecha_aprobacion);
+    if (!base) return '<div style="color:var(--text3);font-family:var(--mono);font-size:12px;padding:12px 0">Sin fecha de aprobación — no se puede calcular el timeline.</div>';
+    const log = state.logEventos.filter(e => e.proyecto_id === proyecto.proyecto_id && e.tipo_entry === 'hito_alcanzado');
+    milestones = HITOS_TIMELINE.map((h, index) => {
+      const reached = log.find(e => e.hito_id === h.id);
+      return {
+        milestone_catalog_id: h.id,
+        milestone_name: h.nombre,
+        current_target_date: h.offset === null ? '' : dateToISO(addBusinessDays(base, h.offset)),
+        actual_date: reached?.fecha_real || '',
+        status: reached ? 'Completado' : 'Pendiente',
+        sort_order: index + 1
+      };
+    });
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const emptyDate = '<span style="color:var(--text3)">—</span>';
+
   function diffBusinessDays(dateA, dateB) {
-    let d = new Date(Math.min(dateA, dateB));
+    let cursor = new Date(Math.min(dateA, dateB));
     const end = new Date(Math.max(dateA, dateB));
     let count = 0;
-    while (d < end) {
-      d.setDate(d.getDate() + 1);
-      if (d.getDay() !== 0 && d.getDay() !== 6) count++;
+    while (cursor < end) {
+      cursor.setDate(cursor.getDate() + 1);
+      if (cursor.getDay() !== 0 && cursor.getDay() !== 6) count++;
     }
     return dateA <= dateB ? count : -count;
   }
 
-  // Helper: color semáforo para hito no alcanzado según días hábiles restantes
-  function colorProximidad(diasRestantes) {
-    if (diasRestantes === null) return 'var(--text3)';
-    if (diasRestantes < 0) return 'var(--red)';   // vencido
-    if (diasRestantes <= 3) return 'var(--red)';
-    if (diasRestantes <= 10) return 'var(--yellow)';
-    return 'var(--text3)';
+  function timelineState(milestone, plannedDate, actualDate) {
+    if (actualDate) return { label:'completado', css:'completado' };
+    if (plannedDate && plannedDate < today) return { label:'vencido', css:'retrasado' };
+    const sourceStatus = normalizeText(milestone.status || '');
+    const remaining = plannedDate ? diffBusinessDays(today, plannedDate) : null;
+    if (sourceStatus === 'afectado' || (remaining !== null && remaining >= 0 && remaining <= 10)) {
+      return { label:'en riesgo', css:'en-riesgo' };
+    }
+    return { label:'pendiente', css:'pendiente' };
   }
 
-  // Construir filas — un hito puede tener múltiples instancias (v1, v2...)
-  const rows = [];
+  const rows = milestones
+    .sort((a, b) => {
+      const ao = Number(a.sort_order || a.milestone_order || 0);
+      const bo = Number(b.sort_order || b.milestone_order || 0);
+      if (ao || bo) return ao - bo;
+      return String(a.milestone_catalog_id || '').localeCompare(String(b.milestone_catalog_id || ''));
+    })
+    .map(m => {
+      const id = m.milestone_catalog_id || m.milestone_id || m.project_milestone_id || '—';
+      const name = m.milestone_name || m.name || m.title || id;
+      const plannedRaw = IS4TOptAdapter.isoDate(m.current_target_date);
+      const actualRaw = IS4TOptAdapter.isoDate(m.actual_date);
+      const plannedDate = plannedRaw ? parseISODate(plannedRaw) : null;
+      const actualDate = actualRaw ? parseISODate(actualRaw) : null;
+      const stateInfo = timelineState(m, plannedDate, actualDate);
+      const delta = plannedDate && actualDate ? diffBusinessDays(plannedDate, actualDate) : null;
+      const deltaLabel = delta === null ? emptyDate : `${delta > 0 ? '+' : ''}${delta}d`;
+      const deltaColor = delta === null ? 'var(--text3)' : delta > 0 ? 'var(--red)' : delta < 0 ? 'var(--green)' : 'var(--text2)';
 
-  HITOS_TIMELINE.forEach(h => {
-    const alcances = log
-      .filter(e => e.hito_id === h.id && e.tipo_entry === 'hito_alcanzado')
-      .sort((a, b) => {
-        const ta = a.timestamp ? new Date(a.timestamp) : new Date(a.fecha_real + 'T12:00:00Z');
-        const tb = b.timestamp ? new Date(b.timestamp) : new Date(b.fecha_real + 'T12:00:00Z');
-        return ta - tb;
-      });
-
-    const totalVersiones = alcances.length;
-    const fechaEsperada = h.offset !== null ? addBusinessDays(base, h.offset) : null;
-
-    if (totalVersiones === 0) {
-      // Hito no alcanzado — una sola fila
-      const retrasado = fechaEsperada && fechaEsperada < hoy;
-      const diasRestantes = fechaEsperada ? diffBusinessDays(hoy, fechaEsperada) : null;
-      const enRiesgo = !retrasado && fechaEsperada && diasRestantes !== null && diasRestantes <= 10;
-      const estadoLabel = retrasado ? 'retrasado' : enRiesgo ? 'en riesgo' : 'pendiente';
-      const estadoClass = retrasado ? 'retrasado' : enRiesgo ? 'en-riesgo' : 'pendiente';
-      const colorFecha = colorProximidad(retrasado ? -1 : diasRestantes);
-      const contadorLabel = diasRestantes !== null
-        ? (retrasado
-            ? `+${Math.abs(diasRestantes)}d`
-            : diasRestantes === 0 ? '0d' : `-${diasRestantes}d`)
-        : '';
-
-      rows.push(`
+      return `
       <div class="timeline-row">
-        <div class="timeline-hito-id">${h.id}</div>
-        <div class="timeline-hito-nombre">${h.nombre}</div>
-        <div class="timeline-fecha">${fechaEsperada ? formatDate(fechaEsperada) : '<span style="color:var(--text3)">variable</span>'}</div>
-        <div class="timeline-fecha" style="color:${colorFecha}">— ${contadorLabel ? '(' + contadorLabel + ')' : ''}</div>
-        <div class="timeline-estado ${estadoClass}">${estadoLabel}</div>
-      </div>`);
-
-    } else {
-      // Una o más instancias alcanzadas
-      alcances.forEach((alcance, idx) => {
-        const version = totalVersiones > 1 ? idx + 1 : null;
-        const nombreConVersion = version ? `${h.nombre} v${version}` : h.nombre;
-        const esV1 = idx === 0;
-
-        // Fecha esperada: solo v1
-        const fechaEsperadaDisplay = esV1 && fechaEsperada
-          ? formatDate(fechaEsperada)
-          : '<span style="color:var(--text3)">N/A</span>';
-
-        // Fecha real de alcance
-        const fechaAlcanceRaw = alcance.fecha_real;
-        const fechaAlcance = fechaAlcanceRaw ? parseISODate(fechaAlcanceRaw) : null;
-
-        // Contador y color — solo v1 con fecha esperada
-        let fechaRealDisplay = '—';
-        if (fechaAlcance) {
-          if (esV1 && fechaEsperada) {
-            const diff = diffBusinessDays(fechaEsperada, fechaAlcance);
-            const anticipacion = diff < 0;
-            const puntual = diff === 0;
-            const color = anticipacion ? 'var(--green)' : puntual ? 'var(--text)' : 'var(--red)';
-            const signo = anticipacion ? '' : diff > 0 ? '+' : '';
-            fechaRealDisplay = `<span style="color:${color}">${formatDate(fechaAlcance)} (${signo}${diff}d)</span>`;
-          } else {
-            // v2+ — solo fecha, sin contador
-            fechaRealDisplay = `<span style="color:var(--text2)">${formatDate(fechaAlcance)}</span>`;
-          }
-        }
-
-        rows.push(`
-        <div class="timeline-row">
-          <div class="timeline-hito-id">${h.id}</div>
-          <div class="timeline-hito-nombre">${nombreConVersion}</div>
-          <div class="timeline-fecha">${fechaEsperadaDisplay}</div>
-          <div class="timeline-fecha">${fechaRealDisplay}</div>
-          <div class="timeline-estado completado">completado</div>
-        </div>`);
-      });
-    }
-  });
-
-  const totalFilas = rows.length;
+        <div class="timeline-hito-id">${id}</div>
+        <div class="timeline-hito-nombre">${name}</div>
+        <div class="timeline-fecha">${plannedDate ? formatDate(plannedRaw) : emptyDate}</div>
+        <div class="timeline-fecha">${actualDate ? formatDate(actualRaw) : emptyDate}</div>
+        <div class="timeline-fecha" style="color:${deltaColor}">${deltaLabel}</div>
+        <div class="timeline-estado ${stateInfo.css}">${stateInfo.label}</div>
+      </div>`;
+    });
 
   return `
   <div class="timeline-section">
@@ -5819,16 +5803,17 @@ function renderTimeline(proyecto) {
       <div style="display:flex;align-items:center;gap:10px">
         <span style="font-size:10px;color:var(--text3);transition:transform 0.15s" id="timeline-chevron">▶</span>
         <span class="section-title" style="margin:0">Hitos del Proyecto</span>
-        <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${totalFilas}</span>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${rows.length}</span>
       </div>
     </div>
     <div class="timeline-body" id="timeline-body">
     <div>
       <div class="timeline-row header">
         <div class="col-header">Hito</div>
-        <div class="col-header">Descripción</div>
-        <div class="col-header">Fecha esperada</div>
-        <div class="col-header">Fecha real</div>
+        <div class="col-header">Nombre</div>
+        <div class="col-header">Planeada</div>
+        <div class="col-header">Real</div>
+        <div class="col-header">Delta</div>
         <div class="col-header">Estado</div>
       </div>
       ${rows.join('')}
@@ -5921,15 +5906,15 @@ function getDisciplinasGrupo(gid) {
 }
 const TAREAS_OPCIONALES_MAP = {
   alarma_sismica: {
-    groupIds: ['G8', 'G08'],
+    groupIds: ['G08'],
     taskName: 'Alarma Sísmica'
   },
   puerta_emergencia: {
-    groupIds: ['G8', 'G08'],
+    groupIds: ['G08'],
     taskName: 'Puerta de Emergencia'
   },
   proyector_laser: {
-    groupIds: ['G7', 'G07'],
+    groupIds: ['G07'],
     taskName: 'Proyector Láser'
   }
 };
@@ -5939,9 +5924,7 @@ function boolTrue(value) {
 }
 
 function normalizarGrupoId(id) {
-  const raw = (id || '').toString().trim().toUpperCase();
-  const m = raw.match(/^G0?(\d+)$/);
-  return m ? `G${parseInt(m[1], 10)}` : raw;
+  return IS4TOptAdapter.canonicalGroupId(id);
 }
 
 function normalizarNombreTarea(nombre) {
@@ -6021,7 +6004,7 @@ function isDisciplinaCompleta(disciplina, grupoId, log) {
   const tieneEv = (nombre) => eventosDisc.some(e => e.hito_id === nombre);
 
   // Override G2 — cierre por condiciones múltiples
-  if (grupoId === 'G2') {
+  if (grupoId === 'G02') {
     const G2_CIERRE = {
       'Plano de Conjunto':        () => tieneEv('Recepción de PDF') && tieneEv('Recepción de DWG'),
       'Huella del Local':         () => tieneEv('Recepción de PDF') && tieneEv('Recepción de DWG'),
@@ -6033,7 +6016,7 @@ function isDisciplinaCompleta(disciplina, grupoId, log) {
   }
 
   // Override G4 — Layout Validación Operaciones + Comercial requiere ambos eventos
-  if (grupoId === 'G4' && disciplina === 'Layout - Validación Operaciones + Comercial') {
+  if (grupoId === 'G04' && disciplina === 'Layout - Validación Operaciones + Comercial') {
     return tieneEv('Validación Operaciones') && tieneEv('Validación Comercial');
   }
 
@@ -6135,7 +6118,7 @@ async function confirmarEntregaParcial() {
     await guardarSnapshotEntrega(proyectoId, res.entry_id, seleccion);
     closeModal('modal-entry');
     showToast('Entrega Parcial registrada', 'success');
-    // Hitos se evalua server-side en AS v1.0.2.
+    // Hitos se evalua server-side en AS v1.1.0.
     await loadProyectoData(proyectoId);
     if (state.currentProyecto) { await openProyecto(proyectoId); restaurarEstadoPaneles(estadoPaneles); }
   } catch(e) { showToast('Error: ' + e.message, 'error'); }
