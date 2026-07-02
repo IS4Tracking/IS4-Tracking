@@ -760,6 +760,7 @@
         <div class="form-group cambio-disc-section">
           <div class="cambio-disc-label">Disciplinas impactadas <span>opcional — se puede editar después</span></div>
           <div id="cambio-disc-container"></div>
+          <div id="nc-cambio-hitos-preview" style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:6px"></div>
         </div>
       </div>
       <!-- Campos solo para RIESGO -->
@@ -1121,7 +1122,7 @@ let state = {
   _riskCodeById: {},
   entriesBorrados: [],
   diasPausaAcumulados: {},
-  _editandoEntryId: null, editandoNotaId: null,
+  _editandoEntryId: null, editandoNotaId: null, editandoDudaId: null,
   _confirmarBorradoFn: null,
   _filtroRegistro: 'todos'
 };
@@ -1131,9 +1132,10 @@ const ENTITY_WRITE_ACTIONS = new Set([
   'updateStandardTask','addProjectEvent','editProjectEvent','deleteProjectEvent',
   'createNote','editNote','deleteNote','createChange','editChange','deleteChange',
   'createRisk','updateRisk','deleteRisk','createQuestion','answerQuestion','updateQuestionStatus','deleteQuestion',
+  'editQuestion',
   'createExtrTask','updateExtrTask','deleteExtrTask','addExtrTaskEvent','deleteExtrTaskEvent',
   'saveSnapshot','deleteSnapshot','createBacklogTask','updateBacklogTask','deleteBacklogTask',
-  'addBacklogEvent','deleteBacklogEvent','restoreDeletedOperationalItem'
+  'addBacklogEvent','editBacklogEvent','deleteBacklogEvent','restoreDeletedOperationalItem'
 ]);
 
 const IS4TOptAdapter = {
@@ -1165,6 +1167,7 @@ const IS4TOptAdapter = {
       throw new Error('El backend confirmó sin devolver la entidad persistida');
     }
     if (data?.entity_type) {
+      this.assertWriteEntity(action, body, data.entity, data.entity_type);
       const localStarted = performance.now();
       this.applyWriteResponse(action, body, data);
       console.log(`[PERF][WRITE][${String(data.entity_type).toUpperCase()}]`, {
@@ -1200,6 +1203,53 @@ const IS4TOptAdapter = {
 
   booleanValue(value) {
     return value === true || value === 1 || value === '1' || String(value).toUpperCase() === 'TRUE';
+  },
+
+  comparableWriteValue(field, value) {
+    if (value === undefined) return undefined;
+    if (value === null) return '';
+    if (['event_date','review_date'].includes(field)) return this.isoDate(value);
+    if (['probability','impact','score','calculated_impact_days'].includes(field)) return Number(value || 0);
+    if (['affected_group_ids','affected_project_task_ids','affected_milestone_ids'].includes(field)) {
+      return normalizeList(value).map(String).map(v => v.trim()).filter(Boolean).sort().join(',');
+    }
+    if (field === 'group_id') return this.canonicalGroupId(value);
+    return String(value);
+  },
+
+  assertWriteEntity(action, body, entity, entityType) {
+    const fieldsByAction = {
+      createNote:['project_id','title','note_type','description','group_id','project_task_id'],
+      editNote:['note_id','project_id','title','note_type','description','group_id','project_task_id'],
+      createQuestion:['project_id','title','question_text','group_id','project_task_id'],
+      editQuestion:['question_id','project_id','title','question_text','group_id','project_task_id'],
+      answerQuestion:['question_id','project_id','answer_text'],
+      updateQuestionStatus:['question_id','project_id','status'],
+      createChange:['project_id','title','change_type','change_origin','scope_description',
+        'affected_project_task_ids','affected_milestone_ids','risk_ref_id'],
+      editChange:['change_id','project_id','title','change_type','change_origin','scope_description',
+        'affected_project_task_ids','affected_milestone_ids','risk_ref_id'],
+      createRisk:['project_id','title','description','category','status','probability','impact','review_date',
+        'mitigation_notes','milestone_catalog_id','group_id','project_task_id'],
+      updateRisk:['risk_id','project_id','title','description','category','status','probability','impact','review_date',
+        'mitigation_notes','milestone_catalog_id','group_id','project_task_id'],
+      addBacklogEvent:['backlog_task_id','title','description','status_change_to','event_date'],
+      editBacklogEvent:['backlog_event_id','backlog_task_id','title','description','status_change_to','event_date']
+    };
+    const fields = fieldsByAction[action] || [];
+    fields.forEach(field => {
+      if (body[field] === undefined) return;
+      const expected = this.comparableWriteValue(field, body[field]);
+      const actual = this.comparableWriteValue(field, entity[field]);
+      if (expected !== actual) throw new Error(`Persistencia no confirmada para ${field}`);
+    });
+    const idFields = {
+      note:'note_id', question:'question_id', change:'change_id', risk:'risk_id',
+      backlog_event:'backlog_event_id'
+    };
+    const idField = idFields[entityType];
+    const requestedId = body[idField] || (action === 'restoreDeletedOperationalItem' ? body.record_id : '');
+    if (requestedId && entity[idField] !== requestedId) throw new Error('La entidad devuelta no corresponde al ID solicitado');
   },
 
   reset(scope, projectId) {
@@ -2029,14 +2079,14 @@ const IS4TOptAdapter = {
     if (action === 'appendLogEvento') {
       if (body.proyecto_id === 'BACKLOG' || body.proyecto_id === 'EVERGREEN' || (body.disciplina_id || '').startsWith('EV::')) {
         const taskId = (body.disciplina_id || '').replace('EV::', '');
+        const eventData = safeJson(body.nota, {});
         result = await this.raw('addBacklogEvent', {
           backlog_task_id: taskId,
-          title: body.hito_id || body.titulo || 'Evento',
-          description: body.nota || body.descripcion || '',
-          status_change_to: statusToNew(body.estatus_nuevo || safeJson(body.nota, {}).estatus_nuevo || ''),
+          title: body.hito_id || body.titulo || eventData.titulo || 'Evento',
+          description: body.descripcion || eventData.descripcion || '',
+          status_change_to: statusToNew(body.estatus_nuevo || eventData.estatus_nuevo || ''),
           event_date: body.fecha_real || todayISO()
         });
-        this.reset('backlog');
         return { entry_id: result.backlog_event_id };
       }
       if ((body.disciplina_id || '').startsWith('ADHOC::')) {
@@ -2077,7 +2127,17 @@ const IS4TOptAdapter = {
         throw new Error('La edición de eventos de Tarea de Proyecto no está disponible en Fase 1; no se guardó ningún cambio');
       }
       if (entry?.tipo_entry === 'evergreen_evento') {
-        throw new Error('La edición de eventos de Backlog no está disponible en Fase 1; no se guardó ningún cambio');
+        const eventData = safeJson(body.nota, {});
+        const backlogTaskId = String(entry.disciplina_id || '').replace('EV::', '') || entry.backlog_task_id;
+        result = await this.raw('editBacklogEvent', {
+          backlog_event_id: body.entry_id,
+          backlog_task_id: backlogTaskId,
+          title: body.titulo || eventData.titulo || entry.hito_id,
+          description: body.descripcion || eventData.descripcion || '',
+          status_change_to: statusToNew(body.estatus_nuevo || eventData.estatus_nuevo || ''),
+          event_date: body.fecha_real || entry.fecha_real
+        });
+        return result;
       }
       result = await this.raw('editProjectEvent', {
         project_id: projectId,
@@ -2095,7 +2155,6 @@ const IS4TOptAdapter = {
         result = await this.raw('deleteExtrTaskEvent', { project_id: projectId, manual_task_event_id: body.entry_id });
       } else if (entry?.tipo_entry === 'evergreen_evento') {
         result = await this.raw('deleteBacklogEvent', { backlog_event_id: body.entry_id });
-        this.reset('backlog');
         return result;
       } else {
         result = await this.raw('deleteProjectEvent', { project_id: projectId, project_event_id: body.entry_id });
@@ -2165,14 +2224,18 @@ const IS4TOptAdapter = {
 
     if (action === 'editarNota') {
       result = await this.raw('editNote', {
-        ...projectBody(), note_id: body.entry_id,
-        title: body.titulo, note_type: body.tipo, description: body.contenido || body.nota
+        ...projectBody(), note_id: body.note_id || body.entry_id,
+        title: body.title ?? body.titulo,
+        note_type: body.note_type ?? body.tipo,
+        description: body.description ?? body.contenido ?? body.nota,
+        group_id: this.canonicalGroupId(body.group_id || ''),
+        project_task_id: body.project_task_id || ''
       });
-      this.reset('project', projectId); return result;
+      return result;
     }
     if (action === 'borrarNota') {
       result = await this.raw('deleteNote', { ...projectBody(), note_id: body.entry_id });
-      this.reset('project', projectId); return result;
+      return result;
     }
     if (action === 'crearNota') {
       result = await this.raw('createNote', {
@@ -2180,10 +2243,9 @@ const IS4TOptAdapter = {
         title: body.title || body.titulo || '',
         note_type: body.note_type || body.tipo || 'General',
         description: body.description || body.contenido || '',
-        group_id: this.canonicalGroupId(String(body.group_id || body.disc_ref || '').split('::')[0])
+        group_id: this.canonicalGroupId(String(body.group_id || body.disc_ref || '').split('::')[0]),
+        project_task_id: body.project_task_id || this.taskIdFromLegacy(body.project_id || projectId, body.disc_ref)
       });
-      const pid = body.project_id || projectId;
-      if (pid) this.reset('project', pid);
       return result;
     }
     if (action === 'appendCambioDetalle') {
@@ -2194,46 +2256,62 @@ const IS4TOptAdapter = {
         change_type: body.impacto_tipo,
         change_origin: body.origen_cambio,
         affected_project_task_ids: this.taskIdsFromLegacy(projectId, body.disciplinas_afectadas),
-        scope_description: body.alcance || body.descripcion || ''
+        affected_milestone_ids: body.hitos_afectados || body.affected_milestone_ids,
+        scope_description: body.alcance || body.descripcion || '',
+        risk_ref_id: body.risk_ref_id || body.riesgo_ref_id || ''
       });
-      this.invalidateProject(projectId, !!result.affects_home); return { change_id: result.change_id, change_code: result.change_code || '' };
+      return { change_id: result.change_id, change_code: result.change_code || '' };
     }
     if (action === 'editarCambioDetalle') {
       result = await this.raw('editChange', {
         ...projectBody(), change_id: body.entry_id,
-        title: body.titulo,
+        title: body.title ?? body.titulo,
         change_type: body.impacto_tipo,
         change_origin: body.origen_cambio,
         affected_project_task_ids: this.taskIdsFromLegacy(projectId, body.disciplinas_afectadas),
-        scope_description: body.alcance
+        affected_milestone_ids: body.hitos_afectados || body.affected_milestone_ids,
+        scope_description: body.alcance,
+        risk_ref_id: body.risk_ref_id || body.riesgo_ref_id || ''
       });
-      this.invalidateProject(projectId, !!result.affects_home); return result;
+      return result;
     }
     if (action === 'borrarCambio') {
       result = await this.raw('deleteChange', { ...projectBody(), change_id: body.entry_id });
-      this.invalidateProject(projectId, !!result.affects_home); return result;
+      return result;
     }
     if (action === 'crearDuda') {
       result = await this.raw('createQuestion', {
-        ...projectBody(), title: body.titulo, question_text: body.texto || body.descripcion || ''
+        ...projectBody(), title: body.titulo, question_text: body.texto || body.descripcion || '',
+        group_id: this.canonicalGroupId(body.group_id || String(body.disciplina_id || '').split('::')[0]),
+        project_task_id: body.project_task_id || this.taskIdFromLegacy(projectId, body.disciplina_id)
       });
-      this.reset('project', projectId); return { entry_id: result.question_id };
+      return { entry_id: result.question_id };
+    }
+    if (action === 'editarDuda') {
+      result = await this.raw('editQuestion', {
+        ...projectBody(), question_id:body.question_id || body.entry_id,
+        title:body.title ?? body.titulo,
+        question_text:body.question_text ?? body.texto,
+        group_id:this.canonicalGroupId(body.group_id || ''),
+        project_task_id:body.project_task_id || ''
+      });
+      return result;
     }
     if (action === 'responderDuda') {
       result = await this.raw('answerQuestion', {
-        ...projectBody(), question_id: body.entry_id, answer_text: body.respuesta || body.texto
+        ...projectBody(), question_id: body.entry_id || body.entry_id_duda, answer_text: body.respuesta || body.texto
       });
-      this.reset('project', projectId); return result;
+      return result;
     }
     if (action === 'actualizarEstatusDuda') {
       result = await this.raw('updateQuestionStatus', {
         ...projectBody(), question_id: body.entry_id, status: statusToNew(body.estatus)
       });
-      this.reset('project', projectId); return result;
+      return result;
     }
     if (action === 'borrarDuda') {
       result = await this.raw('deleteQuestion', { ...projectBody(), question_id: body.entry_id });
-      this.reset('project', projectId); return result;
+      return result;
     }
     if (action === 'crearRiesgo') {
       result = await this.raw('createRisk', {
@@ -2247,7 +2325,6 @@ const IS4TOptAdapter = {
         project_task_id: body.project_task_id || this.taskIdFromLegacy(projectId, body.disc_ref),
         status: statusToNew(body.estatus || 'Activo')
       });
-      this.invalidateProject(projectId, !!result.affects_home);
       if (result.risk_id && result.risk_code) state._riskCodeById[result.risk_id] = result.risk_code;
       return { riesgo_id: result.risk_id, risk_code: result.risk_code, entry_id: result.risk_id };
     }
@@ -2259,13 +2336,16 @@ const IS4TOptAdapter = {
         status: statusToNew(body.estatus),
         probability: body.probabilidad, impact: body.impacto,
         mitigation_notes: body.notas_mitigacion,
-        review_date: body.fecha_revision
+        review_date: body.fecha_revision,
+        milestone_catalog_id: body.hito_ref_id,
+        group_id: body.group_id,
+        project_task_id: body.project_task_id || this.taskIdFromLegacy(projectId, body.disc_ref)
       });
-      this.invalidateProject(projectId, !!result.affects_home); return result;
+      return result;
     }
     if (action === 'borrarRiesgo') {
       result = await this.raw('deleteRisk', { ...projectBody(), risk_id: body.riesgo_id || body.entry_id });
-      this.invalidateProject(projectId, !!result.affects_home); return result;
+      return result;
     }
     if (action === 'restaurarEntryEliminado') {
       const typeMap = { nota:'note', cambio:'change', duda:'question', riesgo:'risk', evento:'project_event' };
@@ -2274,7 +2354,7 @@ const IS4TOptAdapter = {
         record_id: body.entry_id,
         project_id: projectId
       });
-      this.invalidateProject(projectId, !!result.affects_home); return result;
+      return result;
     }
     if (action === 'guardarSnapshot') {
       result = await this.raw('saveSnapshot', {
@@ -2747,6 +2827,71 @@ async function loadEvergreenData() {
     state.logEventos = [...otrosLogs, ...IS4TOptAdapter.backlogEvents()];
   } catch(e) { console.error('[PERF][BACKLOG] loadBacklogData error:', e.message); }
   console.timeEnd('[PERF][BACKLOG] loadBacklogData');
+}
+
+function syncRegistroFromLocalBundle(projectId) {
+  const bundle = IS4TOptAdapter.projectBundles[projectId];
+  if (!bundle) throw new Error('No existe bundle local para actualizar Registro del Proyecto');
+  const started = performance.now();
+  const registryTypes = new Set(['nota','cambio_registrado','duda','riesgo','riesgo_update']);
+  const registryLog = [
+    ...IS4TOptAdapter.notes(bundle),
+    ...IS4TOptAdapter.changes(bundle),
+    ...IS4TOptAdapter.questions(bundle),
+    ...IS4TOptAdapter.risks(bundle)
+  ];
+  state.logEventos = [
+    ...(state.logEventos || []).filter(row => row.proyecto_id !== projectId || !registryTypes.has(row.tipo_entry)),
+    ...registryLog
+  ];
+  state.cambiosDetalle = [
+    ...(state.cambiosDetalle || []).filter(row => row.project_id !== projectId && row.proyecto_id !== projectId),
+    ...IS4TOptAdapter.cambiosDetalle(bundle)
+  ];
+  state.cambios = state.cambiosDetalle;
+  state.dudasDetalle = [
+    ...(state.dudasDetalle || []).filter(row => row.project_id !== projectId && row.proyecto_id !== projectId),
+    ...IS4TOptAdapter.dudasDetalle(bundle)
+  ];
+  state.riesgosDetalle = [
+    ...(state.riesgosDetalle || []).filter(row => row.project_id !== projectId && row.proyecto_id !== projectId),
+    ...IS4TOptAdapter.riesgosDetalle(bundle)
+  ];
+  state.riesgosDetalleBorrados = [
+    ...(state.riesgosDetalleBorrados || []).filter(row => row.project_id !== projectId && row.proyecto_id !== projectId),
+    ...IS4TOptAdapter.deletedRisks(bundle)
+  ];
+  state.riesgosBorrados = state.riesgosDetalleBorrados;
+  state.entriesBorrados = [
+    ...(state.entriesBorrados || []).filter(row => row.project_id !== projectId && row.proyecto_id !== projectId),
+    ...IS4TOptAdapter.deletedEntries(bundle)
+  ];
+  const projectIndex = (state.proyectos || []).findIndex(row => row.proyecto_id === projectId);
+  if (projectIndex >= 0 && bundle.summary) {
+    state.proyectos[projectIndex] = { ...state.proyectos[projectIndex], ...bundle.summary };
+    state.currentProyecto = state.proyectos[projectIndex];
+  }
+
+  const container = document.getElementById('detail-notas');
+  if (container && state.currentProyecto) {
+    const scrollY = window.scrollY;
+    const openPanels = [...container.querySelectorAll('.cambio-detail-panel.open')].map(node => node.id);
+    container.innerHTML = renderNotas(state.currentProyecto);
+    openPanels.forEach(id => document.getElementById(id)?.classList.add('open'));
+    window.scrollTo({ top:scrollY, behavior:'auto' });
+  }
+  ['note','question','change','risk'].forEach(type => IS4TOptAdapter._pendingWriteTypes.delete(type));
+  console.log('[PERF][WRITE][REGISTRY] local render', Math.round(performance.now() - started), 'ms');
+}
+
+function syncBacklogFromLocalCache() {
+  if (!IS4TOptAdapter.backlog) throw new Error('No existe caché local de Backlog');
+  const started = performance.now();
+  state.evergreenTareas = IS4TOptAdapter.backlogTasks();
+  const otrosLogs = (state.logEventos || []).filter(e => e.proyecto_id !== 'BACKLOG' && e.proyecto_id !== 'EVERGREEN');
+  state.logEventos = [...otrosLogs, ...IS4TOptAdapter.backlogEvents()];
+  if (state.currentEvergreenArq) renderEvergreenDetail(state.currentEvergreenArq);
+  console.log('[PERF][WRITE][BACKLOG_EVENT] local render', Math.round(performance.now() - started), 'ms');
 }
 
 async function loadCriteriosData() {
@@ -3234,6 +3379,40 @@ function renderGroups(proyecto) {
   }).join('');
 }
 
+function registroHtmlSeguro(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function registroReferenciaHtml(entity, projectId) {
+  if (!entity) return '';
+  const bundle = IS4TOptAdapter.projectBundles[projectId || entity.project_id || entity.proyecto_id];
+  const taskId = entity.project_task_id || '';
+  const task = (bundle?.project_tasks || bundle?.tasks || []).find(row => row.project_task_id === taskId);
+  const groupId = entity.group_id || task?.group_id || '';
+  const taskName = task?.task_name || task?.title || '';
+  const milestoneId = entity.milestone_catalog_id || entity.hito_ref_id || '';
+  const refs = [];
+  if (groupId) refs.push(`Grupo: ${registroHtmlSeguro(groupId)}`);
+  if (taskId) refs.push(`Tarea: ${registroHtmlSeguro(taskName || taskId)}`);
+  if (milestoneId) refs.push(`Hito: ${registroHtmlSeguro(milestoneId)}`);
+  return refs.length
+    ? `<div style="margin-top:7px;font-family:var(--mono);font-size:11px;color:var(--text3)">${refs.join(' · ')}</div>`
+    : '';
+}
+
+function registroAuditoriaHtml(entity, deleted) {
+  if (!entity) return '';
+  const originalAt = entity.created_at || entity.event_date || entity.fecha_real || '';
+  const originalBy = entity.created_by || entity.registered_by || entity.registrado_por || entity.arquitecto_id || '—';
+  const deletedAt = entity.deleted_at || entity.fecha_borrado || '';
+  const deletedBy = entity.deleted_by || '—';
+  const original = `${originalAt ? formatDate(String(originalAt).slice(0,10)) : '—'} · ${registroHtmlSeguro(originalBy)}`;
+  const deletion = deleted ? ` · Eliminado: ${deletedAt ? formatDate(String(deletedAt).slice(0,10)) : '—'} · ${registroHtmlSeguro(deletedBy)}` : '';
+  return `<div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:7px">Registrado: ${original}${deletion}</div>`;
+}
+
 function renderDeletedBacklog(ownerEmail) {
   const deleted = IS4TOptAdapter.backlogDeleted();
   const ownTasks = deleted.tasks.filter(t => t.asignado_a === ownerEmail);
@@ -3245,9 +3424,20 @@ function renderDeletedBacklog(ownerEmail) {
   const total = ownTasks.length + ownEvents.length;
   if (!total) return '';
   const canRestore = state.rol === 'PM' || state.user?.email === ownerEmail;
+  const taskById = new Map([...state.evergreenTareas, ...ownTasks].map(task => [task.tarea_id, task]));
   const rows = [
-    ...ownTasks.map(t => ({ type:'backlog_task', id:t.tarea_id, title:t.titulo, meta:'Tarea Backlog eliminada', can_restore:canRestore })),
-    ...ownEvents.map(e => ({ type:'backlog_event', id:e.entry_id, title:e.titulo, meta:e.can_restore ? 'Evento Backlog eliminado' : 'Evento eliminado · restaura primero la tarea parent', can_restore:canRestore && e.can_restore }))
+    ...ownTasks.map(t => ({
+      type:'backlog_task', id:t.tarea_id, title:t.titulo, description:t.notes || t.notas || '',
+      status:t.status || t.estatus || '', date:t.due_date || t.fecha_esperada || '', parent:'',
+      entity:t, meta:'Tarea Backlog eliminada', can_restore:canRestore
+    })),
+    ...ownEvents.map(e => ({
+      type:'backlog_event', id:e.entry_id, title:e.titulo, description:e.description || '',
+      status:e.status_change_to || '', date:e.event_date || '',
+      parent:taskById.get(e.tarea_id)?.titulo || e.tarea_id,
+      entity:e, meta:e.can_restore ? 'Evento Backlog eliminado' : 'Evento eliminado · restaura primero la tarea padre',
+      can_restore:canRestore && e.can_restore
+    }))
   ];
   return `<div style="margin-top:16px;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius)">
     <button class="cambio-expand-btn" onclick="toggleCambioPanel('deleted-backlog-panel')">
@@ -3255,11 +3445,21 @@ function renderDeletedBacklog(ownerEmail) {
       Elementos eliminados (${total})
     </button>
     <div class="cambio-detail-panel" id="deleted-backlog-panel" style="margin-top:8px">
-      ${rows.map(r => `<div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;opacity:${r.can_restore?1:.55}">
-        <div style="font-weight:500">${r.title || r.id}</div>
-        <div style="font-family:var(--mono);font-size:10px;color:var(--text3)">${r.meta}</div>
-        ${r.can_restore?`<button class="btn-ghost" style="font-size:11px;margin-top:4px" onclick="restaurarBacklogItem('${r.type}','${r.id}')">Restaurar</button>`:''}
-      </div>`).join('')}
+      ${rows.map((r, index) => {
+        const detailId = `deleted-backlog-${r.type}-${index}`;
+        const metadata = [r.date ? `Fecha: ${formatDate(String(r.date).slice(0,10))}` : '', r.status ? `Estado: ${registroHtmlSeguro(r.status)}` : '', r.parent ? `Tarea padre: ${registroHtmlSeguro(r.parent)}` : ''].filter(Boolean).join(' · ');
+        return `<div style="padding:10px 0;border-bottom:1px solid var(--border);font-size:12px;opacity:${r.can_restore?1:.65}">
+          <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap"><span style="font-family:var(--mono);font-size:10px;color:var(--accent)">${r.type === 'backlog_event' ? 'evento' : 'tarea'}</span><span style="font-weight:500">${registroHtmlSeguro(r.title || r.id)}</span></div>
+          <div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:3px">${r.meta}</div>
+          <button class="cambio-expand-btn" onclick="toggleCambioPanel('${detailId}')"><span id="chevron-${detailId}" style="transition:transform 0.15s;display:inline-block">▶</span> ver detalle</button>
+          <div class="cambio-detail-panel" id="${detailId}">
+            ${r.description ? `<div class="cambio-detail-alcance">${registroHtmlSeguro(r.description)}</div>` : '<div style="color:var(--text3);font-family:var(--mono);font-size:11px">Sin descripción registrada.</div>'}
+            ${metadata ? `<div style="margin-top:7px;font-family:var(--mono);font-size:11px;color:var(--text3)">${metadata}</div>` : ''}
+            ${registroAuditoriaHtml(r.entity, true)}
+          </div>
+          ${r.can_restore?`<button class="btn-ghost" style="font-size:11px;margin-top:6px" onclick="restaurarBacklogItem('${r.type}','${r.id}')">Restaurar</button>`:''}
+        </div>`;
+      }).join('')}
     </div>
   </div>`;
 }
@@ -3267,10 +3467,8 @@ function renderDeletedBacklog(ownerEmail) {
 async function restaurarBacklogItem(entityType, recordId) {
   try {
     await IS4TOptAdapter.raw('restoreDeletedOperationalItem', { entity_type: entityType, record_id: recordId });
-    IS4TOptAdapter.reset('backlog');
-    await loadEvergreenData();
+    syncBacklogFromLocalCache();
     showToast('Elemento restaurado', 'success');
-    if (state.currentEvergreenArq) openEvergreen(state.currentEvergreenArq);
   } catch(e) {
     showToast('Error: ' + e.message, 'error');
   }
@@ -4187,24 +4385,28 @@ function openNotaCambio(modoEdicion = false, cambioData = null) {
 
   document.querySelector('.entry-tipo-selector').style.display = '';
   state.editandoNotaId = null;
+  state.editandoDudaId = null;
   selectNotaCambioTipo(modoEdicion ? 'cambio_registrado' : 'nota');
   if (modoEdicion) buildCambioDiscSelector(preselected);
+  if (modoEdicion) {
+    buildCambioRiesgoRefSelector();
+    const riskSelect = document.getElementById('nc-cambio-riesgo-ref');
+    if (riskSelect) riskSelect.value = cambioData?.risk_ref_id || '';
+    const hitosPreview = document.getElementById('nc-cambio-hitos-preview');
+    if (hitosPreview) hitosPreview.textContent = cambioData?.hitos_afectados
+      ? `Hitos precargados: ${cambioData.hitos_afectados}` : 'Sin hitos afectados';
+  }
   openModal('modal-nota-cambio');
 }
 
 function buildNotaGrupoSelector() {
   if (!state.currentProyecto) return;
-  const activasSet = new Set(
-    state.disciplinasProyecto
-      .filter(d => d.proyecto_id === state.currentProyecto.proyecto_id)
-      .map(d => d.disciplina_id)
-  );
   const grupos = {};
-  state.eventosCatalogo.forEach(e => {
-    if (!e.grupo_id || e.grupo_id === 'G0') return;
-    const key = `${e.grupo_id}::${e.disciplina_nombre}`;
-    if (!activasSet.has(key)) return;
-    if (!grupos[e.grupo_id]) grupos[e.grupo_id] = e.grupo_nombre;
+  state.disciplinasProyecto
+    .filter(d => d.proyecto_id === state.currentProyecto.proyecto_id && d.project_task_id)
+    .forEach(task => {
+      const gid = IS4TOptAdapter.canonicalGroupId(task.grupo_id || task.group_id);
+      if (gid) grupos[gid] = task.grupo_nombre || IS4TOptAdapter.groupName(gid);
   });
   const sel = document.getElementById('nc-nota-grupo');
   if (!sel) return;
@@ -4219,17 +4421,13 @@ function updateNotaGrupo() {
   const sel = document.getElementById('nc-nota-disciplina');
   sel.innerHTML = '<option value="">—</option>';
   if (!gid || !state.currentProyecto) return;
-  const activasSet = new Set(
-    state.disciplinasProyecto
-      .filter(d => d.proyecto_id === state.currentProyecto.proyecto_id)
-      .map(d => d.disciplina_id)
-  );
-  const discs = [...new Set(
-    state.eventosCatalogo
-      .filter(e => e.grupo_id === gid && activasSet.has(`${gid}::${e.disciplina_nombre}`))
-      .map(e => e.disciplina_nombre)
-  )];
-  discs.forEach(d => sel.innerHTML += `<option value="${d}">${d}</option>`);
+  state.disciplinasProyecto
+    .filter(task => task.proyecto_id === state.currentProyecto.proyecto_id &&
+      IS4TOptAdapter.canonicalGroupId(task.grupo_id || task.group_id) === gid && task.project_task_id)
+    .forEach(task => {
+      const label = task.disciplina_nombre || task.task_name || task.disciplina_id;
+      sel.innerHTML += `<option value="${task.project_task_id}">${label}</option>`;
+    });
 }
 
 function buildCambioDiscSelector(preselected = []) {
@@ -4389,6 +4587,9 @@ function resetModalNotaCambio() {
   state._riesgoUpdateProb = 0; state._riesgoUpdateImp = 0;
   state._riesgoModo = 'nuevo';
   state.cambioDiscsSeleccionadas = new Set();
+  state.editandoNotaId = null;
+  state.editandoDudaId = null;
+  state.editandoCambioId = null;
 }
 
 function cerrarFormNota() {
@@ -4414,7 +4615,7 @@ async function guardarNota() {
     });
     cerrarFormNota();
     showToast('Nota guardada', 'success');
-    await refreshProyectoDetalle(capturarEstadoPaneles());
+    syncRegistroFromLocalBundle(state.currentProyecto.proyecto_id);
   } catch(e) {
     showToast('Error: ' + e.message, 'error');
   } finally {
@@ -4451,8 +4652,7 @@ async function guardarNotaCambio() {
 
   // Referencia a disciplina (F3)
   const notaGrupo = esNota ? document.getElementById('nc-nota-grupo').value : '';
-  const notaDisc = esNota ? document.getElementById('nc-nota-disciplina').value : '';
-  const notaDiscKey = (notaGrupo && notaDisc) ? `${notaGrupo}::${notaDisc}` : '';
+  const notaProjectTaskId = esNota ? document.getElementById('nc-nota-disciplina').value : '';
 
   // Generar nota_id para notas (N001, N002...)
   async function generarClaveNota() {
@@ -4464,32 +4664,43 @@ async function guardarNotaCambio() {
 
   try {
     if (state.editandoNotaId) {
-      // Modo edición de nota existente
-      const notaJsonActualizado = JSON.stringify({ titulo, tipo: tipoNota, contenido: texto, disc_ref: notaDiscKey });
       await api('editarNota', {
         entry_id: state.editandoNotaId,
-        fecha_real: fecha,
-        nota_json: notaJsonActualizado
+        title:titulo,
+        note_type:tipoNota,
+        description:texto,
+        group_id:notaGrupo,
+        project_task_id:notaProjectTaskId
       });
-      // Actualizar localmente
-      const idx = state.logEventos.findIndex(x => x.entry_id === state.editandoNotaId);
-      if (idx >= 0) {
-        state.logEventos[idx].fecha_real = fecha;
-        state.logEventos[idx].nota = notaJsonActualizado;
-      }
       state.editandoNotaId = null;
       closeModal('modal-nota-cambio'); resetModalNotaCambio();
       showToast('Nota actualizada', 'success');
+    } else if (state.editandoDudaId) {
+      const dudaGrupo = document.getElementById('nc-duda-grupo').value;
+      const dudaProjectTaskId = document.getElementById('nc-duda-disciplina').value;
+      const tituloDuda = document.getElementById('nc-duda-titulo').value.trim();
+      await api('editarDuda', {
+        entry_id:state.editandoDudaId,
+        title:tituloDuda,
+        question_text:texto,
+        group_id:dudaGrupo,
+        project_task_id:dudaProjectTaskId
+      });
+      state.editandoDudaId = null;
+      closeModal('modal-nota-cambio'); resetModalNotaCambio();
+      showToast('Duda actualizada', 'success');
     } else if (state.editandoCambioId) {
       const discs = [...(state.cambioDiscsSeleccionadas || [])];
       const hitos = getHitosAfectados(discs);
       await api('editarCambioDetalle', {
         entry_id: state.editandoCambioId,
+        titulo: tituloCambio,
         disciplinas_afectadas: discs.join(','),
         hitos_afectados: hitos.join(','),
         impacto_tipo: document.getElementById('e-impacto-tipo').value,
         origen_cambio: document.getElementById('e-origen').value,
-        alcance: texto
+        alcance: texto,
+        riesgo_ref_id: document.getElementById('nc-cambio-riesgo-ref')?.value || ''
       });
       closeModal('modal-nota-cambio'); resetModalNotaCambio();
       showToast('Cambio actualizado', 'success');
@@ -4498,19 +4709,19 @@ async function guardarNotaCambio() {
         const tituloDuda = document.getElementById('nc-duda-titulo').value.trim();
         if (!tituloDuda) { stopSaving(false); showToast('El título de la duda es requerido', 'error'); btn.disabled=false; btn.textContent='Guardar'; return; }
         const dudaGrupo = document.getElementById('nc-duda-grupo').value;
-        const dudaDisc  = document.getElementById('nc-duda-disciplina').value;
-        const dudaDiscKey = (dudaGrupo && dudaDisc) ? `${dudaGrupo}::${dudaDisc}` : '';
+        const dudaProjectTaskId = document.getElementById('nc-duda-disciplina').value;
         await api('crearDuda', {
           proyecto_id: state.currentProyecto.proyecto_id,
           titulo: tituloDuda,
           texto: texto,
           fecha_real: fecha,
-          disciplina_id: dudaDiscKey
+          group_id:dudaGrupo,
+          project_task_id:dudaProjectTaskId
         });
         closeModal('modal-nota-cambio'); resetModalNotaCambio();
         showToast('Duda registrada', 'success');
         await confirmBtn(btn, 'Guardar'); stopSaving(true);
-        await refreshProyectoDetalle(estadoPaneles);
+        syncRegistroFromLocalBundle(state.currentProyecto.proyecto_id);
         btn.disabled=false; btn.textContent='Guardar';
         return;
       }
@@ -4551,10 +4762,15 @@ async function guardarNotaCambio() {
           const updateBody = {
             riesgo_id:        riesgoId,
             proyecto_id:      state.currentProyecto.proyecto_id,
+            titulo:           getRiesgoDetalle(riesgoId)?.titulo,
+            categoria:        getRiesgoDetalle(riesgoId)?.categoria,
             descripcion:      texto,
             fecha_real:       fecha,
             notas_mitigacion: document.getElementById('nc-riesgo-update-mitigacion').value || undefined,
-            fecha_revision:   document.getElementById('nc-riesgo-update-fecha-revision').value || undefined
+            fecha_revision:   document.getElementById('nc-riesgo-update-fecha-revision').value || undefined,
+            hito_ref_id:      getRiesgoDetalle(riesgoId)?.hito_ref_id || '',
+            group_id:         getRiesgoDetalle(riesgoId)?.group_id || '',
+            project_task_id:  getRiesgoDetalle(riesgoId)?.project_task_id || ''
           };
           if (nuevoEstatus) updateBody.estatus = nuevoEstatus;
           if (state._riesgoUpdateProb) updateBody.probabilidad = state._riesgoUpdateProb;
@@ -4563,7 +4779,7 @@ async function guardarNotaCambio() {
           closeModal('modal-nota-cambio'); resetModalNotaCambio();
           showToast(`Riesgo ${riesgoId} actualizado`, 'success');
 if (nuevoEstatus === 'Cristalizado') {
-  await refreshProyectoDetalle(estadoPaneles);
+  syncRegistroFromLocalBundle(state.currentProyecto.proyecto_id);
   btn.disabled = false;
   btn.textContent = 'Guardar';
   setTimeout(() => {
@@ -4588,7 +4804,7 @@ if (nuevoEstatus === 'Cristalizado') {
 }
         }
         await confirmBtn(btn, 'Guardar'); stopSaving(true);
-        await refreshProyectoDetalle(estadoPaneles);
+        syncRegistroFromLocalBundle(state.currentProyecto.proyecto_id);
         btn.disabled=false; btn.textContent='Guardar';
         return;
       }
@@ -4599,8 +4815,8 @@ if (nuevoEstatus === 'Cristalizado') {
           title: titulo,
           note_type: tipoNota || 'General',
           description: texto,
-          group_id: notaDiscKey ? notaDiscKey.split('::')[0] : '',
-          project_task_id: ''
+          group_id: notaGrupo,
+          project_task_id: notaProjectTaskId
         });
         await confirmBtn(btn, 'Guardar'); stopSaving(true);
         closeModal('modal-nota-cambio'); resetModalNotaCambio();
@@ -4609,7 +4825,7 @@ if (nuevoEstatus === 'Cristalizado') {
         const discs = [...(state.cambioDiscsSeleccionadas || [])];
         const hitos = getHitosAfectados(discs);
         if (discs.length > 0 && hitos.length === 0) {
-          showToast('Sin hitos vinculados a las disciplinas — puedes editarlo después', 'success');
+          showToast('Sin hitos vinculados a las disciplinas — puedes editarlo después', 'info');
         }
         const res = await api('appendCambioDetalle', {
           titulo: tituloCambio,
@@ -4617,6 +4833,7 @@ if (nuevoEstatus === 'Cristalizado') {
           disciplinas_afectadas: discs.join(','),
           hitos_afectados: hitos.join(','),
           impacto_tipo: document.getElementById('e-impacto-tipo').value,
+          alcance: texto,
           riesgo_ref_id: document.getElementById('nc-cambio-riesgo-ref')?.value || ''
         });
         const claveCambio = res.data?.change_code || res.change_code || '';
@@ -4660,7 +4877,7 @@ if (nuevoEstatus === 'Cristalizado') {
     }
 
     stopSaving(true);
-    await refreshProyectoDetalle(estadoPaneles);
+    syncRegistroFromLocalBundle(state.currentProyecto.proyecto_id);
   } catch(e) { stopSaving(false); showToast('Error: ' + e.message, 'error'); }
   finally { btn.disabled = false; btn.textContent = 'Guardar'; }
 }
@@ -5155,6 +5372,79 @@ function renderEntriesEliminados(proyecto) {
     </div>
   </div>`;
 }
+
+function renderEntriesEliminadosPhase3A(proyecto) {
+  const projectId = proyecto.proyecto_id;
+  const canRestore = state.rol === 'PM';
+  const entries = (state.entriesBorrados || []).filter(row => row.proyecto_id === projectId);
+  const risks = (state.riesgosDetalleBorrados || []).filter(row => row.proyecto_id === projectId);
+  const rows = [
+    ...entries.map(entity => ({ entity, type:entity.tipo_entry })),
+    ...risks.map(entity => ({ entity, type:'riesgo' }))
+  ];
+  if (!rows.length) return '';
+
+  const typeInfo = {
+    nota:{ label:'nota', restore:'nota', color:'var(--text2)' },
+    duda:{ label:'duda', restore:'duda', color:'#58a6ff' },
+    cambio_registrado:{ label:'cambio', restore:'cambio', color:'#ff6b6b' },
+    riesgo:{ label:'riesgo', restore:'riesgo', color:'#e3b341' },
+    evento:{ label:'evento', restore:'evento', color:'var(--accent)' }
+  };
+  const taskLabel = id => {
+    const bundle = IS4TOptAdapter.projectBundles[projectId];
+    const task = (bundle?.project_tasks || bundle?.tasks || []).find(row => row.project_task_id === id);
+    return task?.task_name || task?.title || id;
+  };
+  const content = rows.map(({ entity, type }, index) => {
+    const info = typeInfo[type] || typeInfo.evento;
+    const title = entity.title || entity.event_name || entity.hito_id || entity.risk_code || entity.entry_id || '(sin título)';
+    const description = entity.description || entity.question_text || entity.scope_description || entity.notes || entity.nota || '';
+    const detailId = `deleted-registry-${index}`;
+    const metadata = [];
+    if (entity.note_type) metadata.push(`Tipo: ${registroHtmlSeguro(entity.note_type)}`);
+    if (entity.change_type) metadata.push(`Tipo de cambio: ${registroHtmlSeguro(entity.change_type)}`);
+    if (entity.change_origin) metadata.push(`Origen: ${registroHtmlSeguro(entity.change_origin)}`);
+    if (entity.status) metadata.push(`Estado: ${registroHtmlSeguro(entity.status)}`);
+    if (entity.category) metadata.push(`Categoría: ${registroHtmlSeguro(entity.category)}`);
+    if (entity.probability != null && entity.probability !== '') metadata.push(`P: ${registroHtmlSeguro(entity.probability)}`);
+    if (entity.impact != null && entity.impact !== '') metadata.push(`I: ${registroHtmlSeguro(entity.impact)}`);
+    const affectedTasks = normalizeList(entity.affected_project_task_ids).map(taskLabel);
+    if (affectedTasks.length) metadata.push(`Tareas afectadas: ${registroHtmlSeguro(affectedTasks.join(', '))}`);
+    const affectedMilestones = normalizeList(entity.affected_milestone_ids);
+    if (affectedMilestones.length) metadata.push(`Hitos afectados: ${registroHtmlSeguro(affectedMilestones.join(', '))}`);
+    if (entity.risk_ref_id || entity.risk_ref) metadata.push(`Riesgo relacionado: ${registroHtmlSeguro(entity.risk_ref_id || entity.risk_ref)}`);
+    if (entity.review_date) metadata.push(`Revisión: ${formatDate(String(entity.review_date).slice(0,10))}`);
+    const extraDetail = [
+      entity.answer_text ? `<div style="margin-top:8px;padding:8px 10px;background:var(--surface2);border-left:2px solid var(--green)"><span style="font-family:var(--mono);font-size:10px;color:var(--text3)">Respuesta</span><div style="margin-top:3px">${registroHtmlSeguro(entity.answer_text)}</div></div>` : '',
+      entity.mitigation_notes ? `<div style="margin-top:7px;font-size:12px;color:var(--text2)">Mitigación: ${registroHtmlSeguro(entity.mitigation_notes)}</div>` : ''
+    ].join('');
+    return `<div style="padding:11px 0;border-bottom:1px solid var(--border);font-size:12px">
+      <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
+        <span style="font-family:var(--mono);font-size:10px;padding:1px 7px;border-radius:3px;background:var(--surface2);color:${info.color}">${info.label}</span>
+        ${type === 'cambio_registrado' ? '<span style="font-family:var(--mono);font-size:10px;color:#ff6b6b">Sin efecto por cambio eliminado</span>' : ''}
+      </div>
+      <div style="font-weight:500;color:var(--text);margin-top:5px">${registroHtmlSeguro(title)}</div>
+      <button class="cambio-expand-btn" onclick="toggleCambioPanel('${detailId}')"><span id="chevron-${detailId}" style="transition:transform 0.15s;display:inline-block">▶</span> ver detalle</button>
+      <div class="cambio-detail-panel" id="${detailId}">
+        ${description ? `<div class="cambio-detail-alcance">${registroHtmlSeguro(description)}</div>` : '<div style="color:var(--text3);font-family:var(--mono);font-size:11px">Sin descripción registrada.</div>'}
+        ${extraDetail}
+        ${metadata.length ? `<div style="margin-top:7px;font-family:var(--mono);font-size:11px;color:var(--text3)">${metadata.join(' · ')}</div>` : ''}
+        ${registroReferenciaHtml(entity, projectId)}
+        ${registroAuditoriaHtml(entity, true)}
+      </div>
+      ${canRestore ? `<button class="btn-ghost" style="font-size:11px;margin-top:6px" onclick="restaurarEntry('${info.restore}','${entity.entry_id}')">Restaurar</button>` : ''}
+    </div>`;
+  }).join('');
+
+  return `<div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
+    <button class="cambio-expand-btn" onclick="toggleCambioPanel('entries-borrados-panel-phase3a')">
+      <span id="chevron-entries-borrados-panel-phase3a" style="transition:transform 0.15s;display:inline-block">▶</span>
+      Elementos eliminados (${rows.length})
+    </button>
+    <div class="cambio-detail-panel" id="entries-borrados-panel-phase3a" style="margin-top:8px">${content}</div>
+  </div>`;
+}
 function stripRiesgoPrefix(riesgoId) {
   const detail = (state.riesgosDetalle || []).find(r => r.riesgo_id === riesgoId);
   if (detail?.risk_code || state._riskCodeById[riesgoId]) return detail?.risk_code || state._riskCodeById[riesgoId];
@@ -5234,11 +5524,14 @@ function renderNotas(proyecto) {
               ${descripcionRiesgo ? `<div class="cambio-detail-alcance" style="margin-bottom:8px">${descripcionRiesgo}</div>` : '<div style="color:var(--text3);font-family:var(--mono);font-size:12px;margin-bottom:8px">Sin descripción registrada.</div>'}
               ${rd ? `
                 <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:6px">
-                  ${rd.hito_ref_id?`<span style="font-size:11px;font-family:var(--mono);color:var(--text3)">Hito: <span style="color:var(--text2)">${rd.hito_ref_id}</span></span>`:''}
-                  ${rd.disc_ref?`<span style="font-size:11px;font-family:var(--mono);color:var(--text3)">Ref: <span style="color:var(--text2)">${rd.disc_ref.split('::')[1]||rd.disc_ref}</span></span>`:''}
+                  ${rd.categoria?`<span style="font-size:11px;font-family:var(--mono);color:var(--text3)">Categoría: <span style="color:var(--text2)">${registroHtmlSeguro(rd.categoria)}</span></span>`:''}
+                  <span style="font-size:11px;font-family:var(--mono);color:var(--text3)">Probabilidad: <span style="color:var(--text2)">${registroHtmlSeguro(rd.probabilidad || '—')}</span></span>
+                  <span style="font-size:11px;font-family:var(--mono);color:var(--text3)">Impacto: <span style="color:var(--text2)">${registroHtmlSeguro(rd.impacto || '—')}</span></span>
                   <span style="font-size:11px;font-family:var(--mono);color:var(--text3)">Revisión: <span style="color:${rd.fecha_revision?'var(--accent)':'var(--text2)'}">${formatDate(rd.fecha_revision)}</span></span>
                 </div>
                 ${rd.notas_mitigacion?`<div style="font-size:12px;color:var(--text2);font-style:italic;margin-bottom:6px">Mitigación: ${rd.notas_mitigacion}</div>`:''}
+                ${registroReferenciaHtml(rd, proyecto.proyecto_id)}
+                ${registroAuditoriaHtml(rd, false)}
               ` : ''}
             </div>
           </div>`;
@@ -5248,17 +5541,18 @@ function renderNotas(proyecto) {
         if (esDuda) {
           const dd = getDudaDetalle(n.entry_id);
           let dudaData = {}; try { dudaData = JSON.parse(n.nota||'{}'); } catch(e) {}
-          const tituloDuda = dudaData.titulo || n.hito_id || 'Duda';
-          const textoDuda = dudaData.texto || '';
+          const tituloDuda = dd?.title || dudaData.titulo || n.hito_id || 'Duda';
+          const textoDuda = dd?.question_text || dudaData.texto || '';
           const estatusDuda = dd?.estatus || 'pendiente';
           const tiempoResp = dd?.tiempo_respuesta_habil ? `${dd.tiempo_respuesta_habil}d hábil${dd.tiempo_respuesta_habil==='1'?'':'es'}` : null;
           const colorEstDuda = estatusDuda === 'respondida' ? 'var(--green)' : 'var(--text3)';
           const puedeResponder = (state.rol === 'PM' || state.rol === 'Validador') && estatusDuda === 'pendiente';
-          const respuesta = getRespuestaDuda(n.entry_id);
-          const respData = respuesta ? (() => { try { return JSON.parse(respuesta.nota||'{}'); } catch(e) { return {}; } })() : null;
-          const autorRespNombre = respuesta ? (state.usuarios.find(u => u.email === respuesta.arquitecto_id)?.nombre || respuesta.arquitecto_id) : null;
+          const respuestaTexto = dd?.answer_text || dd?.respuesta || '';
+          const autorRespNombre = dd?.answered_by || '';
+          const fechaRespuesta = dd?.answered_at || '';
           const menuDuda = `
             <div class="entry-acciones-menu" style="display:none;position:absolute;right:0;top:0;padding:4px 0;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);min-width:150px;z-index:10">
+              ${puedeEditar ? `<div style="padding:6px 14px;font-size:12px;color:var(--text2);cursor:pointer;white-space:nowrap" onmouseenter="this.style.background='var(--surface)'" onmouseleave="this.style.background=''" onclick="abrirEditarDuda('${n.entry_id}')">Editar</div>` : ''}
               ${puedeResponder ? `<div style="padding:6px 14px;font-size:12px;color:var(--text2);cursor:pointer;white-space:nowrap" onmouseenter="this.style.background='var(--surface)'" onmouseleave="this.style.background=''" onclick="openResponderDuda('${n.entry_id}','${tituloDuda.replace(/'/g,"\\'")}')">Responder</div>` : ''}
               ${puedeEliminar ? `<div style="padding:6px 14px;font-size:12px;color:var(--red);cursor:pointer;white-space:nowrap" onmouseenter="this.style.background='var(--surface)'" onmouseleave="this.style.background=''" onclick="borrarDudaEntry('${n.entry_id}','${tituloDuda.replace(/'/g,"\\'")}')">Eliminar</div>` : ''}
             </div>`;
@@ -5280,10 +5574,12 @@ function renderNotas(proyecto) {
             </button>
             <div class="cambio-detail-panel" id="${panelId}">
               ${textoDuda ? `<div class="cambio-detail-alcance" style="margin-bottom:8px">${textoDuda}</div>` : ''}
-              ${respuesta ? `<div style="margin-top:4px;padding:10px 12px;background:var(--surface2);border-radius:var(--radius);border-left:2px solid var(--green)">
-                <div style="font-size:11px;font-family:var(--mono);color:var(--text3);margin-bottom:4px">${formatDate(respuesta.fecha_real)} · ${autorRespNombre}</div>
-                <div style="font-size:13px;color:var(--text)">${respData?.texto || ''}</div>
+              ${registroReferenciaHtml(dd, proyecto.proyecto_id)}
+              ${respuestaTexto ? `<div style="margin-top:8px;padding:10px 12px;background:var(--surface2);border-radius:var(--radius);border-left:2px solid var(--green)">
+                <div style="font-size:11px;font-family:var(--mono);color:var(--text3);margin-bottom:4px">${fechaRespuesta ? formatDate(String(fechaRespuesta).slice(0,10)) : '—'} · ${registroHtmlSeguro(autorRespNombre || '—')}</div>
+                <div style="font-size:13px;color:var(--text)">${registroHtmlSeguro(respuestaTexto)}</div>
               </div>` : ''}
+              ${registroAuditoriaHtml(dd || n, false)}
             </div>
           </div>`;
         }
@@ -5340,15 +5636,22 @@ function renderNotas(proyecto) {
           <div class="cambio-detail-panel" id="${panelId}">
             ${esCambio ? `
               <div class="cambio-detail-alcance">${cd?.alcance || n.nota || '—'}</div>
+              <div style="margin-top:7px;font-family:var(--mono);font-size:11px;color:var(--text3)">
+                ${cd?.impacto_tipo ? `Tipo: ${registroHtmlSeguro(cd.impacto_tipo)}` : 'Tipo: —'}
+                ${cd?.origen_cambio ? ` · Origen: ${registroHtmlSeguro(cd.origen_cambio)}` : ''}
+                ${cd?.risk_ref_id ? ` · Riesgo relacionado: ${registroHtmlSeguro(cd.risk_ref_id)}` : ''}
+              </div>
               <div class="cambio-detail-chips">${chipsHTML}</div>
               ${hitosHTML}
+              ${registroAuditoriaHtml(cd || n, false)}
               <div class="cambio-detail-hist" style="margin-top:10px">
                 <div class="cambio-hist-title">Historial de ediciones</div>
                 ${histHTML}
               </div>
             ` : `
               ${textoNota ? `<div class="cambio-detail-alcance">${textoNota}</div>` : '<div style="color:var(--text3);font-family:var(--mono);font-size:12px">Sin contenido registrado.</div>'}
-              ${notaData?.disc_ref ? `<div style="margin-top:6px;font-family:var(--mono);font-size:11px;color:var(--text3)">Ref: ${notaData.disc_ref}</div>` : ''}
+              ${registroReferenciaHtml(n, proyecto.proyecto_id)}
+              ${registroAuditoriaHtml(n, false)}
             `}
           </div>
         </div>`;
@@ -5379,7 +5682,7 @@ const filtroActivo = state._filtroRegistro || 'todos';
         <button class="btn-ghost" style="font-size:11px" onclick="openNotaCambio()">+ Nueva Entrada</button>
       </div> 
       <div id="notas-lista">${notasHTML}</div>
-      ${renderEntriesEliminados(proyecto)}
+      ${renderEntriesEliminadosPhase3A(proyecto)}
       <div class="nota-form" id="nota-form">
         <textarea class="form-textarea" id="nota-texto-input" placeholder="Escribe la nota…" style="min-height:72px;margin-bottom:10px"></textarea>
         <div style="display:flex;gap:8px;justify-content:flex-end">
@@ -5492,7 +5795,10 @@ function abrirUpdateRiesgo(riesgoId) {
     setTimeout(() => {
       setRiesgoModo('update');
       const sel = document.getElementById('nc-riesgo-update-ref');
-      if (sel) sel.value = riesgoId;
+      if (sel) {
+        sel.value = riesgoId;
+        precargarRiesgoUpdate(riesgoId);
+      }
     }, 100);
   }, 100);
 }
@@ -5518,19 +5824,33 @@ function borrarRiesgoEntry(entryId, riesgoId) {
       try {
         const scope = esEntryOriginal && tieneUpdates ? 'completo' : 'entry';
         await api('borrarRiesgo', { entry_id: entryId, scope, motivo: 'Eliminado desde UI' });
-        state.logEventos = state.logEventos.filter(e => {
-          if (e.entry_id === entryId) return false;
-          if (scope === 'completo' && e.tipo_entry === 'riesgo_update') {
-            try { return JSON.parse(e.nota||'{}').riesgo_id !== riesgoId; } catch(err) { return true; }
-          }
-          return true;
-        });
-        if (scope === 'completo') state.riesgosDetalle = (state.riesgosDetalle || []).filter(r => r.riesgo_id !== riesgoId);
         showToast(scope === 'completo' ? `Riesgo ${riesgoId} eliminado` : 'Entry eliminado', 'success');
-        if (state.currentProyecto) await refreshProyectoDetalle(estadoPaneles);
+        if (state.currentProyecto) syncRegistroFromLocalBundle(state.currentProyecto.proyecto_id);
       } catch(e) { showToast('Error: ' + e.message, 'error'); }
     }
   });
+}
+
+function abrirEditarDuda(entryId) {
+  const projectId = state.currentProyecto?.proyecto_id;
+  const bundle = IS4TOptAdapter.projectBundles[projectId];
+  const entity = (bundle?.questions || []).find(question => question.question_id === entryId);
+  if (!entity) { showToast('No se encontró la duda canónica en el bundle local', 'error'); return; }
+  openNotaCambio();
+  state.editandoNotaId = null;
+  state.editandoCambioId = null;
+  state.editandoDudaId = entryId;
+  selectNotaCambioTipo('duda');
+  document.getElementById('nc-duda-titulo').value = entity.title || '';
+  document.getElementById('nc-texto').value = entity.question_text || '';
+  document.getElementById('nc-fecha').value = normalizarFechaParaInput(entity.created_at);
+  buildDudaGrupoSelector();
+  document.getElementById('nc-duda-grupo').value = entity.group_id || '';
+  updateDudaGrupo();
+  document.getElementById('nc-duda-disciplina').value = entity.project_task_id || '';
+  document.getElementById('nota-cambio-title').textContent = 'Editar duda';
+  document.getElementById('btn-guardar-nc').textContent = 'Guardar cambios';
+  document.querySelector('.entry-tipo-selector').style.display = 'none';
 }
 
 function borrarDudaEntry(entryId, tituloDuda) {
@@ -5542,10 +5862,8 @@ function borrarDudaEntry(entryId, tituloDuda) {
       const estadoPaneles = capturarEstadoPaneles();
       try {
         await api('borrarDuda', { entry_id: entryId, proyecto_id: state.currentProyecto?.proyecto_id || '' });
-        state.logEventos = state.logEventos.filter(e => e.entry_id !== entryId);
-        state.dudasDetalle = (state.dudasDetalle || []).filter(d => d.entry_id !== entryId);
         showToast('Duda eliminada', 'success');
-        if (state.currentProyecto) await refreshProyectoDetalle(estadoPaneles);
+        if (state.currentProyecto) syncRegistroFromLocalBundle(state.currentProyecto.proyecto_id);
       } catch(e) { showToast('Error: ' + e.message, 'error'); }
     }
   });
@@ -5562,35 +5880,15 @@ function editarCambioCompleto(entryId) {
     impacto_tipo: cd?.impacto_tipo || '',
     origen: cd?.origen_cambio || '',
     disciplinas_afectadas: cd?.disciplinas_afectadas || '',
+    hitos_afectados: cd?.hitos_afectados || cd?.affected_milestone_ids || '',
+    risk_ref_id: cd?.risk_ref_id || '',
     titulo: cd?.titulo || ''
   });
   document.getElementById('nota-cambio-title').textContent = 'Editar cambio';
 }
 
 function abrirEditarRiesgoEntry(entryId, riesgoId) {
-  const n = state.logEventos.find(e => e.entry_id === entryId);
-  if (!n) return;
-  let riesgoData = {}; try { riesgoData = JSON.parse(n.nota||'{}'); } catch(e) {}
-  const rd = getRiesgoDetalle(riesgoId);
-  state.editandoRiesgoEntryId = entryId;
-  openNotaCambio();
-  setTimeout(() => {
-    selectNotaCambioTipo('riesgo');
-    setTimeout(() => {
-      document.getElementById('nota-cambio-title').textContent = 'Editar entrada de riesgo';
-      setRiesgoModo('nuevo');
-      const tituloEl = document.getElementById('nc-riesgo-titulo');
-      if (tituloEl) tituloEl.value = riesgoData.titulo || '';
-      const catEl = document.getElementById('nc-riesgo-categoria');
-      if (catEl) { catEl.value = rd?.categoria || ''; updateRiesgoCategoriaTip(); }
-      const descEl = document.getElementById('nc-riesgo-descripcion');
-      if (descEl) descEl.value = riesgoData.descripcion || '';
-      const fechaEl = document.getElementById('nc-fecha');
-      if (fechaEl) fechaEl.value = normalizarFechaParaInput(n.fecha_real);
-      if (rd?.probabilidad) { state._riesgoProb = rd.probabilidad; renderRiesgoStars('nc-riesgo-prob-container', rd.probabilidad); }
-      if (rd?.impacto) { state._riesgoImp = rd.impacto; renderRiesgoStars('nc-riesgo-imp-container', rd.impacto); }
-    }, 100);
-  }, 100);
+  abrirUpdateRiesgo(riesgoId);
 }
 
 async function restaurarEntry(tipo, entryId) {
@@ -5606,7 +5904,7 @@ async function restaurarEntry(tipo, entryId) {
       try {
         await api('restaurarEntryEliminado', { tipo, entry_id: entryId, proyecto_id: proyectoId });
         showToast('Entrada restaurada', 'success');
-        await refreshProyectoDetalle(estadoPaneles);
+        syncRegistroFromLocalBundle(proyectoId);
       } catch(e) { showToast('Error: ' + e.message, 'error'); }
     }
   });
@@ -5615,24 +5913,28 @@ async function restaurarEntry(tipo, entryId) {
 function abrirEditarNota(entryId) {
   const n = state.logEventos.find(x => x.entry_id === entryId);
   if (!n) return;
-  let notaData = null;
-  try { notaData = JSON.parse(n.nota || '{}'); } catch(e) {}
+  const bundle = IS4TOptAdapter.projectBundles[state.currentProyecto?.proyecto_id];
+  const entity = (bundle?.notes || []).find(note => note.note_id === entryId);
+  if (!entity) { showToast('No se encontró la nota canónica en el bundle local', 'error'); return; }
   state.editandoNotaId = entryId;
+  state.editandoDudaId = null;
   state.editandoCambioId = null; // asegurar que no hay modo cambio activo
   // Pre-llenar tipo primero para que los campos estén visibles
   selectNotaCambioTipo('nota');
   // Fecha
-  document.getElementById('nc-fecha').value = normalizarFechaParaInput(n.fecha_real);
-  // Campos de nota — con fallback para notas legacy sin JSON
-  document.getElementById('nc-titulo').value = notaData?.titulo || '';
-  document.getElementById('nc-tipo-nota').value = notaData?.tipo || '';
-  document.getElementById('nc-texto').value = notaData?.contenido || (typeof n.nota === 'string' && !n.nota.startsWith('{') ? n.nota : '') || '';
+  document.getElementById('nc-fecha').value = normalizarFechaParaInput(entity.created_at || n.fecha_real);
+  document.getElementById('nc-titulo').value = entity.title || '';
+  document.getElementById('nc-tipo-nota').value = entity.note_type || '';
+  document.getElementById('nc-texto').value = entity.description || '';
   // Header y botón del modal
   document.getElementById('nota-cambio-title').textContent = 'Editar nota';
   document.getElementById('btn-guardar-nc').textContent = 'Guardar cambios';
   // Ocultar selector de tipo (en edición no se puede cambiar entre nota/cambio)
   document.querySelector('.entry-tipo-selector').style.display = 'none';
   buildNotaGrupoSelector();
+  document.getElementById('nc-nota-grupo').value = entity.group_id || '';
+  updateNotaGrupo();
+  document.getElementById('nc-nota-disciplina').value = entity.project_task_id || '';
   openModal('modal-nota-cambio');
 }
 
@@ -5649,9 +5951,8 @@ function borrarNota(entryId, hitoId, proyectoId) {
       const estadoPaneles = capturarEstadoPaneles();
       try {
         await api('borrarNota', { entry_id: entryId, hito_id: hitoId, proyecto_id: proyectoId });
-        state.logEventos = state.logEventos.filter(e => e.entry_id !== entryId && !(e.hito_id === hitoId && e.tipo_entry === 'nota_ref'));
         showToast('Nota eliminada', 'success');
-        if (state.currentProyecto) await refreshProyectoDetalle(estadoPaneles);
+        if (state.currentProyecto) syncRegistroFromLocalBundle(proyectoId);
       } catch(e) { showToast('Error: ' + e.message, 'error'); }
     }
   });
@@ -5776,7 +6077,7 @@ async function confirmarBorrarCambio() {
     }];
     closeModal('modal-borrar-cambio');
     showToast('Cambio eliminado', 'success');
-    if (state.currentProyecto) await refreshProyectoDetalle(estadoPaneles);
+    if (state.currentProyecto) syncRegistroFromLocalBundle(state.currentProyecto.proyecto_id);
   } catch(e) { showToast('Error: ' + e.message, 'error'); }
   finally { btn.disabled = false; btn.textContent = 'Eliminar cambio'; }
 }
@@ -6824,7 +7125,6 @@ async function guardarTareaEvento() {
   if (!state._modoEvergreen && !state.currentProyecto) return;
   const btn = document.getElementById('btn-guardar-tarea-evento');
   saveModalSnapshot('modal-tarea-evento', ['te-titulo','te-descripcion','te-estatus','te-fecha']);
-  closeModal('modal-tarea-evento');
   btn.disabled = true; btn.textContent = 'Guardando…';
   startSaving();
   const estadoPaneles = capturarEstadoPaneles();
@@ -6835,23 +7135,22 @@ async function guardarTareaEvento() {
         fecha_real: fecha,
         nota: JSON.stringify({ titulo, descripcion, estatus_nuevo: estatusNuevo || null })
       });
-      if (estatusNuevo) {
-        if (state._modoEvergreen) await api('actualizarEvergreenTarea', { tarea_id: tareaId, estatus: estatusNuevo });
-        else await api('actualizarTareaAdhoc', { tarea_id: tareaId, estatus: estatusNuevo });
+      if (estatusNuevo && !state._modoEvergreen) {
+        await api('actualizarTareaAdhoc', { tarea_id: tareaId, estatus: estatusNuevo });
       }
 closeModal('modal-tarea-evento');
 showToast('Evento actualizado', 'success');
 stopSaving(true);
+state._editandoTareaEventoId = null;
 
 if (state._modoEvergreen) {
-  const arqEmail = state.currentEvergreenArq;
+  syncBacklogFromLocalCache();
   state._modoEvergreen = false;
-  if (arqEmail) openEvergreen(arqEmail);
 } else if (state.currentProyecto) {
   await refreshProyectoDetalle(estadoPaneles);
 }
     } catch(e) { stopSaving(false); showToast('Error: ' + e.message, 'error'); }
-    finally { btn.disabled = false; btn.textContent = 'Guardar evento'; state._editandoTareaEventoId = null; }
+    finally { btn.disabled = false; btn.textContent = 'Guardar evento'; }
     return;
   }
   try {
@@ -6867,24 +7166,21 @@ if (state._modoEvergreen) {
       nota: JSON.stringify({ titulo, descripcion, estatus_nuevo: estatusNuevo || null }),
       version_timeline_activa: '1'
     });
-    if (estatusNuevo) {
+    if (estatusNuevo && !state._modoEvergreen) {
       const estatusFinal = estatusNuevo === 'completada-vobo' ? 'completada-vobo' : estatusNuevo;
-      if (state._modoEvergreen) await api('actualizarEvergreenTarea', { tarea_id: tareaId, estatus: estatusFinal });
-      else await api('actualizarTareaAdhoc', { tarea_id: tareaId, estatus: estatusFinal });
+      await api('actualizarTareaAdhoc', { tarea_id: tareaId, estatus: estatusFinal });
     }
     closeModal('modal-tarea-evento');
     showToast('Evento registrado', 'success');
     stopSaving(true);
     if (state._modoEvergreen) {
-      await loadEvergreenData();
-      const arqEmail = state.currentEvergreenArq;
+      syncBacklogFromLocalCache();
       state._modoEvergreen = false;
-      if (arqEmail) openEvergreen(arqEmail);
 } else if (state.currentProyecto) {
   await refreshProyectoDetalle(estadoPaneles);
 }
   } catch(e) { stopSaving(false); showToast('Error: ' + e.message, 'error'); await restoreModalSnapshot(); }
-  finally { btn.disabled = false; btn.textContent = 'Guardar evento'; state._modoEvergreen = false; }
+  finally { btn.disabled = false; btn.textContent = 'Guardar evento'; }
 }
 
 async function confirmarCierreTarea(tareaId) {
@@ -7250,9 +7546,8 @@ function borrarEvergreenEvento(entryId, tareaId) {
     onConfirm: async () => {
       try {
         await api('borrarLogEvento', { entry_id: entryId });
-        state.logEventos = state.logEventos.filter(x => x.entry_id !== entryId);
+        syncBacklogFromLocalCache();
         showToast('Evento eliminado', 'success');
-        await loadEvergreenData();
       } catch(e) { showToast('Error: ' + e.message, 'error'); }
     }
   });
@@ -7330,17 +7625,12 @@ function selectNotaCambioTipo(tipo) {
 
 function buildDudaGrupoSelector() {
   if (!state.currentProyecto) return;
-  const activasSet = new Set(
-    state.disciplinasProyecto
-      .filter(d => d.proyecto_id === state.currentProyecto.proyecto_id)
-      .map(d => d.disciplina_id)
-  );
   const grupos = {};
-  state.eventosCatalogo.forEach(e => {
-    if (!e.grupo_id || e.grupo_id === 'G0') return;
-    const key = `${e.grupo_id}::${e.disciplina_nombre}`;
-    if (!activasSet.has(key)) return;
-    if (!grupos[e.grupo_id]) grupos[e.grupo_id] = e.grupo_nombre;
+  state.disciplinasProyecto
+    .filter(d => d.proyecto_id === state.currentProyecto.proyecto_id && d.project_task_id)
+    .forEach(task => {
+      const gid = IS4TOptAdapter.canonicalGroupId(task.grupo_id || task.group_id);
+      if (gid) grupos[gid] = task.grupo_nombre || IS4TOptAdapter.groupName(gid);
   });
   const sel = document.getElementById('nc-duda-grupo');
   sel.innerHTML = '<option value="">Sin referencia</option>' +
@@ -7353,17 +7643,13 @@ function updateDudaGrupo() {
   const sel = document.getElementById('nc-duda-disciplina');
   sel.innerHTML = '<option value="">—</option>';
   if (!gid || !state.currentProyecto) return;
-  const activasSet = new Set(
-    state.disciplinasProyecto
-      .filter(d => d.proyecto_id === state.currentProyecto.proyecto_id)
-      .map(d => d.disciplina_id)
-  );
-  const discs = [...new Set(
-    state.eventosCatalogo
-      .filter(e => e.grupo_id === gid && activasSet.has(`${gid}::${e.disciplina_nombre}`))
-      .map(e => e.disciplina_nombre)
-  )];
-  discs.forEach(d => sel.innerHTML += `<option value="${d}">${d}</option>`);
+  state.disciplinasProyecto
+    .filter(task => task.proyecto_id === state.currentProyecto.proyecto_id &&
+      IS4TOptAdapter.canonicalGroupId(task.grupo_id || task.group_id) === gid && task.project_task_id)
+    .forEach(task => {
+      const label = task.disciplina_nombre || task.task_name || task.disciplina_id;
+      sel.innerHTML += `<option value="${task.project_task_id}">${label}</option>`;
+    });
 }
 
 function buildCambioRiesgoRefSelector() {
@@ -7371,8 +7657,7 @@ function buildCambioRiesgoRefSelector() {
   const sel = document.getElementById('nc-cambio-riesgo-ref');
   if (!sel) return;
   const riesgos = (state.riesgosDetalle || []).filter(r =>
-    r.proyecto_id === state.currentProyecto.proyecto_id &&
-    r.estatus === 'Cristalizado'
+    r.proyecto_id === state.currentProyecto.proyecto_id
   );
   sel.innerHTML = '<option value="">Sin referencia</option>' +
       riesgos.map(r => `<option value="${r.riesgo_id}">${r.risk_code || stripRiesgoPrefix(r.riesgo_id)} — ${getRiesgoTitulo(r.entry_id)}</option>`).join('');
@@ -7443,6 +7728,16 @@ function precargarRiesgoUpdate(riesgoId) {
   const impDisp  = document.getElementById('nc-riesgo-update-imp-display');
   if (probDisp) probDisp.textContent = RIESGO_PROB_LABELS[rd.probabilidad] || 'Sin cambio';
   if (impDisp)  impDisp.textContent  = RIESGO_IMP_LABELS[rd.impacto]      || 'Sin cambio';
+  document.getElementById('nc-riesgo-update-estatus').value = rd.estatus || '';
+  document.getElementById('nc-riesgo-update-fecha-revision').value = normalizarFechaParaInput(rd.fecha_revision);
+  document.getElementById('nc-riesgo-update-mitigacion').value = rd.notas_mitigacion || '';
+  document.getElementById('nc-texto').value = rd.description || rd.descripcion || '';
+  document.getElementById('nc-riesgo-titulo').value = rd.titulo || rd.title || '';
+  document.getElementById('nc-riesgo-categoria').value = rd.categoria || rd.category || '';
+  document.getElementById('nc-riesgo-hito-ref').value = rd.hito_ref_id || rd.milestone_catalog_id || '';
+  document.getElementById('nc-riesgo-grupo').value = rd.group_id || '';
+  updateRiesgoGrupo();
+  document.getElementById('nc-riesgo-disciplina').value = rd.project_task_id || '';
 }
 
 function updateRiesgoCategoriaTip() {
@@ -7599,8 +7894,9 @@ function getRespuestaDuda(entryId) {
 
 function openResponderDuda(entryId, titulo) {
   state._respondiendo_duda_id = entryId;
+  const duda = getDudaDetalle(entryId);
   document.getElementById('respuesta-duda-titulo').textContent = titulo || 'Duda';
-  document.getElementById('rd-texto').value = '';
+  document.getElementById('rd-texto').value = duda?.respuesta || duda?.answer_text || '';
   document.getElementById('rd-fecha').value = new Date().toISOString().split('T')[0];
   openModal('modal-respuesta-duda');
 }
@@ -7611,8 +7907,6 @@ async function guardarRespuestaDuda() {
   const entryIdDuda = state._respondiendo_duda_id;
   if (!entryIdDuda || !state.currentProyecto) return;
   const btn = document.getElementById('btn-guardar-respuesta');
-  saveModalSnapshot('modal-respuesta-duda', ['rd-fecha','rd-texto']);
-  closeModal('modal-respuesta-duda');
   btn.disabled = true; btn.textContent = 'Guardando…';
   startSaving();
   const estadoPaneles = capturarEstadoPaneles();
@@ -7624,9 +7918,10 @@ async function guardarRespuestaDuda() {
       fecha_real: document.getElementById('rd-fecha').value
     });
     closeModal('modal-respuesta-duda');
+    stopSaving(true);
     showToast('Respuesta guardada', 'success');
-    await refreshProyectoDetalle(estadoPaneles);
-  } catch(e) { stopSaving(false); showToast('Error: ' + e.message, 'error'); await restoreModalSnapshot(); }
+    syncRegistroFromLocalBundle(state.currentProyecto.proyecto_id);
+  } catch(e) { stopSaving(false); showToast('Error: ' + e.message, 'error'); }
   finally { btn.disabled = false; btn.textContent = 'Guardar respuesta'; }
 }
 
@@ -7635,7 +7930,7 @@ async function obsoletarDuda(entryId) {
   try {
     await api('actualizarEstatusDuda', { entry_id: entryId, estatus: 'obsoleta' });
     showToast('Duda marcada como obsoleta', 'success');
-    await refreshProyectoDetalle(estadoPaneles);
+    syncRegistroFromLocalBundle(state.currentProyecto.proyecto_id);
   } catch(e) { showToast('Error: ' + e.message, 'error'); }
 }
 
@@ -7805,6 +8100,23 @@ document.addEventListener('keydown', e => {
     toggleBusqueda();
   }
 });
+
+function bloquearAutocompleteModales() {
+  document.querySelectorAll('.modal, .modal-overlay').forEach(container => container.setAttribute('autocomplete', 'off'));
+  document.querySelectorAll('.modal input:not([type="date"]):not([type="time"]):not([type="number"]), .modal textarea').forEach((field, index) => {
+    field.setAttribute('autocomplete', 'off');
+    field.setAttribute('autocorrect', 'off');
+    field.setAttribute('autocapitalize', 'off');
+    field.setAttribute('spellcheck', 'false');
+    field.setAttribute('data-lpignore', 'true');
+    field.setAttribute('data-1p-ignore', 'true');
+    field.setAttribute('data-form-type', 'other');
+    field.name = `is4t_phase3a_${field.id || index}`;
+  });
+}
+
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bloquearAutocompleteModales);
+else bloquearAutocompleteModales();
 
 function irAGrupo(grupoId) {
   cerrarBusqueda();
