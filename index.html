@@ -1112,6 +1112,7 @@ let state = {
   evergreenTareas: [],
   dudasDetalle: [],
   riesgosDetalle: [], riesgosBorrados: [], riesgosDetalleBorrados: [],
+  _riskCodeById: {},
   entriesBorrados: [],
   diasPausaAcumulados: {},
   _editandoEntryId: null, editandoNotaId: null,
@@ -1489,7 +1490,7 @@ const IS4TOptAdapter = {
       timestamp: r.created_at,
       nota: JSON.stringify({
         riesgo_id: r.risk_id,
-        risk_code: r.risk_code || r.risk_id,
+        risk_code: r.risk_code || state._riskCodeById[r.risk_id] || r.risk_id,
         titulo: r.title,
         descripcion: r.description,
         probabilidad: r.probability,
@@ -1505,7 +1506,7 @@ const IS4TOptAdapter = {
     return (bundle?.risks || []).map(r => ({
       ...r,
       riesgo_id: r.risk_id,
-      risk_code: r.risk_code || r.risk_id,
+      risk_code: r.risk_code || state._riskCodeById[r.risk_id] || r.risk_id,
       entry_id: r.risk_id,
       proyecto_id: r.project_id,
       titulo: r.title,
@@ -2053,6 +2054,7 @@ const IS4TOptAdapter = {
         status: statusToNew(body.estatus || 'Activo')
       });
       this.reset('project', projectId);
+      if (result.risk_id && result.risk_code) state._riskCodeById[result.risk_id] = result.risk_code;
       return { riesgo_id: result.risk_id, risk_code: result.risk_code, entry_id: result.risk_id };
     }
     if (action === 'actualizarRiesgo') {
@@ -2221,9 +2223,17 @@ function initGoogleAPI() {
   if (savedUser) {
     try {
       state.user = JSON.parse(savedUser);
-      silentSignInPending = true;
       document.getElementById('login-screen').classList.add('restoring');
-      tokenClient.requestAccessToken({ prompt: '' });
+      const savedToken = localStorage.getItem('is4_token');
+      const expiresAt = Number(localStorage.getItem('is4_token_expires_at') || 0);
+      if (savedToken && expiresAt > Date.now() + 60000) {
+        state.accessToken = savedToken;
+        scheduleTokenRenewal((expiresAt - Date.now()) / 1000);
+        completeSignIn();
+      } else {
+        silentSignInPending = true;
+        tokenClient.requestAccessToken({ prompt: '' });
+      }
     } catch(e) {
       showLoginScreen(true);
     }
@@ -4940,7 +4950,7 @@ function renderEntriesEliminados(proyecto) {
 }
 function stripRiesgoPrefix(riesgoId) {
   const detail = (state.riesgosDetalle || []).find(r => r.riesgo_id === riesgoId);
-  if (detail?.risk_code) return detail.risk_code;
+  if (detail?.risk_code || state._riskCodeById[riesgoId]) return detail?.risk_code || state._riskCodeById[riesgoId];
   if (!riesgoId || !riesgoId.includes('-')) return riesgoId;
   return riesgoId.split('-').slice(1).join('-') || riesgoId;
 }
@@ -6309,7 +6319,7 @@ function parseISODate(d) {
   if (d instanceof Date) return isNaN(d) ? null : d;
   const s = d.toString().trim();
   // Formato YYYY-MM-DD
-  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return new Date(s + 'T12:00:00');
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return new Date(s.slice(0, 10) + 'T12:00:00');
   // Cualquier otro string — intentar parsear directamente
   const dt = new Date(s);
   return isNaN(dt) ? null : dt;
