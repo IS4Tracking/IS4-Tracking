@@ -23,7 +23,7 @@
   --accent: #58a6ff;  /* Azul brillante */
   --accent2: #1f6feb; /* Azul profundo */
   
-/* Semánticos para Dashboard (High Contrast / - Eye-Friendly) */
+/* Semánticos para Dashboard (High Contrast / Eye-Friendly) */
   --red: #ff6b6b;    /* Crítico / Retrasado */
   --yellow: #e3b341; /* Riesgo / En Pausa */
   --green: #44cc88;  /* Completado / A tiempo */
@@ -1126,6 +1126,16 @@ let state = {
   _filtroRegistro: 'todos'
 };
 
+const ENTITY_WRITE_ACTIONS = new Set([
+  'createProject','updateProject','deleteProject','changeProjectStatus','reassignArchitect','saveProjectSettings',
+  'updateStandardTask','addProjectEvent','editProjectEvent','deleteProjectEvent',
+  'createNote','editNote','deleteNote','createChange','editChange','deleteChange',
+  'createRisk','updateRisk','deleteRisk','createQuestion','answerQuestion','updateQuestionStatus','deleteQuestion',
+  'createExtrTask','updateExtrTask','deleteExtrTask','addExtrTaskEvent','deleteExtrTaskEvent',
+  'saveSnapshot','deleteSnapshot','createBacklogTask','updateBacklogTask','deleteBacklogTask',
+  'addBacklogEvent','deleteBacklogEvent','restoreDeletedOperationalItem'
+]);
+
 const IS4TOptAdapter = {
   bootstrap: null,
   home: null,
@@ -1133,8 +1143,12 @@ const IS4TOptAdapter = {
   projectBundles: {},
   projectBundlePromises: {},
   backlog: null,
+  _localWriteProjects: {},
+  _localBacklogWrite: false,
+  _pendingWriteTypes: new Set(),
 
   async raw(action, body = {}) {
+    const callStarted = performance.now();
     const payload = { action, token: state.accessToken, ...body };
     const res = await fetch(CONFIG.WEBAPP_URL, {
       method: 'POST',
@@ -1144,6 +1158,21 @@ const IS4TOptAdapter = {
     const data = await res.json();
     if (!res.ok) throw new Error(`Error HTTP ${res.status}`);
     if (data && (data.error || data.ok === false)) throw new Error(data.error || 'La operaciÃ³n no fue aplicada');
+    if (!String(action).startsWith('get') && data?.ok !== true) {
+      throw new Error('El backend no confirmÃ³ la persistencia de la operaciÃ³n');
+    }
+    if (ENTITY_WRITE_ACTIONS.has(action) && !data?.entity) {
+      throw new Error('El backend confirmÃ³ sin devolver la entidad persistida');
+    }
+    if (data?.entity_type) {
+      const localStarted = performance.now();
+      this.applyWriteResponse(action, body, data);
+      console.log(`[PERF][WRITE][${String(data.entity_type).toUpperCase()}]`, {
+        call_ms: Math.round(performance.now() - callStarted),
+        local_update_ms: Math.round(performance.now() - localStarted),
+        backend: data._perf || null
+      });
+    }
     return data;
   },
 
@@ -1174,6 +1203,14 @@ const IS4TOptAdapter = {
   },
 
   reset(scope, projectId) {
+    if (scope === 'project' && projectId && this._localWriteProjects[projectId]) {
+      delete this._localWriteProjects[projectId];
+      return;
+    }
+    if (scope === 'backlog' && this._localBacklogWrite) {
+      this._localBacklogWrite = false;
+      return;
+    }
     if (!scope || scope === 'home') {
       this.home = null;
       this.homePromise = null;
@@ -1197,8 +1234,123 @@ const IS4TOptAdapter = {
   },
 
   invalidateProject(projectId, affectsHome) {
-    this.reset('project', projectId);
+    if (this._localWriteProjects[projectId]) delete this._localWriteProjects[projectId];
+    else this.reset('project', projectId);
     if (affectsHome) this.reset('home');
+  },
+
+  upsertById(list, entity, idField) {
+    if (!entity || !idField) return list || [];
+    const rows = list || [];
+    const id = entity[idField];
+    const index = rows.findIndex(row => row[idField] === id);
+    if (index >= 0) rows[index] = { ...rows[index], ...entity };
+    else rows.push(entity);
+    return rows;
+  },
+
+  applyProjectEntity(bundle, type, entity, operation) {
+    const config = {
+      project_event:['events','project_event_id','events'],
+      note:['notes','note_id','notes'],
+      change:['changes','change_id','changes'],
+      risk:['risks','risk_id','risks'],
+      question:['questions','question_id','questions'],
+      extr_task:['extr_tasks','manual_task_id','extr_tasks'],
+      extr_task_event:['extr_task_events','manual_task_event_id','extr_task_events'],
+      snapshot:['snapshots','snapshot_id','snapshots'],
+      std_task:['std_tasks','project_task_id','std_tasks']
+    }[type];
+    if (!bundle || !entity) return;
+    if (type === 'project') {
+      bundle.project = { ...(bundle.project || {}), ...entity };
+      return;
+    }
+    if (!config) return;
+    const [collection, idField, deletedKey] = config;
+    bundle[collection] = bundle[collection] || [];
+    bundle.deleted_items = bundle.deleted_items || {};
+    bundle.deleted_items[deletedKey] = bundle.deleted_items[deletedKey] || [];
+    const id = entity[idField];
+    const isDelete = operation === 'delete' || entity.is_deleted === true ||
+      String(entity.is_deleted).toUpperCase() === 'TRUE';
+    if (isDelete) {
+      bundle[collection] = bundle[collection].filter(row => row[idField] !== id);
+      this.upsertById(bundle.deleted_items[deletedKey], entity, idField);
+    } else {
+      bundle.deleted_items[deletedKey] = bundle.deleted_items[deletedKey]
+        .filter(row => row[idField] !== id);
+      this.upsertById(bundle[collection], entity, idField);
+    }
+  },
+
+  applyRelatedProjectEntities(bundle, related) {
+    if (!bundle || !related) return;
+    const idFields = {
+      std_tasks:'project_task_id', events:'project_event_id', milestones:'project_milestone_id',
+      extr_tasks:'manual_task_id', extr_task_events:'manual_task_event_id',
+      assignment_history:'assignment_history_id', status_history:'status_history_id',
+      timeline_versions:'timeline_version_id', snapshots:'snapshot_id'
+    };
+    Object.keys(idFields).forEach(key => {
+      const rows = (related[key] || []).filter(Boolean);
+      if (!rows.length) return;
+      bundle[key] = bundle[key] || [];
+      rows.forEach(row => this.upsertById(bundle[key], row, idFields[key]));
+    });
+  },
+
+  applyBacklogEntity(type, entity, operation, related) {
+    this.backlog = this.backlog || { tasks:[], events:[], deleted_items:{ tasks:[], events:[] } };
+    this.backlog.deleted_items = this.backlog.deleted_items || { tasks:[], events:[] };
+    const isTask = type === 'backlog_task';
+    const collection = isTask ? 'tasks' : 'events';
+    const idField = isTask ? 'backlog_task_id' : 'backlog_event_id';
+    const id = entity?.[idField];
+    const isDelete = operation === 'delete' || entity?.is_deleted === true ||
+      String(entity?.is_deleted).toUpperCase() === 'TRUE';
+    if (entity) {
+      if (isDelete) {
+        this.backlog[collection] = (this.backlog[collection] || []).filter(row => row[idField] !== id);
+        this.upsertById(this.backlog.deleted_items[collection], entity, idField);
+      } else {
+        this.backlog.deleted_items[collection] = (this.backlog.deleted_items[collection] || [])
+          .filter(row => row[idField] !== id);
+        this.upsertById(this.backlog[collection], entity, idField);
+      }
+    }
+    (related?.backlog_tasks || []).filter(Boolean)
+      .forEach(row => this.upsertById(this.backlog.tasks, row, 'backlog_task_id'));
+    this._localBacklogWrite = true;
+  },
+
+  applyWriteResponse(action, body, response) {
+    const entity = response.entity;
+    const type = response.entity_type;
+    const projectId = entity?.project_id || body.project_id || body.proyecto_id ||
+      state.currentProyecto?.proyecto_id || '';
+    const localStarted = performance.now();
+    if (type !== 'backlog_task' && type !== 'backlog_event') this._pendingWriteTypes.add(type);
+    if (type === 'backlog_task' || type === 'backlog_event') {
+      this.applyBacklogEntity(type, entity, response.operation, response.related_entities);
+    } else if (projectId) {
+      const bundle = this.projectBundles[projectId];
+      if (bundle) {
+        this.applyProjectEntity(bundle, type, entity, response.operation);
+        this.applyRelatedProjectEntities(bundle, response.related_entities);
+        if (response.project_summary) bundle.summary = {
+          ...(bundle.summary || {}), ...response.project_summary
+        };
+        bundle.generated_at = new Date().toISOString();
+      }
+      this._localWriteProjects[projectId] = true;
+    }
+    if (response.invalidate?.home || response.affects_home) {
+      this.home = null;
+      this.homePromise = null;
+    }
+    console.log(`[PERF][WRITE][${String(type).toUpperCase()}] local cache`,
+      Math.round(performance.now() - localStarted), 'ms');
   },
 
   async ensureBootstrap() {
@@ -1852,29 +2004,20 @@ const IS4TOptAdapter = {
     }
 
     if (action === 'actualizarProyecto') {
-      const currentProject = state.currentProyecto || {};
-      await this.raw('updateProject', {
+      result = await this.raw('saveProjectSettings', {
         project_id: projectId,
         project_name: body.nombre,
         project_code: body.clave_innovasport ?? body.clave,
         project_type: body.tipo_proyecto ?? body.tipo,
-        approval_date: body.fecha_aprobacion,
+        ...(body.fecha_aprobacion ? { approval_date: body.fecha_aprobacion } : {}),
         bubble_plan_applies: body.bubble_plan_aplica ?? body.bubble_plan,
-        notes: body.notas
+        notes: body.notas,
+        status: body.estado,
+        assigned_architect_user_id: body.arquitecto_id ? this.userIdFromEmailOrId(body.arquitecto_id) : '',
+        optional_task_updates: body.optional_task_updates || []
       });
-      if (body.estado && body.estado !== currentProject.estado) {
-        await this.raw('changeProjectStatus', { project_id: projectId, new_status: body.estado });
-      }
-      const nextArchitectId = body.arquitecto_id ? this.userIdFromEmailOrId(body.arquitecto_id) : '';
-      const currentArchitectId = currentProject.arquitecto_user_id || this.userIdFromEmailOrId(currentProject.arquitecto_id);
-      if (nextArchitectId && nextArchitectId !== currentArchitectId) {
-        await this.raw('reassignArchitect', {
-          project_id: projectId,
-          assigned_architect_user_id: nextArchitectId
-        });
-      }
-      this.reset('project', projectId); this.reset('home');
-      return { ok: true };
+      delete this._localWriteProjects[projectId];
+      return result;
     }
 
     if (action === 'borrarProyecto') {
@@ -1906,7 +2049,7 @@ const IS4TOptAdapter = {
           status_change_to: statusToNew(body.estatus_nuevo || safeJson(body.nota, {}).estatus_nuevo || ''),
           event_date: body.fecha_real || todayISO()
         });
-        this.invalidateProject(projectId, true);
+        this.invalidateProject(projectId, !!result.affects_home);
         return { entry_id: result.manual_task_event_id };
       }
       if (body.tipo_entry === 'hito_alcanzado') {
@@ -1924,7 +2067,7 @@ const IS4TOptAdapter = {
         event_datetime: body.fecha_hora || '',
         notes: body.nota || ''
       });
-      this.invalidateProject(projectId, true);
+      this.invalidateProject(projectId, !!result.affects_home);
       return { entry_id: result.project_event_id };
     }
 
@@ -1942,7 +2085,7 @@ const IS4TOptAdapter = {
         event_date: body.fecha_real,
         notes: body.nota
       });
-      this.invalidateProject(projectId, true);
+      this.invalidateProject(projectId, !!result.affects_home);
       return result;
     }
 
@@ -1957,7 +2100,7 @@ const IS4TOptAdapter = {
       } else {
         result = await this.raw('deleteProjectEvent', { project_id: projectId, project_event_id: body.entry_id });
       }
-      this.invalidateProject(projectId, true);
+      this.invalidateProject(projectId, !!result.affects_home);
       return result;
     }
 
@@ -1970,7 +2113,7 @@ const IS4TOptAdapter = {
         notes: body.notas,
         category: body.categoria || 'Sin clasificar'
       });
-      this.invalidateProject(projectId, true);
+      this.invalidateProject(projectId, !!result.affects_home);
       return { tarea_id: result.manual_task_id };
     }
     if (action === 'actualizarTareaAdhoc') {
@@ -1983,12 +2126,12 @@ const IS4TOptAdapter = {
         notes: body.notas,
         status: statusToNew(body.estatus)
       });
-      this.invalidateProject(projectId, true);
+      this.invalidateProject(projectId, !!result.affects_home);
       return result;
     }
     if (action === 'borrarTareaAdhoc') {
       result = await this.raw('deleteExtrTask', { ...projectBody(), manual_task_id: body.tarea_id });
-      this.invalidateProject(projectId, true);
+      this.invalidateProject(projectId, !!result.affects_home);
       return result;
     }
 
@@ -2053,7 +2196,7 @@ const IS4TOptAdapter = {
         affected_project_task_ids: this.taskIdsFromLegacy(projectId, body.disciplinas_afectadas),
         scope_description: body.alcance || body.descripcion || ''
       });
-      this.invalidateProject(projectId, true); return { change_id: result.change_id, change_code: result.change_code || '' };
+      this.invalidateProject(projectId, !!result.affects_home); return { change_id: result.change_id, change_code: result.change_code || '' };
     }
     if (action === 'editarCambioDetalle') {
       result = await this.raw('editChange', {
@@ -2064,11 +2207,11 @@ const IS4TOptAdapter = {
         affected_project_task_ids: this.taskIdsFromLegacy(projectId, body.disciplinas_afectadas),
         scope_description: body.alcance
       });
-      this.invalidateProject(projectId, true); return result;
+      this.invalidateProject(projectId, !!result.affects_home); return result;
     }
     if (action === 'borrarCambio') {
       result = await this.raw('deleteChange', { ...projectBody(), change_id: body.entry_id });
-      this.invalidateProject(projectId, true); return result;
+      this.invalidateProject(projectId, !!result.affects_home); return result;
     }
     if (action === 'crearDuda') {
       result = await this.raw('createQuestion', {
@@ -2104,7 +2247,7 @@ const IS4TOptAdapter = {
         project_task_id: body.project_task_id || this.taskIdFromLegacy(projectId, body.disc_ref),
         status: statusToNew(body.estatus || 'Activo')
       });
-      this.invalidateProject(projectId, true);
+      this.invalidateProject(projectId, !!result.affects_home);
       if (result.risk_id && result.risk_code) state._riskCodeById[result.risk_id] = result.risk_code;
       return { riesgo_id: result.risk_id, risk_code: result.risk_code, entry_id: result.risk_id };
     }
@@ -2118,11 +2261,11 @@ const IS4TOptAdapter = {
         mitigation_notes: body.notas_mitigacion,
         review_date: body.fecha_revision
       });
-      this.invalidateProject(projectId, true); return result;
+      this.invalidateProject(projectId, !!result.affects_home); return result;
     }
     if (action === 'borrarRiesgo') {
       result = await this.raw('deleteRisk', { ...projectBody(), risk_id: body.riesgo_id || body.entry_id });
-      this.invalidateProject(projectId, true); return result;
+      this.invalidateProject(projectId, !!result.affects_home); return result;
     }
     if (action === 'restaurarEntryEliminado') {
       const typeMap = { nota:'note', cambio:'change', duda:'question', riesgo:'risk', evento:'project_event' };
@@ -2131,7 +2274,7 @@ const IS4TOptAdapter = {
         record_id: body.entry_id,
         project_id: projectId
       });
-      this.invalidateProject(projectId, ['cambio','riesgo','evento'].includes(body.tipo)); return result;
+      this.invalidateProject(projectId, !!result.affects_home); return result;
     }
     if (action === 'guardarSnapshot') {
       result = await this.raw('saveSnapshot', {
@@ -2956,9 +3099,41 @@ async function refreshProyectoDetalle(estadoPaneles = null) {
   const timer = `[PERF][PROJECT] post-write refresh - ${projectId} - ${Date.now()}`;
   console.time(timer);
   try {
-    IS4TOptAdapter.reset('project', projectId);
     await loadProyectoData(projectId);
-    renderProyectoDetalleActual(projectId);
+    const p = state.proyectos.find(x => x.proyecto_id === projectId) || state.currentProyecto;
+    const types = new Set(IS4TOptAdapter._pendingWriteTypes || []);
+    IS4TOptAdapter._pendingWriteTypes.clear();
+    const renderStarted = performance.now();
+    if (!types.size) {
+      renderProyectoDetalleActual(projectId);
+    } else {
+      const registerTypes = ['note','question','change','risk','snapshot'];
+      const taskTypes = ['extr_task','extr_task_event'];
+      const eventTypes = ['project_event','std_task'];
+      const renderRegister = registerTypes.some(type => types.has(type));
+      const renderTasks = taskTypes.some(type => types.has(type));
+      const renderEvents = eventTypes.some(type => types.has(type));
+      const renderSettings = types.has('project');
+
+      if (renderSettings) {
+        state.currentProyecto = p;
+        document.getElementById('detail-title').textContent = p.nombre;
+        document.getElementById('detail-meta').textContent =
+          `${p.clave_innovasport ? p.clave_innovasport + ' Â· ' : ''}${p.tipo_proyecto || 'â€”'} Â· AprobaciÃ³n: ${formatDate(p.fecha_aprobacion)} Â· Entrega estimada: ${p.fecha_entrega ? formatDate(p.fecha_entrega) : calcFechaEntrega(p.fecha_aprobacion)}`;
+      }
+      if (renderRegister) document.getElementById('detail-notas').innerHTML = renderNotas(p);
+      if (renderTasks || renderSettings) document.getElementById('detail-tareas').innerHTML = renderTareasAdhoc(p);
+      if (renderEvents || renderSettings) {
+        renderGroups(p);
+        document.getElementById('detail-timeline').innerHTML = renderTimeline(p);
+      }
+      if (renderEvents || renderSettings || types.has('risk') || types.has('change')) {
+        document.getElementById('detail-scoreboard').innerHTML = renderScoreboard(projectId, true);
+      }
+      console.log('[PERF][WRITE] render component', {
+        types:[...types], render_ms:Math.round(performance.now() - renderStarted)
+      });
+    }
 
     if (estadoPaneles) {
       restaurarEstadoPaneles(estadoPaneles);
@@ -4239,7 +4414,7 @@ async function guardarNota() {
     });
     cerrarFormNota();
     showToast('Nota guardada', 'success');
-    await loadProyectoData(state.currentProyecto.proyecto_id);
+    await refreshProyectoDetalle(capturarEstadoPaneles());
   } catch(e) {
     showToast('Error: ' + e.message, 'error');
   } finally {
@@ -4842,6 +5017,20 @@ async function guardarSettings() {
     }
 
     const fechaInput = document.getElementById('s-fecha').value;
+    const optionalTaskUpdates = [];
+    if (state.rol === 'PM') {
+      const optionalState = {
+        alarma_sismica:    document.getElementById('toggle-alarma-sismica')?.classList.contains('on') || false,
+        puerta_emergencia: document.getElementById('toggle-puerta-emergencia')?.classList.contains('on') || false,
+        proyector_laser:   document.getElementById('toggle-proyector-laser')?.classList.contains('on') || false,
+      };
+      Object.keys(optionalState).forEach(key => {
+        const task = getProjectStdTaskByOptionalKey(key, state.currentProyecto.proyecto_id);
+        if (task?.project_task_id && boolTrue(task.applies ?? task.aplica) !== optionalState[key]) {
+          optionalTaskUpdates.push({ project_task_id:task.project_task_id, applies:optionalState[key] });
+        }
+      });
+    }
     await api('actualizarProyecto', {
       proyecto_id: state.currentProyecto.proyecto_id,
       nombre, clave_innovasport: document.getElementById('s-clave').value,
@@ -4853,16 +5042,9 @@ async function guardarSettings() {
       bubble_plan_aplica: document.getElementById('toggle-settings-bubble').classList.contains('on'),
       notas: document.getElementById('s-notas').value,
       fecha_pausa,
-      fecha_reactivacion
+      fecha_reactivacion,
+      optional_task_updates: optionalTaskUpdates
     });
-
-    if (state.rol === 'PM') {
-      await guardarTareasOpcionalesSettings(state.currentProyecto.proyecto_id, {
-        alarma_sismica:    document.getElementById('toggle-alarma-sismica')?.classList.contains('on') || false,
-        puerta_emergencia: document.getElementById('toggle-puerta-emergencia')?.classList.contains('on') || false,
-        proyector_laser:   document.getElementById('toggle-proyector-laser')?.classList.contains('on') || false,
-      });
-    }
 
     closeModal('modal-settings');
     const msgPausa = estadoNuevo === 'En pausa' ? ' · Proyecto en pausa' : estadoAnterior === 'En pausa' ? ' · Proyecto reactivado' : '';
