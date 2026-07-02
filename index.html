@@ -1157,12 +1157,12 @@ const IS4TOptAdapter = {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(`Error HTTP ${res.status}`);
-    if (data && (data.error || data.ok === false)) throw new Error(data.error || 'La operaciÃ³n no fue aplicada');
+    if (data && (data.error || data.ok === false)) throw new Error(data.error || 'La operación no fue aplicada');
     if (!String(action).startsWith('get') && data?.ok !== true) {
-      throw new Error('El backend no confirmÃ³ la persistencia de la operaciÃ³n');
+      throw new Error('El backend no confirmó la persistencia de la operación');
     }
     if (ENTITY_WRITE_ACTIONS.has(action) && !data?.entity) {
-      throw new Error('El backend confirmÃ³ sin devolver la entidad persistida');
+      throw new Error('El backend confirmó sin devolver la entidad persistida');
     }
     if (data?.entity_type) {
       const localStarted = performance.now();
@@ -3119,7 +3119,7 @@ async function refreshProyectoDetalle(estadoPaneles = null) {
         state.currentProyecto = p;
         document.getElementById('detail-title').textContent = p.nombre;
         document.getElementById('detail-meta').textContent =
-          `${p.clave_innovasport ? p.clave_innovasport + ' Â· ' : ''}${p.tipo_proyecto || 'â€”'} Â· AprobaciÃ³n: ${formatDate(p.fecha_aprobacion)} Â· Entrega estimada: ${p.fecha_entrega ? formatDate(p.fecha_entrega) : calcFechaEntrega(p.fecha_aprobacion)}`;
+          `${p.clave_innovasport ? p.clave_innovasport + ' · ' : ''}${p.tipo_proyecto || '—'} · Aprobación: ${formatDate(p.fecha_aprobacion)} · Entrega estimada: ${p.fecha_entrega ? formatDate(p.fecha_entrega) : calcFechaEntrega(p.fecha_aprobacion)}`;
       }
       if (renderRegister) document.getElementById('detail-notas').innerHTML = renderNotas(p);
       if (renderTasks || renderSettings) document.getElementById('detail-tareas').innerHTML = renderTareasAdhoc(p);
