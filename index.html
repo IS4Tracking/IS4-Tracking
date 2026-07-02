@@ -1102,6 +1102,11 @@ const CONFIG = {
 let state = {
   user: null, rol: null, accessToken: null,
   proyectos: [], eventosCatalogo: [], logEventos: [], criterios: [], usuarios: [],
+  homeAlerts: {
+    overdue_milestones: [], upcoming_milestones: [],
+    overdue_tasks: [], upcoming_tasks: [],
+    critical_risks: [], risk_reviews: []
+  },
   disciplinasProyecto: [],
   currentProyecto: null, entryTipo: 'nota',
   bubblePlan: false, disciplinasSeleccionadas: new Set(),
@@ -1123,6 +1128,7 @@ let state = {
 const IS4TOptAdapter = {
   bootstrap: null,
   home: null,
+  homePromise: null,
   projectBundles: {},
   projectBundlePromises: {},
   backlog: null,
@@ -1167,12 +1173,25 @@ const IS4TOptAdapter = {
   },
 
   reset(scope, projectId) {
-    if (!scope || scope === 'home') this.home = null;
-    if (!scope || scope === 'backlog') this.backlog = null;
+    if (!scope || scope === 'home') {
+      this.home = null;
+      this.homePromise = null;
+    }
+    if (!scope || scope === 'backlog') {
+      this.backlog = null;
+      if (scope === 'backlog') {
+        this.home = null;
+        this.homePromise = null;
+      }
+    }
     if (!scope || scope === 'project') {
       if (projectId) {
         delete this.projectBundles[projectId];
         delete this.projectBundlePromises[projectId];
+        if (scope === 'project') {
+          this.home = null;
+          this.homePromise = null;
+        }
       } else {
         this.projectBundles = {};
         this.projectBundlePromises = {};
@@ -1186,8 +1205,26 @@ const IS4TOptAdapter = {
   },
 
   async ensureHome() {
-    if (!this.home) this.home = await this.raw('getHomeBundle');
-    return this.home;
+    if (this.home) return this.home;
+    if (!this.homePromise) {
+      const request = this.raw('getHomeBundle')
+        .then(home => {
+          if (this.homePromise === request) {
+            this.home = home;
+            if (home?.backlog) this.backlog = home.backlog;
+          }
+          return home;
+        })
+        .catch(error => {
+          if (this.homePromise === request) this.homePromise = null;
+          throw error;
+        });
+      this.homePromise = request;
+    }
+    const pending = this.homePromise;
+    const home = await pending;
+    if (this.homePromise === pending) this.homePromise = null;
+    return home;
   },
 
   async ensureProject(projectId) {
@@ -1316,6 +1353,18 @@ const IS4TOptAdapter = {
 
   homeProjects() {
     return (this.home?.projects || []).map(p => this.projectRow(p));
+  },
+
+  homeAlerts() {
+    const alerts = this.home?.alerts || {};
+    return {
+      overdue_milestones: alerts.overdue_milestones || [],
+      upcoming_milestones: alerts.upcoming_milestones || [],
+      overdue_tasks: alerts.overdue_tasks || [],
+      upcoming_tasks: alerts.upcoming_tasks || [],
+      critical_risks: alerts.critical_risks || [],
+      risk_reviews: alerts.risk_reviews || []
+    };
   },
 
   bundleProjects(projectId) {
@@ -2406,7 +2455,7 @@ async function restoreModalSnapshot() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function loadStaticData() {
-  console.time('[PERF] loadStaticData');
+  console.time('[PERF][HOME] loadStaticData');
   try {
     const [usuarios, eventos] = await Promise.all([
       api('getUsuarios'),
@@ -2414,36 +2463,40 @@ async function loadStaticData() {
     ]);
     state.usuarios = usuarios || [];
     state.eventosCatalogo = eventos || [];
-  } catch(e) { console.error('[PERF] loadStaticData error:', e.message); }
-  console.timeEnd('[PERF] loadStaticData');
+  } catch(e) { console.error('[PERF][HOME] loadStaticData error:', e.message); }
+  console.timeEnd('[PERF][HOME] loadStaticData');
 }
 
 async function loadHomeData() {
-  console.time('[PERF] loadHomeData total');
+  let coreTimerStarted = false;
+  console.time('[PERF][HOME] loadHomeData total');
   try {
-    console.time('[PERF] loadHomeData core');
-    const [proyectos, evergreen] = await Promise.all([
-      api('getProyectos'),
-      api('getBacklog', {}).catch(e => { console.warn('[PERF] getBacklog error:', e.message); return []; })
-    ]);
-    console.timeEnd('[PERF] loadHomeData core');
-    state.proyectos       = proyectos     || [];
-    state.criterios       = [];
+    console.time('[PERF][HOME] loadHomeData core');
+    coreTimerStarted = true;
+    await IS4TOptAdapter.ensureHome();
+    console.timeEnd('[PERF][HOME] loadHomeData core');
+    coreTimerStarted = false;
+    state.proyectos = IS4TOptAdapter.homeProjects();
+    state.homeAlerts = IS4TOptAdapter.homeAlerts();
+    state.criterios = [];
 
     // Módulos adicionales en paralelo (IX-1: antes eran secuenciales)
-    state.evergreenTareas = evergreen || [];
+    state.evergreenTareas = IS4TOptAdapter.backlogTasks();
     const otrosLogs = (state.logEventos || []).filter(e => e.proyecto_id !== 'BACKLOG' && e.proyecto_id !== 'EVERGREEN');
     state.logEventos = [...otrosLogs, ...IS4TOptAdapter.backlogEvents()];
   } catch(e) { showToast('Error cargando datos: ' + e.message, 'error'); console.error(e); }
-  console.timeEnd('[PERF] loadHomeData total');
+  finally {
+    if (coreTimerStarted) console.timeEnd('[PERF][HOME] loadHomeData core');
+    console.timeEnd('[PERF][HOME] loadHomeData total');
+  }
 }
 
 async function loadProyectoData(proyectoId) {
   if (!proyectoId) return;
 
   const runId = `${proyectoId} - ${Date.now()} - ${Math.random().toString(36).slice(2, 7)}`;
-  const timerTotal = `[PERF] loadProyectoData total - ${runId}`;
-  const timerBundle = `[PERF] loadProyectoData bundle - ${runId}`;
+  const timerTotal = `[PERF][PROJECT] loadProyectoData total - ${runId}`;
+  const timerBundle = `[PERF][PROJECT] loadProyectoData bundle - ${runId}`;
   let bundleTimerStarted = false;
 
   console.time(timerTotal);
@@ -2478,7 +2531,13 @@ async function loadProyectoData(proyectoId) {
     if (projectBundle?.project) {
       const projectRow = IS4TOptAdapter.projectRow(projectBundle.project);
       const idx = state.proyectos.findIndex(p => p.proyecto_id === projectRow.proyecto_id);
-      if (idx >= 0) state.proyectos[idx] = projectRow;
+      if (idx >= 0) {
+        state.proyectos[idx] = {
+          ...state.proyectos[idx],
+          ...projectRow,
+          ...(projectBundle.summary || {})
+        };
+      }
       else state.proyectos.push(projectRow);
     }
 
@@ -2590,8 +2649,6 @@ function renderDashboard() {
   // Visibles en listado: activos + pausados. Cerrados van en sección colapsable.
   const visibles = state.proyectos.filter(p => !p.estado || p.estado === 'Activo' || p.estado === 'En pausa');
   const cerrados = state.proyectos.filter(p => p.estado === 'Cerrado');
-  // Para alertas: solo activos (sin pausa)
-  const activos = state.proyectos.filter(p => !p.estado || p.estado === 'Activo');
   const container = document.getElementById('proyectos-list');
 
   const renderCard = p => {
@@ -2606,7 +2663,7 @@ function renderDashboard() {
           <div class="meta-item"><span class="label">Tipo&nbsp;</span>${p.tipo_proyecto || '—'}</div>
           <div class="meta-item"><span class="label">Aprobación&nbsp;</span>${formatDate(p.fecha_aprobacion)}</div>
           <div class="meta-item"><span class="label">Entrega est.&nbsp;</span>${p.fecha_entrega ? formatDate(p.fecha_entrega) : calcFechaEntrega(p.fecha_aprobacion)}</div>
-          ${p.arquitecto_id ? `<div class="meta-item"><span class="label">Arq.&nbsp;</span>${(state.usuarios.find(u => u.email === p.arquitecto_id)?.nombre) || p.arquitecto_id}</div>` : ''}
+          ${(p.architect_name || p.arquitecto_id) ? `<div class="meta-item"><span class="label">Arq.&nbsp;</span>${p.architect_name || (state.usuarios.find(u => u.email === p.arquitecto_id)?.nombre) || p.arquitecto_id}</div>` : ''}
         </div>
       </div>
       <div class="project-right">
@@ -2633,58 +2690,37 @@ function renderDashboard() {
   }
 
   // Hitos próximos y vencidos
-  const hoy = new Date();
-  const limite = new Date(); limite.setDate(limite.getDate() + 7);
-  const proximos = [];
-  const vencidos = [];
+  const proximos = (state.homeAlerts?.upcoming_milestones || []).map(item => ({
+    proyecto: item.project_name,
+    hito: item.milestone_name,
+    hitoId: item.milestone_catalog_id,
+    fecha: item.target_date,
+    proyectoId: item.project_id
+  }));
+  const vencidos = (state.homeAlerts?.overdue_milestones || []).map(item => ({
+    proyecto: item.project_name,
+    hito: item.milestone_name,
+    hitoId: item.milestone_catalog_id,
+    fecha: item.target_date,
+    proyectoId: item.project_id
+  }));
 
-  const limiteTareas = new Date(); limiteTareas.setDate(limiteTareas.getDate() + 3);
-  const tareasVencidas = [];
-  const tareasProximas = [];
-
-  activos.forEach(p => {
-    if (!p.fecha_aprobacion) return;
-    // Proyectos en pausa no aparecen en secciones de alertas
-    if (p.estado === 'En pausa') return;
-    // Filtro por rol: arquitecto ve solo sus proyectos asignados
-    if (state.rol === 'Arquitecto' && p.arquitecto_id !== state.user.email) return;
-    // Días hábiles de pausa acumulados — se suman a todos los offsets
-    const offsetPausa = getOffsetPausa(p);
-    const logP = state.logEventos.filter(e => e.proyecto_id === p.proyecto_id);
-    HITOS_TIMELINE.filter(h => h.offset !== null).forEach(h => {
-      const completado = logP.some(e => e.hito_id === h.id && e.tipo_entry === 'hito_alcanzado');
-      if (completado) return;
-      const fecha = addBusinessDays(parseISODate(p.fecha_aprobacion), h.offset + offsetPausa);
-      if (fecha < hoy) {
-        vencidos.push({ proyecto: p.nombre, hito: h.nombre, hitoId: h.id, fecha: fecha.toISOString().split('T')[0], proyectoId: p.proyecto_id });
-      } else if (fecha <= limite) {
-        proximos.push({ proyecto: p.nombre, hito: h.nombre, hitoId: h.id, fecha: fecha.toISOString().split('T')[0], proyectoId: p.proyecto_id });
-      }
-    });
-    // Tareas (disciplinas) vencidas y próximas 3 días
-    const activasSet = new Set(
-      state.disciplinasProyecto.filter(d => d.proyecto_id === p.proyecto_id).map(d => d.disciplina_id)
-    );
-    activasSet.forEach(discKey => {
-      const [gid, dNombre] = discKey.split('::');
-      if (!dNombre) return;
-      const completa = isDisciplinaCompleta(dNombre, gid, logP);
-      if (completa) return;
-      const cierreEvento = state.eventosCatalogo.find(e =>
-        e.grupo_id === gid && e.disciplina_nombre === dNombre &&
-        (e.es_cierre === 'TRUE' || e.es_cierre === 'true' || e.es_cierre === true)
-      );
-      if (!cierreEvento) return;
-      const hitosDisciplina = DISCIPLINA_HITOS[discKey];
-      if (!hitosDisciplina || hitosDisciplina.length === 0) return;
-      const hitoTimeline = HITOS_TIMELINE.find(h => h.id === hitosDisciplina[0]);
-      if (!hitoTimeline || hitoTimeline.offset === null) return;
-      const fechaTarea = addBusinessDays(parseISODate(p.fecha_aprobacion), hitoTimeline.offset + offsetPausa);
-      const entry = { proyecto: p.nombre, tarea: dNombre, grupoId: gid, fecha: fechaTarea.toISOString().split('T')[0], proyectoId: p.proyecto_id };
-      if (fechaTarea < hoy) tareasVencidas.push(entry);
-      else if (fechaTarea <= limiteTareas) tareasProximas.push(entry);
-    });
-  });
+  const tareasVencidas = (state.homeAlerts?.overdue_tasks || []).map(item => ({
+    proyecto: item.project_name,
+    tarea: item.task_name,
+    grupoId: item.group_id,
+    fecha: item.due_date,
+    proyectoId: item.project_id,
+    taskSource: item.task_source
+  }));
+  const tareasProximas = (state.homeAlerts?.upcoming_tasks || []).map(item => ({
+    proyecto: item.project_name,
+    tarea: item.task_name,
+    grupoId: item.group_id,
+    fecha: item.due_date,
+    proyectoId: item.project_id,
+    taskSource: item.task_source
+  }));
 
   proximos.sort((a,b) => new Date(a.fecha) - new Date(b.fecha));
   vencidos.sort((a,b) => new Date(a.fecha) - new Date(b.fecha));
@@ -2722,11 +2758,14 @@ function renderDashboard() {
 
   tareasVencidas.sort((a,b) => new Date(a.fecha) - new Date(b.fecha));
   tareasProximas.sort((a,b) => new Date(a.fecha) - new Date(b.fecha));
+  const taskAlertOnClick = task => task.grupoId
+    ? `openProyectoEnTarea('${task.proyectoId}','${task.grupoId}','${task.tarea.replace(/'/g,"\\'")}')`
+    : `openProyecto('${task.proyectoId}')`;
 
   const tareasContainer = document.getElementById('tareas-dashboard');
   const tareasVencHTML = tareasVencidas.length === 0
     ? `<div style="color:var(--text3);font-family:var(--mono);font-size:12px;padding:4px 0 8px">Sin tareas vencidas</div>`
-    : tareasVencidas.map(t => `<div class="hito-row tarea-vencida" onclick="openProyectoEnTarea('${t.proyectoId}','${t.grupoId}','${t.tarea.replace(/'/g,"\\'")}')">
+    : tareasVencidas.map(t => `<div class="hito-row tarea-vencida" onclick="${taskAlertOnClick(t)}">
         <div class="hito-fecha" style="color:#ff5050">${formatDate(t.fecha)}</div>
         <div class="hito-link">${t.tarea}</div>
         <div class="hito-link secondary">${t.proyecto}</div>
@@ -2734,7 +2773,7 @@ function renderDashboard() {
       </div>`).join('');
   const tareasProxHTML = tareasProximas.length === 0
     ? `<div style="color:var(--text3);font-family:var(--mono);font-size:12px;padding:4px 0 8px">Sin tareas en los próximos 3 días</div>`
-    : tareasProximas.map(t => `<div class="hito-row tarea-proxima" onclick="openProyectoEnTarea('${t.proyectoId}','${t.grupoId}','${t.tarea.replace(/'/g,"\\'")}')">
+    : tareasProximas.map(t => `<div class="hito-row tarea-proxima" onclick="${taskAlertOnClick(t)}">
         <div class="hito-fecha">${formatDate(t.fecha)}</div>
         <div class="hito-link">${t.tarea}</div>
         <div class="hito-link secondary">${t.proyecto}</div>
@@ -2797,28 +2836,26 @@ function renderDashboard() {
 
   const riesgosContainer = document.getElementById('riesgos-dashboard');
   if (riesgosContainer) {
-    const hoyR = new Date(); hoyR.setHours(0,0,0,0);
-    const limiteR = new Date(); limiteR.setDate(limiteR.getDate() + 7);
-    const riesgosAlerta = [];
-    const riesgosRevision = [];
-    (state.riesgosDetalle || []).forEach(r => {
-      if (['Cerrado','Obsoleto','Cristalizado'].includes(r.estatus)) return;
-      const p = state.proyectos.find(x => x.proyecto_id === r.proyecto_id);
-      if (!p || p.estado === 'En pausa' || p.estado === 'Cerrado') return;
-      if (state.rol === 'Arquitecto' && p.arquitecto_id !== state.user?.email) return;
-      if (r.score >= 15) riesgosAlerta.push({ ...r, proyecto: p.nombre });
-      if (r.fecha_revision) {
-        const fechaRev = parseISODate(r.fecha_revision);
-        if (fechaRev && fechaRev <= limiteR) riesgosRevision.push({ ...r, proyecto: p.nombre, fechaRev: r.fecha_revision });
-      }
-    });
+    const riesgosAlerta = (state.homeAlerts?.critical_risks || []).map(r => ({
+      ...r,
+      entry_id: r.risk_id,
+      titulo: r.title,
+      proyecto: r.project_name
+    }));
+    const riesgosRevision = (state.homeAlerts?.risk_reviews || []).map(r => ({
+      ...r,
+      entry_id: r.risk_id,
+      titulo: r.title,
+      proyecto: r.project_name,
+      fechaRev: r.review_date
+    }));
     riesgosAlerta.sort((a,b) => b.score - a.score);
     riesgosRevision.sort((a,b) => new Date(a.fechaRev) - new Date(b.fechaRev));
     const rAlertaHTML = riesgosAlerta.length === 0
       ? `<div style="color:var(--text3);font-family:var(--mono);font-size:12px;padding:4px 0 8px">Sin riesgos críticos activos</div>`
       : riesgosAlerta.map(r => `<div class="hito-row retrasado">
           <div class="hito-fecha" style="color:#ff5050"><span class="riesgo-score-badge riesgo-score-red">${r.score}</span></div>
-          <div class="hito-link">${getRiesgoTitulo(r.entry_id)}</div>
+          <div class="hito-link">${r.titulo || r.title || getRiesgoTitulo(r.entry_id)}</div>
           <div class="hito-link secondary">${r.proyecto}</div>
           <div></div>
         </div>`).join('');
@@ -2826,7 +2863,7 @@ function renderDashboard() {
       ? `<div style="color:var(--text3);font-family:var(--mono);font-size:12px;padding:4px 0 8px">Sin revisiones próximas</div>`
       : riesgosRevision.map(r => `<div class="hito-row">
           <div class="hito-fecha">${formatDate(r.fechaRev)}</div>
-          <div class="hito-link">${getRiesgoTitulo(r.entry_id)}</div>
+          <div class="hito-link">${r.titulo || r.title || getRiesgoTitulo(r.entry_id)}</div>
           <div class="hito-link secondary">${r.proyecto}</div>
           <div></div>
         </div>`).join('');
@@ -2868,13 +2905,11 @@ function renderCriteriosBanner() {
 
 // ── SCOREBOARD ──
 function calcScoreboard(proyectoId) {
-  const log = state.logEventos.filter(e => e.proyecto_id === proyectoId);
-  const hitosAlcanzados = new Set(
-    log.filter(e => e.tipo_entry === 'hito_alcanzado').map(e => e.hito_id)
-  ).size;
-  const total = 38;
+  const proyecto = state.proyectos.find(p => p.proyecto_id === proyectoId);
+  const total = Number(proyecto?.milestones_total) || 0;
+  const hitosAlcanzados = Number(proyecto?.milestones_completed) || 0;
   const pct = Math.round((hitosAlcanzados / total) * 100);
-  return { hitosAlcanzados, total, pct };
+  return { hitosAlcanzados, total, pct: total ? pct : 0 };
 }
 
 function renderScoreboard(proyectoId, inline = false) {
@@ -2953,12 +2988,18 @@ async function openProyecto(proyectoId) {
 async function refreshProyectoDetalle(estadoPaneles = null) {
   if (!state.currentProyecto?.proyecto_id) return;
   const projectId = state.currentProyecto.proyecto_id;
-  IS4TOptAdapter.reset('project', projectId);
-  await loadProyectoData(projectId);
-  renderProyectoDetalleActual(projectId);
+  const timer = `[PERF][PROJECT] post-write refresh - ${projectId} - ${Date.now()}`;
+  console.time(timer);
+  try {
+    IS4TOptAdapter.reset('project', projectId);
+    await loadProyectoData(projectId);
+    renderProyectoDetalleActual(projectId);
 
-  if (estadoPaneles) {
-    restaurarEstadoPaneles(estadoPaneles);
+    if (estadoPaneles) {
+      restaurarEstadoPaneles(estadoPaneles);
+    }
+  } finally {
+    console.timeEnd(timer);
   }
 }
 
@@ -2979,6 +3020,25 @@ function showView(view) {
   const navMap = { 'dashboard': 'nav-dashboard', 'criterios': 'nav-criterios' };
   if (navMap[view]) document.getElementById(navMap[view])?.classList.add('active');
   if (view === 'criterios') renderCriteriosList();
+  if (view === 'dashboard' && !IS4TOptAdapter.home) void refreshHomeAfterWrite();
+}
+
+let homeRefreshPromise = null;
+async function refreshHomeAfterWrite() {
+  if (homeRefreshPromise) return homeRefreshPromise;
+  const timer = `[PERF][HOME] post-write refresh - ${Date.now()}`;
+  console.time(timer);
+  homeRefreshPromise = (async () => {
+    try {
+      await loadHomeData();
+      renderDashboard();
+      renderCriteriosBanner();
+    } finally {
+      console.timeEnd(timer);
+      homeRefreshPromise = null;
+    }
+  })();
+  return homeRefreshPromise;
 }
 
 function renderGroups(proyecto) {
@@ -5918,7 +5978,7 @@ function calcRiesgo(proyecto) {
   const dt = parseISODate(proyecto.fecha_aprobacion);
   if (!dt) return { nivel: 'gray', label: 'Sin fecha' };
   const hoy = new Date();
-  const fechaEntrega = addBusinessDays(dt, 43);
+  const fechaEntrega = parseISODate(proyecto.fecha_entrega) || addBusinessDays(dt, 43);
   const dias = Math.round((fechaEntrega - hoy) / (1000*60*60*24));
   if (dias < 0) return { nivel: 'red', label: Math.abs(dias) + 'd vencido' };
   if (dias < 7) return { nivel: 'yellow', label: dias + 'd' };
