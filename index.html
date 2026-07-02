@@ -1098,6 +1098,7 @@ const CONFIG = {
   WEBAPP_URL: 'https://script.google.com/macros/s/AKfycbxkn7St49-mewL9DjwfZ_-H64kcLIi0xZeZOTCqYgI3BBQbsc0LXXbxDQE8c06k_p2O/exec',
   SCOPES: 'https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile openid'
 };
+const PERF_DEBUG = true;
 
 let state = {
   user: null, rol: null, accessToken: null,
@@ -2473,7 +2474,8 @@ async function loadHomeData() {
   try {
     console.time('[PERF][HOME] loadHomeData core');
     coreTimerStarted = true;
-    await IS4TOptAdapter.ensureHome();
+    const homeBundle = await IS4TOptAdapter.ensureHome();
+    if (PERF_DEBUG && homeBundle?._perf) console.log('[PERF][AS][HOME]', homeBundle._perf);
     console.timeEnd('[PERF][HOME] loadHomeData core');
     coreTimerStarted = false;
     state.proyectos = IS4TOptAdapter.homeProjects();
@@ -2506,6 +2508,7 @@ async function loadProyectoData(proyectoId) {
     bundleTimerStarted = true;
 
     const projectBundle = await IS4TOptAdapter.ensureProject(proyectoId);
+    if (PERF_DEBUG && projectBundle?._perf) console.log('[PERF][AS][PROJECT]', projectBundle._perf);
 
     console.timeEnd(timerBundle);
     bundleTimerStarted = false;
@@ -2653,8 +2656,10 @@ function renderDashboard() {
 
   const renderCard = p => {
     const enPausa = p.estado === 'En pausa';
-    const { nivel, label } = enPausa ? { nivel: 'gray', label: 'En pausa' } : calcRiesgo(p);
-    return `<div class="project-card risk-${nivel}" onclick="openProyecto('${p.proyecto_id}')" style="${enPausa ? 'opacity:0.75' : ''}">
+    const salud = enPausa ? { nivel: 'gray', score: null } : calcSaludProyecto(p);
+    const entrega = calcDiasEntrega(p);
+    const saludTitle = salud.score === null ? 'Salud sin dato' : `Salud ${salud.score}/100`;
+    return `<div class="project-card risk-${salud.nivel}" onclick="openProyecto('${p.proyecto_id}')" style="${enPausa ? 'opacity:0.75' : ''}">
       <div>
         <div class="project-name">${p.nombre || '—'}${enPausa ? ' <span style="font-family:var(--mono);font-size:10px;color:var(--text3);font-weight:400">(Pausado)</span>' : ''}</div>
         <div style="${enPausa ? 'filter:grayscale(1);opacity:0.6' : ''}">${renderScoreboard(p.proyecto_id)}</div>
@@ -2667,8 +2672,8 @@ function renderDashboard() {
         </div>
       </div>
       <div class="project-right">
-        <div class="semaforo ${nivel}"></div>
-        <div class="desvio-badge ${nivel}">${label}</div>
+        <div class="semaforo ${salud.nivel}" title="${saludTitle}"></div>
+        <div class="desvio-badge ${entrega.nivel}" title="Días restantes para entrega">${entrega.label}</div>
       </div>
     </div>`;
   };
@@ -2836,6 +2841,7 @@ function renderDashboard() {
 
   const riesgosContainer = document.getElementById('riesgos-dashboard');
   if (riesgosContainer) {
+    const hoyRiesgos = dateToISO(new Date());
     const riesgosAlerta = (state.homeAlerts?.critical_risks || []).map(r => ({
       ...r,
       entry_id: r.risk_id,
@@ -2847,7 +2853,8 @@ function renderDashboard() {
       entry_id: r.risk_id,
       titulo: r.title,
       proyecto: r.project_name,
-      fechaRev: r.review_date
+      fechaRev: r.review_date,
+      revisionVencida: !!r.review_date && r.review_date < hoyRiesgos
     }));
     riesgosAlerta.sort((a,b) => b.score - a.score);
     riesgosRevision.sort((a,b) => new Date(a.fechaRev) - new Date(b.fechaRev));
@@ -2862,7 +2869,7 @@ function renderDashboard() {
     const rRevHTML = riesgosRevision.length === 0
       ? `<div style="color:var(--text3);font-family:var(--mono);font-size:12px;padding:4px 0 8px">Sin revisiones próximas</div>`
       : riesgosRevision.map(r => `<div class="hito-row">
-          <div class="hito-fecha">${formatDate(r.fechaRev)}</div>
+          <div class="hito-fecha" style="${r.revisionVencida ? 'color:#ff5050' : ''}">${formatDate(r.fechaRev)}</div>
           <div class="hito-link">${r.titulo || r.title || getRiesgoTitulo(r.entry_id)}</div>
           <div class="hito-link secondary">${r.proyecto}</div>
           <div></div>
@@ -2870,7 +2877,7 @@ function renderDashboard() {
     riesgosContainer.innerHTML =
       makeToggleHeader('riesgos-alerta', `<span style="color:#ff5050">⚠ RIESGOS SCORE ≥ 15 — ${riesgosAlerta.length}</span>`, true) +
       `<div id="riesgos-alerta">${rAlertaHTML}</div>` +
-      makeToggleHeader('riesgos-rev-alert', `RIESGOS PRÓX. REVISIÓN — ${riesgosRevision.length}`, true) +
+      makeToggleHeader('riesgos-rev-alert', `RIESGOS VENCIDOS / PRÓX. REVISIÓN — ${riesgosRevision.length}`, true) +
       `<div id="riesgos-rev-alert">${rRevHTML}</div>`;
   }
 }
@@ -5973,7 +5980,21 @@ function calcFechaEntrega(fechaAprobacion) {
   } catch(e) { return '—'; }
 }
 
-function calcRiesgo(proyecto) {
+function calcSaludProyecto(proyecto) {
+  const hasScore = proyecto.health_score !== '' && proyecto.health_score !== null && proyecto.health_score !== undefined;
+  const score = Number(proyecto.health_score);
+  if (hasScore && Number.isFinite(score)) {
+    const boundedScore = Math.max(0, Math.min(100, Math.round(score)));
+    if (boundedScore >= 80) return { nivel: 'green', score: boundedScore };
+    if (boundedScore >= 50) return { nivel: 'yellow', score: boundedScore };
+    return { nivel: 'red', score: boundedScore };
+  }
+  const vencimientos = (Number(proyecto.overdue_milestones_count) || 0) +
+    (Number(proyecto.overdue_tasks_count) || 0);
+  return { nivel: vencimientos > 0 ? 'red' : 'gray', score: null };
+}
+
+function calcDiasEntrega(proyecto) {
   if (!proyecto.fecha_aprobacion) return { nivel: 'gray', label: 'Sin fecha' };
   const dt = parseISODate(proyecto.fecha_aprobacion);
   if (!dt) return { nivel: 'gray', label: 'Sin fecha' };
