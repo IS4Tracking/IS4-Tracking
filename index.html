@@ -528,7 +528,7 @@
       <div class="groups-container" id="groups-container"></div>
     </div>
 
-    <!-- EVERGREEN DETAIL -->
+    <!-- BACKLOG DETAIL -->
     <div class="view" id="view-evergreen-detail">
       <button class="back-btn" onclick="showView('dashboard')">← Volver</button>
       <div class="project-detail-header">
@@ -1189,15 +1189,16 @@ const IS4TOptAdapter = {
       if (projectId) {
         delete this.projectBundles[projectId];
         delete this.projectBundlePromises[projectId];
-        if (scope === 'project') {
-          this.home = null;
-          this.homePromise = null;
-        }
       } else {
         this.projectBundles = {};
         this.projectBundlePromises = {};
       }
     }
+  },
+
+  invalidateProject(projectId, affectsHome) {
+    this.reset('project', projectId);
+    if (affectsHome) this.reset('home');
   },
 
   async ensureBootstrap() {
@@ -1905,7 +1906,7 @@ const IS4TOptAdapter = {
           status_change_to: statusToNew(body.estatus_nuevo || safeJson(body.nota, {}).estatus_nuevo || ''),
           event_date: body.fecha_real || todayISO()
         });
-        this.reset('project', projectId);
+        this.invalidateProject(projectId, true);
         return { entry_id: result.manual_task_event_id };
       }
       if (body.tipo_entry === 'hito_alcanzado') {
@@ -1923,7 +1924,7 @@ const IS4TOptAdapter = {
         event_datetime: body.fecha_hora || '',
         notes: body.nota || ''
       });
-      this.reset('project', projectId);
+      this.invalidateProject(projectId, true);
       return { entry_id: result.project_event_id };
     }
 
@@ -1941,7 +1942,7 @@ const IS4TOptAdapter = {
         event_date: body.fecha_real,
         notes: body.nota
       });
-      this.reset('project', projectId);
+      this.invalidateProject(projectId, true);
       return result;
     }
 
@@ -1956,7 +1957,7 @@ const IS4TOptAdapter = {
       } else {
         result = await this.raw('deleteProjectEvent', { project_id: projectId, project_event_id: body.entry_id });
       }
-      this.reset('project', projectId);
+      this.invalidateProject(projectId, true);
       return result;
     }
 
@@ -1969,7 +1970,7 @@ const IS4TOptAdapter = {
         notes: body.notas,
         category: body.categoria || 'Sin clasificar'
       });
-      this.reset('project', projectId);
+      this.invalidateProject(projectId, true);
       return { tarea_id: result.manual_task_id };
     }
     if (action === 'actualizarTareaAdhoc') {
@@ -1982,12 +1983,12 @@ const IS4TOptAdapter = {
         notes: body.notas,
         status: statusToNew(body.estatus)
       });
-      this.reset('project', projectId);
+      this.invalidateProject(projectId, true);
       return result;
     }
     if (action === 'borrarTareaAdhoc') {
       result = await this.raw('deleteExtrTask', { ...projectBody(), manual_task_id: body.tarea_id });
-      this.reset('project', projectId);
+      this.invalidateProject(projectId, true);
       return result;
     }
 
@@ -2052,7 +2053,7 @@ const IS4TOptAdapter = {
         affected_project_task_ids: this.taskIdsFromLegacy(projectId, body.disciplinas_afectadas),
         scope_description: body.alcance || body.descripcion || ''
       });
-      this.reset('project', projectId); return { change_id: result.change_id, change_code: result.change_code || '' };
+      this.invalidateProject(projectId, true); return { change_id: result.change_id, change_code: result.change_code || '' };
     }
     if (action === 'editarCambioDetalle') {
       result = await this.raw('editChange', {
@@ -2063,11 +2064,11 @@ const IS4TOptAdapter = {
         affected_project_task_ids: this.taskIdsFromLegacy(projectId, body.disciplinas_afectadas),
         scope_description: body.alcance
       });
-      this.reset('project', projectId); return result;
+      this.invalidateProject(projectId, true); return result;
     }
     if (action === 'borrarCambio') {
       result = await this.raw('deleteChange', { ...projectBody(), change_id: body.entry_id });
-      this.reset('project', projectId); return result;
+      this.invalidateProject(projectId, true); return result;
     }
     if (action === 'crearDuda') {
       result = await this.raw('createQuestion', {
@@ -2103,7 +2104,7 @@ const IS4TOptAdapter = {
         project_task_id: body.project_task_id || this.taskIdFromLegacy(projectId, body.disc_ref),
         status: statusToNew(body.estatus || 'Activo')
       });
-      this.reset('project', projectId);
+      this.invalidateProject(projectId, true);
       if (result.risk_id && result.risk_code) state._riskCodeById[result.risk_id] = result.risk_code;
       return { riesgo_id: result.risk_id, risk_code: result.risk_code, entry_id: result.risk_id };
     }
@@ -2117,11 +2118,11 @@ const IS4TOptAdapter = {
         mitigation_notes: body.notas_mitigacion,
         review_date: body.fecha_revision
       });
-      this.reset('project', projectId); return result;
+      this.invalidateProject(projectId, true); return result;
     }
     if (action === 'borrarRiesgo') {
       result = await this.raw('deleteRisk', { ...projectBody(), risk_id: body.riesgo_id || body.entry_id });
-      this.reset('project', projectId); return result;
+      this.invalidateProject(projectId, true); return result;
     }
     if (action === 'restaurarEntryEliminado') {
       const typeMap = { nota:'note', cambio:'change', duda:'question', riesgo:'risk', evento:'project_event' };
@@ -2130,7 +2131,7 @@ const IS4TOptAdapter = {
         record_id: body.entry_id,
         project_id: projectId
       });
-      this.reset('project', projectId); return result;
+      this.invalidateProject(projectId, ['cambio','riesgo','evento'].includes(body.tipo)); return result;
     }
     if (action === 'guardarSnapshot') {
       result = await this.raw('saveSnapshot', {
@@ -2147,7 +2148,7 @@ const IS4TOptAdapter = {
         delivery_number: body.numero_entrega,
         change_ids: (body.cambios_causa || []).join ? body.cambios_causa.join(',') : body.cambios_causa
       });
-      this.reset('project', projectId); return result;
+      this.invalidateProject(projectId, true); return result;
     }
 
     return this.raw(action, body);
@@ -2595,14 +2596,14 @@ async function loadProyectoData(proyectoId) {
 }
 
 async function loadEvergreenData() {
-  console.time('[PERF] loadEvergreenData');
+  console.time('[PERF][BACKLOG] loadBacklogData');
   try {
     const evergreen = await api('getBacklog', {}).catch(() => []);
     state.evergreenTareas = evergreen || [];
     const otrosLogs = (state.logEventos || []).filter(e => e.proyecto_id !== 'BACKLOG' && e.proyecto_id !== 'EVERGREEN');
     state.logEventos = [...otrosLogs, ...IS4TOptAdapter.backlogEvents()];
-  } catch(e) { console.error('[PERF] loadEvergreenData error:', e.message); }
-  console.timeEnd('[PERF] loadEvergreenData');
+  } catch(e) { console.error('[PERF][BACKLOG] loadBacklogData error:', e.message); }
+  console.timeEnd('[PERF][BACKLOG] loadBacklogData');
 }
 
 async function loadCriteriosData() {
@@ -2739,27 +2740,19 @@ function renderDashboard() {
   }
 
   const hitosContainer = document.getElementById('hitos-proximos');
-  const vencidosHTML = vencidos.length === 0
-    ? `<div style="color:var(--text3);font-family:var(--mono);font-size:12px;padding:4px 0 8px">Sin hitos vencidos</div>`
-    : vencidos.map(h => `<div class="hito-row retrasado">
-        <div class="hito-fecha" style="color:#ff5050">${formatDate(h.fecha)}</div>
-        <div class="hito-link" onclick="openProyectoEnHito('${h.proyectoId}','${h.hitoId}')">${h.hitoId} — ${h.hito}</div>
-        <div class="hito-link secondary" onclick="openProyecto('${h.proyectoId}')">${h.proyecto}</div>
-        <div></div>
-      </div>`).join('');
-  const proximosHTML = proximos.length === 0
-    ? `<div style="color:var(--text3);font-family:var(--mono);font-size:12px;padding:4px 0 8px">Sin hitos en los próximos 7 días</div>`
-    : proximos.map(h => `<div class="hito-row">
-        <div class="hito-fecha">${formatDate(h.fecha)}</div>
+  const hoyHome = dateToISO(new Date());
+  const hitosHome = [...vencidos, ...proximos].sort((a,b) => new Date(a.fecha) - new Date(b.fecha));
+  const hitosHTML = hitosHome.length === 0
+    ? `<div style="color:var(--text3);font-family:var(--mono);font-size:12px;padding:4px 0 8px">Sin hitos vencidos o próximos en 5 días</div>`
+    : hitosHome.map(h => `<div class="hito-row${h.fecha < hoyHome ? ' retrasado' : ''}">
+        <div class="hito-fecha" style="${h.fecha < hoyHome ? 'color:#ff5050' : ''}">${formatDate(h.fecha)}</div>
         <div class="hito-link" onclick="openProyectoEnHito('${h.proyectoId}','${h.hitoId}')">${h.hitoId} — ${h.hito}</div>
         <div class="hito-link secondary" onclick="openProyecto('${h.proyectoId}')">${h.proyecto}</div>
         <div></div>
       </div>`).join('');
   hitosContainer.innerHTML =
-    makeToggleHeader('hitos-alert', `<span style="color:#ff5050">⚠ HITOS VENCIDOS — ${vencidos.length}</span>`, true) +
-    `<div id="hitos-alert">${vencidosHTML}</div>` +
-    makeToggleHeader('hitos-prox-alert', `HITOS PRÓX. 7 DÍAS — ${proximos.length}`, true) +
-    `<div id="hitos-prox-alert">${proximosHTML}</div>`;
+    makeToggleHeader('hitos-alert', `HITOS — VENCIDOS / PRÓX. 5 DÍAS — ${hitosHome.length}`, true) +
+    `<div id="hitos-alert">${hitosHTML}</div>`;
 
   tareasVencidas.sort((a,b) => new Date(a.fecha) - new Date(b.fecha));
   tareasProximas.sort((a,b) => new Date(a.fecha) - new Date(b.fecha));
@@ -2768,37 +2761,28 @@ function renderDashboard() {
     : `openProyecto('${task.proyectoId}')`;
 
   const tareasContainer = document.getElementById('tareas-dashboard');
-  const tareasVencHTML = tareasVencidas.length === 0
-    ? `<div style="color:var(--text3);font-family:var(--mono);font-size:12px;padding:4px 0 8px">Sin tareas vencidas</div>`
-    : tareasVencidas.map(t => `<div class="hito-row tarea-vencida" onclick="${taskAlertOnClick(t)}">
-        <div class="hito-fecha" style="color:#ff5050">${formatDate(t.fecha)}</div>
-        <div class="hito-link">${t.tarea}</div>
-        <div class="hito-link secondary">${t.proyecto}</div>
-        <div></div>
-      </div>`).join('');
-  const tareasProxHTML = tareasProximas.length === 0
-    ? `<div style="color:var(--text3);font-family:var(--mono);font-size:12px;padding:4px 0 8px">Sin tareas en los próximos 3 días</div>`
-    : tareasProximas.map(t => `<div class="hito-row tarea-proxima" onclick="${taskAlertOnClick(t)}">
-        <div class="hito-fecha">${formatDate(t.fecha)}</div>
+  const tareasHome = [...tareasVencidas, ...tareasProximas].sort((a,b) => new Date(a.fecha) - new Date(b.fecha));
+  const tareasHTML = tareasHome.length === 0
+    ? `<div style="color:var(--text3);font-family:var(--mono);font-size:12px;padding:4px 0 8px">Sin tareas vencidas o próximas en 3 días</div>`
+    : tareasHome.map(t => `<div class="hito-row ${t.fecha < hoyHome ? 'tarea-vencida' : 'tarea-proxima'}" onclick="${taskAlertOnClick(t)}">
+        <div class="hito-fecha" style="${t.fecha < hoyHome ? 'color:#ff5050' : ''}">${formatDate(t.fecha)}</div>
         <div class="hito-link">${t.tarea}</div>
         <div class="hito-link secondary">${t.proyecto}</div>
         <div></div>
       </div>`).join('');
   tareasContainer.innerHTML =
-    makeToggleHeader('tareas-alert', `<span style="color:#ff5050">⚠ TAREAS VENCIDAS — ${tareasVencidas.length}</span>`, true) +
-    `<div id="tareas-alert">${tareasVencHTML}</div>` +
-    makeToggleHeader('tareas-prox-alert', `TAREAS PRÓX. 3 DÍAS — ${tareasProximas.length}`, true) +
-    `<div id="tareas-prox-alert">${tareasProxHTML}</div>`;
+    makeToggleHeader('tareas-alert', `TAREAS — VENCIDAS / PRÓX. 3 DÍAS — ${tareasHome.length}`, true) +
+    `<div id="tareas-alert">${tareasHTML}</div>`;
 
   // Backlog alerts
   const evContainer = document.getElementById('evergreen-dashboard');
   if (evContainer) {
     const hoyEv = new Date(); hoyEv.setHours(0,0,0,0);
-    const limiteEv = new Date(); limiteEv.setDate(limiteEv.getDate() + 7);
+    const limiteEv = new Date(); limiteEv.setDate(limiteEv.getDate() + 5);
     const evVencidas = [], evProximas = [];
     state.evergreenTareas.forEach(t => {
       if (!t.fecha_esperada) return;
-      if (t.estatus === 'completada' || t.estatus === 'cancelada') return;
+      if (['completada','completado','cancelada','cancelado','cerrada','cerrado'].includes(normalizeText(t.estatus))) return;
       if (state.rol === 'Arquitecto' && t.asignado_a !== state.user?.email) return;
       const fechaEv = parseISODate(t.fecha_esperada);
       if (!fechaEv) return;
@@ -2809,27 +2793,18 @@ function renderDashboard() {
     });
     evVencidas.sort((a,b) => new Date(a.fecha) - new Date(b.fecha));
     evProximas.sort((a,b) => new Date(a.fecha) - new Date(b.fecha));
-    const evVencHTML = evVencidas.length === 0
-      ? `<div style="color:var(--text3);font-family:var(--mono);font-size:12px;padding:4px 0 8px">Sin backlog vencido</div>`
-      : evVencidas.map(e => `<div class="hito-row retrasado">
-          <div class="hito-fecha" style="color:#ff5050">${formatDate(e.fecha)}</div>
-          <div class="hito-link">${e.titulo}</div>
-          <div class="hito-link secondary">${e.asignado}</div>
-          <div></div>
-        </div>`).join('');
-    const evProxHTML = evProximas.length === 0
-      ? `<div style="color:var(--text3);font-family:var(--mono);font-size:12px;padding:4px 0 8px">Sin backlog en los próximos 7 días</div>`
-      : evProximas.map(e => `<div class="hito-row">
-          <div class="hito-fecha">${formatDate(e.fecha)}</div>
+    const backlogHome = [...evVencidas, ...evProximas].sort((a,b) => new Date(a.fecha) - new Date(b.fecha));
+    const backlogHTML = backlogHome.length === 0
+      ? `<div style="color:var(--text3);font-family:var(--mono);font-size:12px;padding:4px 0 8px">Sin elementos de Backlog vencidos o próximos en 5 días</div>`
+      : backlogHome.map(e => `<div class="hito-row${e.fecha < hoyHome ? ' retrasado' : ''}">
+          <div class="hito-fecha" style="${e.fecha < hoyHome ? 'color:#ff5050' : ''}">${formatDate(e.fecha)}</div>
           <div class="hito-link">${e.titulo}</div>
           <div class="hito-link secondary">${e.asignado}</div>
           <div></div>
         </div>`).join('');
     evContainer.innerHTML =
-      makeToggleHeader('ev-alert', `<span style="color:#ff5050">⚠ EVERGREEN VENCIDO — ${evVencidas.length}</span>`, true) +
-      `<div id="ev-alert">${evVencHTML}</div>` +
-      makeToggleHeader('ev-prox-alert', `EVERGREEN PRÓX. 7 DÍAS — ${evProximas.length}`, true) +
-      `<div id="ev-prox-alert">${evProxHTML}</div>`;
+      makeToggleHeader('ev-alert', `BACKLOG — VENCIDO / PRÓX. 5 DÍAS — ${backlogHome.length}`, true) +
+      `<div id="ev-alert">${backlogHTML}</div>`;
     let evSection = document.getElementById('evergreen-section-home');
   if (!evSection) {
     evSection = document.createElement('div');
@@ -2842,12 +2817,6 @@ function renderDashboard() {
   const riesgosContainer = document.getElementById('riesgos-dashboard');
   if (riesgosContainer) {
     const hoyRiesgos = dateToISO(new Date());
-    const riesgosAlerta = (state.homeAlerts?.critical_risks || []).map(r => ({
-      ...r,
-      entry_id: r.risk_id,
-      titulo: r.title,
-      proyecto: r.project_name
-    }));
     const riesgosRevision = (state.homeAlerts?.risk_reviews || []).map(r => ({
       ...r,
       entry_id: r.risk_id,
@@ -2856,18 +2825,9 @@ function renderDashboard() {
       fechaRev: r.review_date,
       revisionVencida: !!r.review_date && r.review_date < hoyRiesgos
     }));
-    riesgosAlerta.sort((a,b) => b.score - a.score);
     riesgosRevision.sort((a,b) => new Date(a.fechaRev) - new Date(b.fechaRev));
-    const rAlertaHTML = riesgosAlerta.length === 0
-      ? `<div style="color:var(--text3);font-family:var(--mono);font-size:12px;padding:4px 0 8px">Sin riesgos críticos activos</div>`
-      : riesgosAlerta.map(r => `<div class="hito-row retrasado">
-          <div class="hito-fecha" style="color:#ff5050"><span class="riesgo-score-badge riesgo-score-red">${r.score}</span></div>
-          <div class="hito-link">${r.titulo || r.title || getRiesgoTitulo(r.entry_id)}</div>
-          <div class="hito-link secondary">${r.proyecto}</div>
-          <div></div>
-        </div>`).join('');
     const rRevHTML = riesgosRevision.length === 0
-      ? `<div style="color:var(--text3);font-family:var(--mono);font-size:12px;padding:4px 0 8px">Sin revisiones próximas</div>`
+      ? `<div style="color:var(--text3);font-family:var(--mono);font-size:12px;padding:4px 0 8px">Sin riesgos vencidos o próximos a revisión en 5 días</div>`
       : riesgosRevision.map(r => `<div class="hito-row">
           <div class="hito-fecha" style="${r.revisionVencida ? 'color:#ff5050' : ''}">${formatDate(r.fechaRev)}</div>
           <div class="hito-link">${r.titulo || r.title || getRiesgoTitulo(r.entry_id)}</div>
@@ -2875,9 +2835,7 @@ function renderDashboard() {
           <div></div>
         </div>`).join('');
     riesgosContainer.innerHTML =
-      makeToggleHeader('riesgos-alerta', `<span style="color:#ff5050">⚠ RIESGOS SCORE ≥ 15 — ${riesgosAlerta.length}</span>`, true) +
-      `<div id="riesgos-alerta">${rAlertaHTML}</div>` +
-      makeToggleHeader('riesgos-rev-alert', `RIESGOS VENCIDOS / PRÓX. REVISIÓN — ${riesgosRevision.length}`, true) +
+      makeToggleHeader('riesgos-rev-alert', `RIESGOS — VENCIDOS / PRÓX. 5 DÍAS — ${riesgosRevision.length}`, true) +
       `<div id="riesgos-rev-alert">${rRevHTML}</div>`;
   }
 }
@@ -6595,7 +6553,7 @@ function openNuevaTarea() {
   document.getElementById('ta-titulo').value = '';
   document.getElementById('ta-fecha').value = '';
   document.getElementById('ta-notas').value = '';
-  // FIX-P1 guard: restaurar visibilidad si venía de modal Evergreen
+  // FIX-P1 guard: restaurar visibilidad si venía de modal Backlog
   document.getElementById('row-ta-asignado').style.display = '';
   const sel = document.getElementById('ta-asignado');
   sel.innerHTML = '';
@@ -6816,7 +6774,7 @@ function borrarTareaEvento(entryId, tareaId) {
   });
 }
 
-// ── H11-03 EVERGREEN ──
+// ── H11-03 BACKLOG ──
 
 function renderEvergreenHome() {
   const usuarioActual = state.usuarios.find(u => u.email === state.user?.email);
